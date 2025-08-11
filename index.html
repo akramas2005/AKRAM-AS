@@ -246,110 +246,91 @@
     animation-fill-mode: forwards;
     opacity: 0;
   }
-
-  /* ========== New Animated Images Section ========== */
-  .animated-images-container {
+  
+  /* New Styles for Image Animation */
+  .image-animation-container {
     position: relative;
-    height: 320px;
-    max-width: 900px;
-    margin: 0 auto;
-    perspective: 1200px;
-  }
-  .center-image {
-    position: relative;
-    width: 300px;
-    height: 300px;
-    object-fit: cover;
-    border-radius: 18px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.12);
-    z-index: 3;
-    margin: 0 auto;
-    opacity: 0;
-    transform: translateY(30px);
-    transition: opacity 0.8s ease, transform 0.8s ease;
-  }
-  .side-image {
-    position: absolute;
-    top: 10px;
-    width: 240px;
-    height: 240px;
-    object-fit: cover;
-    border-radius: 20px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.08);
-    opacity: 0;
-    transform: translateY(30px);
-    transition: opacity 0.8s ease, transform 0.8s ease;
-  }
-  .left-image {
-    left: -140px;
-    clip-path: polygon(0 0, 85% 0, 100% 100%, 0% 100%);
-    border-bottom-right-radius: 80px;
-    border-top-right-radius: 40px;
-    z-index: 2;
-  }
-  .right-image {
-    right: -140px;
-    clip-path: polygon(15% 0, 100% 0, 100% 100%, 0% 100%);
-    border-bottom-left-radius: 80px;
-    border-top-left-radius: 40px;
-    z-index: 2;
-  }
-  .animated-images-text {
+    width: 100%;
     max-width: 600px;
-    margin-top: 24px;
-    text-align: left;
-    color: #0b2633;
+    height: 400px;
+    margin: 0 auto 50px;
   }
-  .animated-images-text h2 {
-    font-weight: 700;
-    font-size: 28px;
-    margin-bottom: 12px;
+  .image-animation-container img {
+    position: absolute;
+    border-radius: 12px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+    transition: transform 1s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 1s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    opacity: 0;
   }
-  .animated-images-text p {
-    font-size: 16px;
-    color: #394a52;
-    line-height: 1.5;
+  .image-animation-container img.is-visible {
+    opacity: 1;
   }
-  .fade-item.visible {
-    opacity: 1 !important;
-    transform: translateY(0) !important;
+  .image-animation-container .center-img {
+    width: 60%;
+    left: 20%;
+    top: 50%;
+    transform: translate(0, -50%) scale(1.05);
+    z-index: 2;
+  }
+  .image-animation-container .left-img {
+    width: 50%;
+    left: 0;
+    top: 50%;
+    transform: translate(-10%, -50%) rotate(-12deg);
+    z-index: 1;
+  }
+  .image-animation-container .left-img.is-visible {
+    transform: translate(10%, -50%) rotate(-12deg);
+  }
+  .image-animation-container .right-img {
+    width: 50%;
+    right: 0;
+    top: 50%;
+    transform: translate(10%, -50%) rotate(12deg);
+    z-index: 1;
+  }
+  .image-animation-container .right-img.is-visible {
+    transform: translate(-10%, -50%) rotate(12deg);
+  }
+  .image-content {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    max-width: 900px;
+    margin: 0 auto 50px;
+    padding: 0 16px;
+  }
+  .image-content .text-area {
+    width: 50%;
+    padding-left: 20px;
+  }
+  .image-content .text-area h2, .image-content .text-area p {
+    opacity: 0;
+    transition: opacity 1s ease;
+  }
+  .image-content .text-area h2.is-visible, .image-content .text-area p.is-visible {
+    opacity: 1;
   }
   @media (max-width: 768px) {
-    .animated-images-container {
-      height: auto;
-      display: flex;
+    .image-animation-container {
+      height: 300px;
+      margin-bottom: 20px;
+    }
+    .image-animation-container .center-img {
+      width: 80%;
+      left: 10%;
+    }
+    .image-animation-container .left-img, .image-animation-container .right-img {
+      display: none; /* Hide side images on mobile */
+    }
+    .image-content {
       flex-direction: column;
-      align-items: center;
-      perspective: none;
-    }
-    .center-image {
-      width: 260px;
-      height: 260px;
-      margin-bottom: 20px;
-    }
-    .side-image {
-      position: relative;
-      width: 180px;
-      height: 180px;
-      left: 0 !important;
-      right: 0 !important;
-      clip-path: none;
-      border-radius: 18px;
-      margin-bottom: 20px;
-      opacity: 1 !important;
-      transform: translateY(0) !important;
-      box-shadow: 0 6px 20px rgba(0,0,0,0.08);
-    }
-    .animated-images-text {
-      max-width: 100%;
-      padding: 0 12px;
       text-align: center;
+      justify-content: center;
     }
-    .animated-images-text h2 {
-      font-size: 22px;
-    }
-    .animated-images-text p {
-      font-size: 15px;
+    .image-content .text-area {
+      width: 100%;
+      padding-left: 0;
     }
   }
 </style>
@@ -403,23 +384,26 @@
       </div>
     </div>
   </section>
-
-  <!-- New Animated Images Section -->
-  <section id="animated-images-section" style="max-width: 900px; margin: 0 auto 60px auto; padding: 0 16px;">
-    <div class="animated-images-container">
-      <img src="https://imagef2.promeai.pro/process/do/5d80ef0d9d5156e23c7a3b9d232e0f91.webp?sourceUrl=/g/p/gallery/publish/2025/08/01/43e3320addd04d21bda08c3addec851e.jpg&x-oss-process=image/resize,w_300,h_300/format,webp&sign=33999327716c57fd54ad638cbd2532dd" alt="AI Image Generation" class="center-image fade-item" />
-      <img src="https://imagef2.promeai.pro/process/do/29256f1c29726151135d66f3cdd12a16.webp?sourceUrl=/g/p/gallery/publish/2025/05/02/528c65e2b08e4e15b013839414eaeab8.jpg&x-oss-process=image/resize,w_300,h_300/format,webp&sign=be6b67bb25bb00f1ea88626f712d752e" alt="Anime Style" class="side-image left-image fade-item" />
-      <img src="https://imagef2.promeai.pro/process/do/2fbf35bec7de7177c6ee67ee51b707bc.webp?sourceUrl=/g/p/gallery/publish/2024/04/19/569bcdd373714f2d8df5117ceb7d381b.png&x-oss-process=image/resize,w_300,h_300/format,webp&sign=cf2fc785858167beb945d357e7fb7819" alt="Cartoon Style" class="side-image right-image fade-item" />
-    </div>
-    <div class="animated-images-text">
-      <h2>Unleash Your Imagination with Multiple Image Generation Tools</h2>
-      <p>Anime, Realistic, Cartoon... Experience cutting-edge AI techniques to create stunning images effortlessly.</p>
-    </div>
+  
+  <section class="features-section">
+      <div class="image-content" data-section>
+          <div class="image-animation-container">
+              <img src="https://img.freepik.com/free-photo/portrait-broken-hearted-person_23-2151267486.jpg?semt=ais_hybrid&w=740&q=80" alt="Center Image" class="center-img">
+              <img src="https://img.freepik.com/premium-photo/anime-girl-with-blue-eyes-long-hair-water-generative-ai_900833-41392.jpg" alt="Right Image" class="right-img">
+              <img src="https://creator.nightcafe.studio/jobs/wAYBPK1P2k6OP3802ebE/wAYBPK1P2k6OP3802ebE--1--mnqbb.jpg" alt="Left Image" class="left-img">
+          </div>
+          <div class="text-area">
+              <h2 class="title">Unleash Your Imagination with Multiple Image Generation Tools</h2>
+              <p class="description">Anime, Realistic, Cartoon... Experience cutting-edge AI techniques to create stunning images effortlessly.</p>
+          </div>
+      </div>
   </section>
 
-  <section class="support-buttons">
-    <button>Contact Us</button>
-    <button>Get Support</button>
+  <section class="features-section">
+    <div class="support-buttons">
+      <button>Contact Us</button>
+      <button>Get Support</button>
+    </div>
   </section>
 
 <script>
@@ -472,7 +456,58 @@
       const desc = document.getElementById('mainDesc');
       const btn = document.getElementById('ctaBtn');
       const btnText = btn.querySelector('span');
+      const observerOptions = {
+        root: null,
+        rootMargin: '0px',
+        threshold: 0.1
+      };
+      
+      const observer = new IntersectionObserver((entries, observer) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const container = entry.target;
+            const centerImg = container.querySelector('.center-img');
+            const leftImg = container.querySelector('.left-img');
+            const rightImg = container.querySelector('.right-img');
+            const title = container.querySelector('.title');
+            const description = container.querySelector('.description');
+            
+            // Fade-in the center image first
+            centerImg.classList.add('is-visible');
+            
+            // After a delay, show the side images
+            setTimeout(() => {
+              leftImg.classList.add('is-visible');
+              rightImg.classList.add('is-visible');
+            }, 500);
 
+            // After another delay, show the text
+            setTimeout(() => {
+              title.classList.add('is-visible');
+              description.classList.add('is-visible');
+            }, 1500);
+
+            // This is the change to make it repeat
+            observer.unobserve(container);
+          } else {
+             // Reset the animation when it goes out of view
+            const container = entry.target;
+            const centerImg = container.querySelector('.center-img');
+            const leftImg = container.querySelector('.left-img');
+            const rightImg = container.querySelector('.right-img');
+            const title = container.querySelector('.title');
+            const description = container.querySelector('.description');
+
+            centerImg.classList.remove('is-visible');
+            leftImg.classList.remove('is-visible');
+            rightImg.classList.remove('is-visible');
+            title.classList.remove('is-visible');
+            description.classList.remove('is-visible');
+          }
+        });
+      }, observerOptions);
+
+      // Hero section animations
       title.classList.add('fade-in');
       setTimeout(() => {
         desc.classList.add('fade-in');
@@ -492,21 +527,12 @@
           });
         }, 1500);
       });
-
-      // Animation for fade-in on scroll for new images
-      const fadeItems = document.querySelectorAll('.fade-item');
-
-      function checkFadeIn() {
-        const triggerBottom = window.innerHeight * 0.9;
-        fadeItems.forEach(item => {
-          const itemTop = item.getBoundingClientRect().top;
-          if(itemTop < triggerBottom){
-            item.classList.add('visible');
-          }
-        });
+      
+      // Observe the new section
+      const newSection = document.querySelector('.image-content');
+      if (newSection) {
+        observer.observe(newSection);
       }
-      window.addEventListener('scroll', checkFadeIn);
-      checkFadeIn(); // initial check
     });
   })();
 </script>
