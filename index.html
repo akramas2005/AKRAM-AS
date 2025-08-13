@@ -18,16 +18,33 @@
     z-index:1000;
   }
   .left-area { display:flex; align-items:center; gap:8px; min-width:0; }
+  /* modern hamburger button (keeps same ID menuBtn) */
   .menu-btn {
-    font-size:22px;
-    color:#0078ff;
+    width:42px;
+    height:36px;
     background: transparent;
     border: none;
     cursor: pointer;
     padding:6px;
     border-radius:8px;
     display:none;
+    align-items:center;
+    justify-content:center;
   }
+  .menu-btn .hamburger { display:inline-block; width:22px; height:18px; position:relative; }
+  .menu-btn .hamburger span{
+    display:block;
+    height:2px;
+    background:#0078ff;
+    margin:3.8px 0;
+    border-radius:2px;
+    transition: transform .28s cubic-bezier(.2,.9,.25,1), opacity .2s ease;
+    transform-origin: center;
+  }
+  .menu-btn.open .hamburger span:nth-child(1){ transform: translateY(6px) rotate(45deg); }
+  .menu-btn.open .hamburger span:nth-child(2){ opacity:0; transform: scaleX(0); }
+  .menu-btn.open .hamburger span:nth-child(3){ transform: translateY(-6px) rotate(-45deg); }
+
   .site-name {
     font-weight:800;
     color:#0078ff;
@@ -49,32 +66,34 @@
     color:#111; text-decoration:none; font-weight:600; padding:6px 8px; border-radius:8px;
   }
   .nav-links a:hover { color:#0078ff; background: rgba(3,100,170,0.04); }
+
+  /* SIDE MENU (HAMBURGER) - updated width: up to 50% */
   .side-menu {
     position: fixed;
-    top: 56px;
-    left: 12px;
-    width: 240px;
-    max-height: calc(100vh - 80px);
+    top: 56px; /* keep topbar visible */
+    left: 0;
+    height: calc(100vh - 56px); /* tall, occupies remaining screen height */
+    width: min(50%, 420px); /* half-ish on phones, capped */
     overflow:auto;
-    background: rgba(255,255,255,0.98);
+    background: rgba(255,255,255,0.86); /* slightly transparent */
     backdrop-filter: blur(6px);
-    box-shadow: 0 18px 40px rgba(10,30,50,0.12);
-    border-radius: 12px;
-    padding:6px 6px;
+    box-shadow: 0 30px 80px rgba(10,30,50,0.12);
+    border-radius: 0 12px 12px 0;
+    padding:18px 12px;
     z-index: 99999;
     opacity: 0;
-    transform: translateY(-8px) scale(0.995);
+    transform: translateX(-10px);
     pointer-events: none;
-    transition: opacity .28s ease, transform .28s ease;
+    transition: opacity .32s cubic-bezier(.2,.9,.25,1), transform .32s cubic-bezier(.2,.9,.25,1);
   }
   .side-menu.visible {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateX(0);
     pointer-events: auto;
   }
   .side-menu a {
     display:block;
-    padding:12px 14px;
+    padding:14px 12px;
     color: #111;
     text-decoration: none;
     border-radius:8px;
@@ -84,11 +103,14 @@
     color: #0078ff;
     background: rgba(3,100,170,0.04);
   }
+
   @media (max-width: 768px) {
     .nav-links { display:none; }
-    .menu-btn { display:inline-block; }
+    .menu-btn { display:inline-flex; }
     .search-bar { display:none; }
+    .side-menu { width: 50%; /* half the screen on phones */ }
   }
+
   /* Hero section */
   .hero {
     text-align: center;
@@ -214,17 +236,20 @@
     .feature-item {
       flex-wrap: wrap;
       justify-content: center;
+      flex-direction: column; /* Set to column for mobile */
     }
     .feature-item.reverse {
-      flex-direction: column;
+      flex-direction: column; /* Set to column for mobile */
     }
     .feature-item img,
     .feature-item video,
     .feature-text {
       max-width: 100%;
       flex: unset;
+      text-align: center;
     }
   }
+
   /* Animations for fade-in from left and right */
   @keyframes fadeInLeft {
     from { opacity: 0; transform: translateX(-40px); }
@@ -246,100 +271,358 @@
     animation-fill-mode: forwards;
     opacity: 0;
   }
-  
-  /* New Styles for Image Animation */
-  .image-animation-container {
-    position: relative;
-    width: 100%;
-    max-width: 600px;
-    height: 400px;
-    margin: 0 auto 50px;
-  }
-  .image-animation-container img {
-    position: absolute;
-    border-radius: 12px;
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
-    transition: transform 1s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 1s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-    opacity: 0;
-  }
-  .image-animation-container img.is-visible {
-    opacity: 1;
-  }
-  .image-animation-container .center-img {
-    width: 60%;
-    left: 20%;
-    top: 50%;
-    transform: translate(0, -50%) scale(1.05);
-    z-index: 2;
-  }
-  .image-animation-container .left-img {
-    width: 50%;
-    left: 0;
-    top: 50%;
-    transform: translate(-10%, -50%) rotate(-12deg);
-    z-index: 1;
-  }
-  .image-animation-container .left-img.is-visible {
-    transform: translate(10%, -50%) rotate(-12deg);
-  }
-  .image-animation-container .right-img {
-    width: 50%;
-    right: 0;
-    top: 50%;
-    transform: translate(10%, -50%) rotate(12deg);
-    z-index: 1;
-  }
-  .image-animation-container .right-img.is-visible {
-    transform: translate(-10%, -50%) rotate(12deg);
-  }
-  .image-content {
+
+  /*
+    * New Styles for Swiper (unchanged)
+    */
+  .swiper-section-container {
     display: flex;
-    justify-content: flex-start;
+    justify-content: space-between;
     align-items: center;
     max-width: 900px;
-    margin: 0 auto 50px;
+    margin: 60px auto;
     padding: 0 16px;
   }
-  .image-content .text-area {
-    width: 50%;
-    padding-left: 20px;
+  .swiper-frame {
+    width: 45%;
+    height: 450px;
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 0 10px 5px rgba(0, 120, 255, 0.5), 0 0 15px 10px rgba(0, 120, 255, 0.3), 0 0 20px 15px rgba(0, 120, 255, 0.1);
   }
-  .image-content .text-area h2, .image-content .text-area p {
+  .mySwiper {
+      width: 100%;
+      height: 100%;
+  }
+  .swiper-slide {
+    position: relative;
+    overflow: hidden;
+    border-radius: 8px;
+  }
+  .swiper-slide img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: filter 0.5s ease, transform 0.5s ease;
+  }
+  .swiper-slide:hover img {
+    filter: brightness(70%) blur(1px);
+    transform: scale(1.05);
+  }
+  .slide-content {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    padding: 16px;
+    color: white;
+    background: linear-gradient(to top, rgba(0,0,0,0.8), rgba(0,0,0,0));
     opacity: 0;
-    transition: opacity 1s ease;
+    transition: opacity 0.5s ease;
   }
-  .image-content .text-area h2.is-visible, .image-content .text-area p.is-visible {
+  .swiper-slide:hover .slide-content {
     opacity: 1;
   }
-  @media (max-width: 768px) {
-    .image-animation-container {
-      height: 300px;
+  .slide-content h3 {
+    margin-top: 0;
+    font-size: 18px;
+    font-weight: 700;
+  }
+  .slide-content p {
+    margin-bottom: 0;
+    font-size: 14px;
+    color: #ddd;
+  }
+  .text-content {
+    width: 45%;
+    padding-left: 30px;
+  }
+  .text-content h2, .text-content p {
       margin-bottom: 20px;
-    }
-    .image-animation-container .center-img {
-      width: 80%;
-      left: 10%;
-    }
-    .image-animation-container .left-img, .image-animation-container .right-img {
-      display: none; /* Hide side images on mobile */
-    }
-    .image-content {
+  }
+  .swiper-pagination {
+    position: relative;
+    bottom: -20px;
+  }
+  @media (max-width: 768px) {
+    .swiper-section-container {
       flex-direction: column;
-      text-align: center;
-      justify-content: center;
+      align-items: center;
     }
-    .image-content .text-area {
-      width: 100%;
-      padding-left: 0;
+    .swiper-frame {
+        width: 100%;
+        height: 350px;
+        margin-bottom: 20px;
+        border: none;
+        box-shadow: none;
+    }
+    .text-content {
+        width: 100%;
+        padding: 0;
+        text-align: center;
+    }
+  }
+
+  /* =========================
+     Explore (mobile only)  -- moved to LEFT, restored items, slightly transparent BG
+     ========================= */
+  .explore { display:none; position:relative; }
+  .explore-btn{
+    display:inline-flex; align-items:center; gap:6px;
+    padding:8px 12px; font-weight:700; font-size:14px;
+    border:none; border-radius:999px; cursor:pointer;
+    background: rgba(255,255,255,0.7);
+    backdrop-filter: blur(6px);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.08), inset 0 0 0 1px rgba(0,120,255,0.25);
+    transition: transform .18s ease, box-shadow .25s ease, background .25s ease;
+    color:#0b2633;
+  }
+  .explore-btn:after{
+    content:""; position:absolute; inset:-2px;
+    border-radius:999px; pointer-events:none;
+    background: linear-gradient(90deg, rgba(0,120,255,.25), rgba(0,170,255,.25), rgba(0,120,255,.25));
+    opacity:.0; transition: opacity .25s ease;
+  }
+  .explore-btn:hover{ transform: translateY(-1px); box-shadow: 0 8px 18px rgba(0,120,255,0.25); background: rgba(255,255,255,0.9);}
+
+  /* PANEL: now uses CSS var for arrow position (--arrow-left) */
+  .explore-panel{
+    position:absolute; top:42px; left:12px; right:auto;
+    width: calc(100% - 24px);
+    max-width: 420px;
+    background: rgba(255,255,255,0.92); /* slightly more transparent white */
+    backdrop-filter: blur(8px);
+    border-radius:12px; padding:6px;
+    box-shadow: 0 18px 36px rgba(10,30,50,0.12);
+    transform: translateY(8px) scale(0.98);
+    opacity:0; pointer-events:none;
+    transition: opacity .22s cubic-bezier(.2,.9,.25,1), transform .22s cubic-bezier(.2,.9,.25,1);
+    z-index:1001;
+    max-height: 220px; /* shows ~3 items + part of 4th */
+    overflow-y: auto;
+  }
+  .explore-panel.open{ opacity:1; pointer-events:auto; transform: translateY(0) scale(1); }
+  .explore-panel::before{
+    content:""; position:absolute; top:-8px; left: var(--arrow-left, 22px);
+    width:14px; height:14px; background:inherit; transform: rotate(45deg);
+    border-radius:2px; box-shadow:-2px -2px 6px rgba(10,30,50,0.06);
+  }
+  .explore-panel .explore-list{ display:flex; flex-direction:column; gap:4px; padding:6px; }
+  .explore-panel .explore-item{
+    display:block; text-decoration:none; padding:12px 14px; border-radius:10px;
+    font-weight:700; color:#0b2633; font-size:15px; transition: background .2s ease, transform .12s ease; white-space:nowrap;
+  }
+  .explore-panel .explore-item:hover{
+    background: rgba(3,100,170,0.06);
+    transform: translateX(2px);
+    color:#0078ff;
+  }
+  @media (max-width:768px){
+    .explore{ display:inline-flex; margin-left:6px; }
+    .explore-panel{ left:12px; width: calc(100% - 24px); max-width:none; border-radius:10px; }
+    .explore-panel{ position: fixed !important; top:56px !important; left:8px !important; right:8px !important; width: auto !important; max-width: none !important; border-radius: 12px; padding: 8px 10px; z-index: 11000; }
+  }
+
+  /* =========================
+     Section (mobile only)  -- keep structure, start from screen left and transparent BG
+     ========================= */
+  .section { display:none; position:relative; }
+  .section-btn{
+    display:inline-flex; align-items:center; gap:8px;
+    padding:8px 12px; font-weight:700; font-size:14px;
+    border:none; border-radius:999px; cursor:pointer;
+    background: rgba(255,255,255,0.7);
+    backdrop-filter: blur(6px);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.08), inset 0 0 0 1px rgba(0,120,255,0.12);
+    transition: transform .18s ease, box-shadow .25s ease, background .25s ease;
+    color:#0b2633;
+  }
+  .section-btn:after{
+    content:""; position:absolute; inset:-2px;
+    border-radius:999px; pointer-events:none;
+    background: linear-gradient(90deg, rgba(0,120,255,.14), rgba(0,170,255,.14), rgba(0,120,255,.14));
+    opacity:0; transition: opacity .25s ease;
+  }
+  .section-btn:hover{ transform: translateY(-1px); box-shadow: 0 8px 18px rgba(0,120,255,0.18); background: rgba(255,255,255,0.9);}
+  .section-btn:hover:after{ opacity:1; }
+
+  .section-panel{
+    position:absolute; top:42px; left:12px; /* start near screen left edge */
+    width: calc(100% - 24px); /* won't exceed screen */
+    max-width: 420px; /* moderate width on larger screens */
+    background: rgba(255,255,255,0.92); /* slightly transparent */
+    backdrop-filter: blur(8px);
+    border-radius:12px; padding:8px;
+    box-shadow: 0 18px 36px rgba(10,30,50,0.16);
+    transform: translateY(8px) scale(0.98);
+    opacity:0; pointer-events:none;
+    transition: opacity .22s cubic-bezier(.2,.9,.25,1), transform .22s cubic-bezier(.2,.9,.25,1);
+    z-index: 10050; /* ensure above topbar and everything */
+    will-change: opacity, transform;
+    max-height: 220px; /* <= CHANGED: show ~3 items + part of 4th */
+    overflow-y: auto;
+  }
+  .section-panel.open{ opacity:1; pointer-events:auto; transform: translateY(0) scale(1); }
+  .section-panel::before{
+    content:""; position:absolute; top:-8px; left: var(--arrow-left, 16px);
+    width:14px; height:14px; background:inherit; transform: rotate(45deg);
+    border-radius:2px; box-shadow:2px -2px 6px rgba(10,30,50,0.06);
+  }
+
+  .section-panel .section-list{ display:flex; flex-direction:column; gap:6px; padding:6px; }
+  .section-item {
+    display:flex; gap:10px; align-items:center;
+    padding:8px 10px; border-radius:10px; text-decoration:none; color:#0b2633;
+    transition: background .18s ease, transform .12s ease;
+  }
+  .section-item:hover { background: rgba(3,100,170,0.06); transform: translateX(4px); color:#0078ff; }
+  .section-thumb {
+    width:44px; height:44px; border-radius:10px; display:flex; align-items:center; justify-content:center;
+    background: linear-gradient(180deg, rgba(0,120,255,0.12), rgba(0,120,255,0.06));
+    font-size:18px;
+    flex-shrink:0;
+  }
+  .section-meta { display:flex; flex-direction:column; }
+  .section-title { font-weight:800; font-size:14px; color:#0b2633; line-height:1; }
+
+  /* MOBILE OVERRIDE: force section panel to be fixed & wide (prevents narrow column) */
+  @media (max-width:768px){
+    .section{ display:inline-flex; margin-left:6px; }
+    .section-panel{
+      position: fixed !important;
+      top: 56px !important;
+      left: 8px !important;
+      right: 8px !important;
+      width: auto !important;
+      max-width: none !important;
+      border-radius: 12px;
+      padding: 8px 10px;
+      z-index: 11000;
+      /* <= CHANGED: fixed height to show ~3 items + partial 4th, user scrolls for rest */
+      max-height: 220px !important;
+      overflow-y: auto;
+    }
+  }
+
+  /* =========================
+     Mobile Hero Search (phones only)
+     ========================= */
+  .mobile-hero-search { display:none; }
+  @keyframes dropIn {
+    from { opacity:0; transform: translateY(-8px); }
+    to   { opacity:1; transform: translateY(0); }
+  }
+  @media (max-width:768px){
+    .mobile-hero-search{
+      display:block;
+      max-width:92%;
+      margin: 6px auto 10px;
+      position: relative;
+      opacity:0; /* will animate to 1 */
+    }
+    .mobile-hero-search.pop-in{ animation: dropIn .6s ease forwards; }
+    .mobile-hero-search input{
+      width:100%;
+      padding:12px 40px 12px 14px;
+      border-radius:18px;
+      border:1px solid #d0d7dd;
+      background: rgba(255,255,255,0.98);
+      box-shadow: 0 6px 18px rgba(0,120,255,0.10), inset 0 0 0 1px rgba(0,120,255,0.06);
+      font-size:14px; outline:none;
+      transition: box-shadow .25s ease, transform .15s ease, border-color .25s ease;
+    }
+    .mobile-hero-search input:focus{
+      border-color:#b7cff1;
+      box-shadow: 0 0 0 3px rgba(0,120,255,0.15), 0 10px 24px rgba(0,120,255,0.18);
+      transform: translateY(-1px);
+    }
+    .mobile-hero-search .icon{
+      position:absolute; right:12px; top:50%; transform: translateY(-50%);
+      width:20px; height:20px; pointer-events:none; opacity:.8;
     }
   }
 </style>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
 </head>
 <body>
   <div class="topbar">
     <div class="left-area">
-      <button id="menuBtn" class="menu-btn" aria-label="Open menu" onclick="toggleMenu()">☰</button>
+      <!-- keep same ID/menuBtn but changed inner markup for modern hamburger -->
+      <button id="menuBtn" class="menu-btn" aria-label="Open menu" onclick="toggleMenu()">
+        <span class="hamburger" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </span>
+      </button>
       <div class="site-name">Às Space</div>
+
+      <!-- Explore (mobile only) -->
+      <div class="explore" id="explore">
+        <button id="exploreBtn" class="explore-btn" aria-haspopup="true" aria-expanded="false">Explore ▾</button>
+        <div id="explorePanel" class="explore-panel" role="menu" aria-hidden="true">
+          <div class="explore-list">
+            <!-- UPDATED labels as requested -->
+            <div class="explore-item" data-target="freechat" role="menuitem">Free Chat</div>
+            <div class="explore-item" data-target="image" role="menuitem">Image Generation</div>
+            <div class="explore-item" data-target="whatnew" role="menuitem">What New ?</div>
+            <div class="explore-item" data-target="improvements" role="menuitem">Improvements and additions</div>
+          </div>
+        </div>
+      </div>
+      <!-- /Explore -->
+
+      <!-- Section (mobile only) -->
+      <div class="section" id="sectionWrap">
+        <button id="sectionBtn" class="section-btn" aria-haspopup="true" aria-expanded="false">Section ▾</button>
+        <div id="sectionPanel" class="section-panel" role="menu" aria-hidden="true">
+          <div class="section-list">
+            <a href="#" class="section-item" data-target="fitness" role="menuitem">
+              <div class="section-thumb"></div>
+              <div class="section-meta">
+                <div class="section-title">Fitness & Nutrition Expert</div>
+              </div>
+            </a>
+            <a href="#" class="section-item" data-target="study" role="menuitem">
+              <div class="section-thumb"></div>
+              <div class="section-meta">
+                <div class="section-title">Study Assistant</div>
+              </div>
+            </a>
+            <a href="#" class="section-item" data-target="chef" role="menuitem">
+              <div class="section-thumb"></div>
+              <div class="section-meta">
+                <div class="section-title">Kitchen Chef</div>
+              </div>
+            </a>
+            <a href="#" class="section-item" data-target="tech" role="menuitem">
+              <div class="section-thumb"></div>
+              <div class="section-meta">
+                <div class="section-title">Tech Expert</div>
+              </div>
+            </a>
+            <a href="#" class="section-item" data-target="tour" role="menuitem">
+              <div class="section-thumb"></div>
+              <div class="section-meta">
+                <div class="section-title">Tour Guide</div>
+              </div>
+            </a>
+            <a href="#" class="section-item" data-target="finance" role="menuitem">
+              <div class="section-thumb"></div>
+              <div class="section-meta">
+                <div class="section-title">Financial & Career Advisor</div>
+              </div>
+            </a>
+            <a href="#" class="section-item" data-target="creator" role="menuitem">
+              <div class="section-thumb"></div>
+              <div class="section-meta">
+                <div class="section-title">Content Creator</div>
+              </div>
+            </a>
+          </div>
+        </div>
+      </div>
+      <!-- /Section -->
+
     </div>
     <div class="search-bar">
       <input type="search" placeholder="Search..." aria-label="Search">
@@ -353,13 +636,23 @@
 
   <nav id="sideMenu" class="side-menu" aria-hidden="true">
     <a href="#" onclick="menuNavClick(event, 'home')">Home</a>
-    <a href="#" onclick="menuNavClick(event, 'sections')">Sections</a>
+    <a href="#" onclick="menuNavClick(event, 'allsections')">All Section</a>
     <a href="#" onclick="menuNavClick(event, 'image')">Image Generation</a>
-    <a href="#" onclick="menuNavClick(event, 'video')">Video Generation</a>
-    <a href="#" onclick="menuNavClick(event, 'support')">Support & Contact</a>
+    <a href="#" onclick="menuNavClick(event, 'account')">My account</a>
+    <a href="#" onclick="menuNavClick(event, 'language')">Language</a>
+    <a href="#" onclick="menuNavClick(event, 'support')">Support and Contact</a>
   </nav>
 
   <div class="hero">
+    <!-- Mobile-only search bar ABOVE the big title -->
+    <div id="mobileHeroSearch" class="mobile-hero-search" aria-hidden="false">
+      <input type="search" placeholder="Search tools, prompts…" aria-label="Mobile search" />
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M15.5 14h-.79l-.28-.27a6.471 6.471 0 0 0 1.57-4.23A6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79L20 21.49 21.49 20 15.5 14Zm-6 0A4.5 4.5 0 1 1 14 9.5 4.505 4.505 0 0 1 9.5 14Z"></path>
+      </svg>
+    </div>
+    <!-- /Mobile-only search -->
+
     <h1 id="mainTitle" style="opacity:0;">
       Welcome to <span id="asSpaceTitle" class="color-wave">Às Space</span>
     </h1>
@@ -375,7 +668,6 @@
         <p>Discover a wide range of smart tools designed specifically to meet your diverse needs easily and efficiently.</p>
       </div>
     </div>
-
     <div class="feature-item reverse">
       <video src="https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.webm" autoplay muted loop playsinline></video>
       <div class="feature-text fade-in-right" style="animation-delay: 0.7s;">
@@ -384,19 +676,58 @@
       </div>
     </div>
   </section>
-  
-  <section class="features-section">
-      <div class="image-content" data-section>
-          <div class="image-animation-container">
-              <img src="https://img.freepik.com/free-photo/portrait-broken-hearted-person_23-2151267486.jpg?semt=ais_hybrid&w=740&q=80" alt="Center Image" class="center-img">
-              <img src="https://img.freepik.com/premium-photo/anime-girl-with-blue-eyes-long-hair-water-generative-ai_900833-41392.jpg" alt="Right Image" class="right-img">
-              <img src="https://creator.nightcafe.studio/jobs/wAYBPK1P2k6OP3802ebE/wAYBPK1P2k6OP3802ebE--1--mnqbb.jpg" alt="Left Image" class="left-img">
+
+  <section class="swiper-section-container">
+    <div class="swiper-frame">
+      <div class="swiper mySwiper">
+        <div class="swiper-wrapper">
+          <div class="swiper-slide">
+            <img src="https://image.tensorartassets.com/cdn-cgi/image/anim=true,plain=false,w=1536,f=jpeg,q=85/posts/images/853600856371674968/b8378a9d-b37d-4110-9f12-e583d4ecb6df.png" alt="AI Art Generator">
+            <div class="slide-content">
+              <h3>AI Art Generator</h3>
+              <p>Create stunning AI-generated artwork effortlessly.</p>
+            </div>
           </div>
-          <div class="text-area">
-              <h2 class="title">Unleash Your Imagination with Multiple Image Generation Tools</h2>
-              <p class="description">Anime, Realistic, Cartoon... Experience cutting-edge AI techniques to create stunning images effortlessly.</p>
+          <div class="swiper-slide">
+            <img src="https://image.tensorartassets.com/cdn-cgi/image/anim=true,plain=false,w=1536,f=jpeg,q=85/posts/images/764101865079106886/6f4d8948-681b-4619-9b6b-db34b936c248.png" alt="Realistic Portrait Maker">
+            <div class="slide-content">
+              <h3>Realistic Portrait Maker</h3>
+              <p>Generate lifelike portraits in seconds.</p>
+            </div>
           </div>
+          <div class="swiper-slide">
+            <img src="https://image.tensorartassets.com/cdn-cgi/image/anim=true,plain=false,w=1536,f=jpeg,q=85/posts/images/817909541780860957/9d26bf0a-3dfe-4d31-b9a3-bd35fec3f889.png" alt="3D Model Creator">
+            <div class="slide-content">
+              <h3>3D Model Creator</h3>
+              <p>Turn your concepts into 3D masterpieces.</p>
+            </div>
+          </div>
+          <div class="swiper-slide">
+            <img src="https://image.tensorartassets.com/cdn-cgi/image/anim=true,plain=false,w=1536,f=jpeg,q=85/posts/images/782019583874852219/af954be9-82a9-4d9e-a8bb-c8db3de0eb7c.png" alt="Abstract Pattern Designer">
+            <div class="slide-content">
+              <h3>Abstract Pattern Designer</h3>
+              <p>Design unique abstract visuals instantly.</p>
+            </div>
+          </div>
+          <div class="swiper-slide">
+            <img src="https://image.tensorartassets.com/cdn-cgi/image/anim=true,plain=false,w=1536,f=jpeg,q=85/posts/images/816092993953132779/e1ce34a3-c637-402a-95e3-88b78247fd72.png" alt="Fantasy Scene Builder">
+            <div class="slide-content">
+              <h3>Fantasy Scene Builder</h3>
+              <p>Bring your fantasy worlds to life.</p>
+            </div>
+          </div>
+        </div>
+        <div class="swiper-pagination"></div>
       </div>
+    </div>
+    <div class="text-content">
+      <h2 style="font-size:28px; font-weight:800; margin-bottom:30px;">
+        Unleash Your Imagination with Multiple Image Generation Tools
+      </h2>
+      <p style="font-size:16px; color:#555;">
+        Anime, Realistic, Cartoon... Experience cutting-edge AI techniques to create stunning images effortlessly.
+      </p>
+    </div>
   </section>
 
   <section class="features-section">
@@ -406,10 +737,11 @@
     </div>
   </section>
 
+<script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
 <script>
   (function(){
     const menu = document.getElementById('sideMenu');
-    const btn  = document.getElementById('menuBtn');
+    const btn = document.getElementById('menuBtn');
     let timer = null;
 
     window.toggleMenu = function(){
@@ -424,6 +756,8 @@
       if(!menu) return;
       menu.classList.add('visible');
       menu.setAttribute('aria-hidden','false');
+      // animate hamburger to open
+      if(btn) btn.classList.add('open');
       if(timer) { clearTimeout(timer); timer = null; }
       timer = setTimeout(hideMenu, 12000);
     }
@@ -431,6 +765,8 @@
       if(!menu) return;
       menu.classList.remove('visible');
       menu.setAttribute('aria-hidden','true');
+      // animate hamburger back
+      if(btn) btn.classList.remove('open');
       if(timer) { clearTimeout(timer); timer = null; }
     }
     document.addEventListener('click', function(e){
@@ -449,6 +785,31 @@
       ev.preventDefault();
       hideMenu();
       console.log("navigate to:", target);
+      // You can connect real navigation here.
+    }
+
+    // helper: position arrow notch for a panel to point at its button
+    function positionPanelArrow(buttonEl, panelEl, opt){ 
+      if(!buttonEl || !panelEl) return;
+      try{
+        const wasOpen = panelEl.classList.contains('open');
+        // temporarily ensure panel layout exists to measure
+        panelEl.classList.add('open');
+        panelEl.style.opacity = '0';
+        // measure
+        const btnRect = buttonEl.getBoundingClientRect();
+        const panelRect = panelEl.getBoundingClientRect();
+        const targetCenter = btnRect.left + btnRect.width / 2;
+        const leftWithinPanel = Math.round(targetCenter - panelRect.left - 7); // center the 14px notch
+        const maxLeft = Math.max(12, panelRect.width - 24);
+        const safeLeft = Math.max(12, Math.min(leftWithinPanel, maxLeft));
+        panelEl.style.setProperty('--arrow-left', safeLeft + 'px');
+        // restore open state
+        panelEl.style.opacity = '';
+        if(!wasOpen) panelEl.classList.remove('open');
+      }catch(e){
+        // ignore measurement errors
+      }
     }
 
     window.addEventListener('DOMContentLoaded', () => {
@@ -456,82 +817,141 @@
       const desc = document.getElementById('mainDesc');
       const btn = document.getElementById('ctaBtn');
       const btnText = btn.querySelector('span');
-      const observerOptions = {
-        root: null,
-        rootMargin: '0px',
-        threshold: 0.1
-      };
-      
-      const observer = new IntersectionObserver((entries, observer) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            const container = entry.target;
-            const centerImg = container.querySelector('.center-img');
-            const leftImg = container.querySelector('.left-img');
-            const rightImg = container.querySelector('.right-img');
-            const title = container.querySelector('.title');
-            const description = container.querySelector('.description');
-            
-            // Fade-in the center image first
-            centerImg.classList.add('is-visible');
-            
-            // After a delay, show the side images
-            setTimeout(() => {
-              leftImg.classList.add('is-visible');
-              rightImg.classList.add('is-visible');
-            }, 500);
 
-            // After another delay, show the text
-            setTimeout(() => {
-              title.classList.add('is-visible');
-              description.classList.add('is-visible');
-            }, 1500);
-
-            // This is the change to make it repeat
-            observer.unobserve(container);
-          } else {
-             // Reset the animation when it goes out of view
-            const container = entry.target;
-            const centerImg = container.querySelector('.center-img');
-            const leftImg = container.querySelector('.left-img');
-            const rightImg = container.querySelector('.right-img');
-            const title = container.querySelector('.title');
-            const description = container.querySelector('.description');
-
-            centerImg.classList.remove('is-visible');
-            leftImg.classList.remove('is-visible');
-            rightImg.classList.remove('is-visible');
-            title.classList.remove('is-visible');
-            description.classList.remove('is-visible');
-          }
-        });
-      }, observerOptions);
-
-      // Hero section animations
       title.classList.add('fade-in');
       setTimeout(() => {
         desc.classList.add('fade-in');
       }, 400);
       btn.classList.add('fade-in');
-
       btn.addEventListener('click', () => {
         btnText.style.transform = 'translateX(150%)';
-
         setTimeout(() => {
           btnText.style.transition = 'none';
           btnText.style.transform = 'translateX(-150%)';
-
           requestAnimationFrame(() => {
             btnText.style.transition = 'transform 0.8s ease';
             btnText.style.transform = 'translateX(0)';
           });
         }, 1500);
       });
-      
-      // Observe the new section
-      const newSection = document.querySelector('.image-content');
-      if (newSection) {
-        observer.observe(newSection);
+
+      const swiper = new Swiper(".mySwiper", {
+        slidesPerView: 1.2,
+        spaceBetween: 30,
+        loop: true,
+        autoplay: {
+          delay: 3000,
+          disableOnInteraction: false,
+        },
+        pagination: {
+          el: ".swiper-pagination",
+          clickable: true,
+        },
+        breakpoints: {
+          768: {
+            slidesPerView: 1,
+          },
+          1024: {
+            slidesPerView: 1.2,
+          }
+        }
+      });
+
+      /* ===== Explore (mobile) ===== */
+      const exploreBtn = document.getElementById('exploreBtn');
+      const explorePanel = document.getElementById('explorePanel');
+      const exploreWrap = document.getElementById('explore');
+
+      function openExplore(){
+        // position notch before opening
+        positionPanelArrow(exploreBtn, explorePanel);
+        explorePanel.classList.add('open');
+        explorePanel.setAttribute('aria-hidden','false');
+        exploreBtn.setAttribute('aria-expanded','true');
+      }
+      function closeExplore(){
+        explorePanel.classList.remove('open');
+        explorePanel.setAttribute('aria-hidden','true');
+        exploreBtn.setAttribute('aria-expanded','false');
+      }
+      if(exploreBtn && explorePanel && exploreWrap){
+        exploreBtn.addEventListener('click', (e)=>{
+          e.stopPropagation();
+          // close section if open
+          closeSection();
+          if(explorePanel.classList.contains('open')) closeExplore(); else openExplore();
+        });
+        document.addEventListener('click', (e)=>{
+          if(explorePanel.classList.contains('open') && !exploreWrap.contains(e.target)) closeExplore();
+        }, true);
+        document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeExplore(); });
+
+        explorePanel.querySelectorAll('.explore-item').forEach(a=>{
+          a.addEventListener('click', (ev)=>{
+            ev.preventDefault();
+            closeExplore();
+            menuNavClick(ev, a.dataset.target || 'sections');
+          });
+        });
+      }
+      /* =========================== */
+
+      /* ===== Section (mobile) ===== */
+      const sectionBtn = document.getElementById('sectionBtn');
+      const sectionPanel = document.getElementById('sectionPanel');
+      const sectionWrap = document.getElementById('sectionWrap');
+
+      function openSection(){
+        // position notch before opening
+        positionPanelArrow(sectionBtn, sectionPanel);
+        sectionPanel.classList.add('open');
+        sectionPanel.setAttribute('aria-hidden','false');
+        sectionBtn.setAttribute('aria-expanded','true');
+      }
+      function closeSection(){
+        sectionPanel.classList.remove('open');
+        sectionPanel.setAttribute('aria-hidden','true');
+        sectionBtn.setAttribute('aria-expanded','false');
+      }
+
+      if(sectionBtn && sectionPanel && sectionWrap){
+        sectionBtn.addEventListener('click', (e)=>{
+          e.stopPropagation();
+          // close explore if open
+          closeExplore();
+          if(sectionPanel.classList.contains('open')) closeSection(); else openSection();
+        });
+
+        document.addEventListener('click', (e)=>{
+          if(sectionPanel.classList.contains('open') && !sectionWrap.contains(e.target)) closeSection();
+        }, true);
+        document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeSection(); });
+
+        sectionPanel.querySelectorAll('.section-item').forEach(item=>{
+          item.addEventListener('click', (ev)=>{
+            ev.preventDefault();
+            const target = item.dataset.target || 'sections';
+            closeSection();
+            menuNavClick(ev, target);
+          });
+        });
+      }
+      /* =========================== */
+
+      // reposition arrows on resize/scroll if open
+      window.addEventListener('resize', ()=>{
+        if(explorePanel.classList.contains('open')) positionPanelArrow(exploreBtn, explorePanel);
+        if(sectionPanel.classList.contains('open')) positionPanelArrow(sectionBtn, sectionPanel);
+      });
+      window.addEventListener('scroll', ()=>{
+        if(explorePanel.classList.contains('open')) positionPanelArrow(exploreBtn, explorePanel);
+        if(sectionPanel.classList.contains('open')) positionPanelArrow(sectionBtn, sectionPanel);
+      });
+
+      /* Animate the mobile hero search on load */
+      const mSearch = document.getElementById('mobileHeroSearch');
+      if (mSearch) {
+        mSearch.classList.add('pop-in');
       }
     });
   })();
