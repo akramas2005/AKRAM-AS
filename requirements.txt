@@ -1,5 +1,2 @@
 openai
 gradio
-fastapi
-uvicorn
-python-multipart
