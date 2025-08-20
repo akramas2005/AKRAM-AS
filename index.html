@@ -576,44 +576,59 @@
         <button id="sectionBtn" class="section-btn" aria-haspopup="true" aria-expanded="false">Section ▾</button>
         <div id="sectionPanel" class="section-panel" role="menu" aria-hidden="true">
           <div class="section-list">
+            <!-- أضفت الأيقونة داخل .section-thumb فقط -->
             <a href="#" class="section-item" data-target="fitness" role="menuitem">
-              <div class="section-thumb"></div>
+              <div class="section-thumb">
+                <img src="https://cdn-icons-png.flaticon.com/128/2083/2083509.png" alt="Fitness & Nutrition Expert" loading="lazy" style="width:26px;height:26px;object-fit:contain;display:block;">
+              </div>
               <div class="section-meta">
                 <div class="section-title">Fitness & Nutrition Expert</div>
               </div>
             </a>
             <a href="#" class="section-item" data-target="study" role="menuitem">
-              <div class="section-thumb"></div>
+              <div class="section-thumb">
+                <img src="https://cdn-icons-png.flaticon.com/128/8224/8224757.png" alt="Study Assistant" loading="lazy" style="width:26px;height:26px;object-fit:contain;display:block;">
+              </div>
               <div class="section-meta">
                 <div class="section-title">Study Assistant</div>
               </div>
             </a>
             <a href="#" class="section-item" data-target="chef" role="menuitem">
-              <div class="section-thumb"></div>
+              <div class="section-thumb">
+                <img src="https://cdn-icons-png.flaticon.com/128/6072/6072763.png" alt="Kitchen Chef" loading="lazy" style="width:26px;height:26px;object-fit:contain;display:block;">
+              </div>
               <div class="section-meta">
                 <div class="section-title">Kitchen Chef</div>
               </div>
             </a>
             <a href="#" class="section-item" data-target="tech" role="menuitem">
-              <div class="section-thumb"></div>
+              <div class="section-thumb">
+                <img src="https://cdn-icons-png.flaticon.com/128/11934/11934247.png" alt="Tech Expert" loading="lazy" style="width:26px;height:26px;object-fit:contain;display:block;">
+              </div>
               <div class="section-meta">
                 <div class="section-title">Tech Expert</div>
               </div>
             </a>
             <a href="#" class="section-item" data-target="tour" role="menuitem">
-              <div class="section-thumb"></div>
+              <div class="section-thumb">
+                <img src="https://cdn-icons-png.flaticon.com/128/7051/7051476.png" alt="Tour Guide" loading="lazy" style="width:26px;height:26px;object-fit:contain;display:block;">
+              </div>
               <div class="section-meta">
                 <div class="section-title">Tour Guide</div>
               </div>
             </a>
             <a href="#" class="section-item" data-target="finance" role="menuitem">
-              <div class="section-thumb"></div>
+              <div class="section-thumb">
+                <img src="https://cdn-icons-png.flaticon.com/128/10842/10842490.png" alt="Financial & Career Advisor" loading="lazy" style="width:26px;height:26px;object-fit:contain;display:block;">
+              </div>
               <div class="section-meta">
                 <div class="section-title">Financial & Career Advisor</div>
               </div>
             </a>
             <a href="#" class="section-item" data-target="creator" role="menuitem">
-              <div class="section-thumb"></div>
+              <div class="section-thumb">
+                <img src="https://cdn-icons-png.flaticon.com/128/10329/10329072.png" alt="Content Creator" loading="lazy" style="width:26px;height:26px;object-fit:contain;display:block;">
+              </div>
               <div class="section-meta">
                 <div class="section-title">Content Creator</div>
               </div>
@@ -639,6 +654,8 @@
     <a href="#" onclick="menuNavClick(event, 'allsections')">All Section</a>
     <a href="#" onclick="menuNavClick(event, 'image')">Image Generation</a>
     <a href="#" onclick="menuNavClick(event, 'account')">My account</a>
+    <!-- التعديل الثاني: إضافة Setting بعد My account مباشرة -->
+    <a href="#" onclick="menuNavClick(event, 'settings')">Setting</a>
     <a href="#" onclick="menuNavClick(event, 'language')">Language</a>
     <a href="#" onclick="menuNavClick(event, 'support')">Support and Contact</a>
   </nav>
