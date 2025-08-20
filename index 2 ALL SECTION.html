@@ -2264,18 +2264,40 @@
         reportStep1.style.display = '';
       });
       reportModal.querySelector('[data-report="send"]').addEventListener('click', ()=>{
-        const payload = {
-          reason: selectedReason,
-          details: (reportText.value || '').trim(),
-          at: Date.now(),
-          countMessages: messages.length
-        };
-        const logs = JSON.parse(localStorage.getItem(REPORTS_KEY) || '[]');
-        logs.push({ type:'conversation_report', ...payload });
-        localStorage.setItem(REPORTS_KEY, JSON.stringify(logs));
-        closeReport();
+    const payload = {
+      reason: selectedReason,
+      details: (reportText.value || '').trim(),
+      at: Date.now(),
+      countMessages: messages.length
+    };
+
+    // --- هذا هو الكود الجديد الذي يتفاعل مع Gradio ---
+
+    // 1. ابحث عن صندوق النص المخفي الذي أنشأناه في Gradio
+    const reportInput = document.getElementById('report_data_input')?.querySelector('textarea');
+    
+    // 2. ابحث عن الزر المخفي
+    const submitButton = document.getElementById('submit_report_button');
+
+    if (reportInput && submitButton) {
+        // 3. ضع بيانات البلاغ (بعد تحويلها لنص) في صندوق النص المخفي
+        reportInput.value = JSON.stringify(payload);
+        
+        // 4. قم بتحديث Gradio بقيمة الصندوق الجديدة (خطوة ضرورية)
+        const updateEvent = new Event('input', { bubbles: true });
+        reportInput.dispatchEvent(updateEvent);
+
+        // 5. انقر برمجيًا على الزر المخفي لتشغيل دالة البايثون
+        submitButton.click();
+        
         toast('Report sent, thank you');
-      });
+    } else {
+        console.error("Gradio report components not found.");
+        toast('Error: Could not send report');
+    }
+
+    closeReport();
+});
 
       // ===== Rotator logic =====
       const suggestions = [
