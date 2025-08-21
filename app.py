@@ -3,9 +3,9 @@ import json
 import datetime
 
 # ==============================================================================
-# ابدأ من هنا
+# تم دمج كود واجهة الشات بالكامل هنا. لا تقم بتعديل هذا المتغير.
 # ==============================================================================
-html_full = ""\"
+html_full = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1686,7 +1686,7 @@ html_full = ""\"
               if(!locked || liked){
                 const likeActive = liked ? 'data-active="true"' : '';
                 const likeLockedAttr = locked ? 'data-locked="true"' : '';
-                 // MODIFICATION: Added stroke-width="2"
+                // MODIFICATION: Added stroke-width="2"
                 html += `<button class="act-btn" data-act="like" data-tip="Like" title="Like" ${likeActive} ${likeLockedAttr}>
                     <svg width="16" height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="2" stroke="${liked ? '#0b80ff' : '#0b2633'}" stroke-linecap="round" stroke-linejoin="round" fill="${liked ? '#0b80ff' : 'none'}">
                     <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
@@ -1707,12 +1707,12 @@ html_full = ""\"
             html += `<span class="divider"></span>
               <button class="act-btn" data-act="copy" data-tip="Copy" title="Copy"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0b2633" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
               <button class="act-btn" data-act="share" data-tip="Share" title="Share">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0b2633" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-                      <polyline points="15 3 21 3 21 9"></polyline>
-                      <line x1="10" y1="14" x2="21" y2="3"></line>
-                  </svg>
-              </button>`;
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0b2633" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                          <polyline points="15 3 21 3 21 9"></polyline>
+                          <line x1="10" y1="14" x2="21" y2="3"></line>
+                    </svg>
+                </button>`;
             actions.innerHTML = html;
             div.appendChild(actions);
             const fr = document.createElement('div');
@@ -2278,11 +2278,35 @@ html_full = ""\"
           at: Date.now(),
           countMessages: messages.length
         };
-        const logs = JSON.parse(localStorage.getItem(REPORTS_KEY) || '[]');
-        logs.push({ type:'conversation_report', ...payload });
-        localStorage.setItem(REPORTS_KEY, JSON.stringify(logs));
+
+        // --- هذا هو الكود الجديد الذي يتفاعل مع Gradio ---
+
+        // 1. ابحث عن صندوق النص المخفي الذي أنشأناه في Gradio
+        const reportInput = document.getElementById('report_data_input')?.querySelector('textarea');
+        
+        // 2. ابحث عن الزر المخفي
+        const submitButton = document.getElementById('submit_report_button');
+
+        if (reportInput && submitButton) {
+            // 3. ضع بيانات البلاغ (بعد تحويلها لنص) في صندوق النص المخفي
+            reportInput.value = JSON.stringify(payload);
+            
+            // 4. قم بتحديث Gradio بقيمة الصندوق الجديدة (خطوة ضرورية)
+            const updateEvent = new Event('input', { bubbles: true });
+            reportInput.dispatchEvent(updateEvent);
+
+            // 5. انقر برمجيًا على الزر المخفي لتشغيل دالة البايثون
+            setTimeout(() => {
+                submitButton.click();
+            }, 100); // تأخير بسيط لضمان تحديث القيمة قبل النقر
+            
+            toast('Report sent, thank you');
+        } else {
+            console.error("Gradio report components not found.");
+            toast('Error: Could not send report');
+        }
+
         closeReport();
-        toast('Report sent, thank you');
       });
 
       // ===== Rotator logic =====
@@ -2716,6 +2740,7 @@ html_full = ""\"
 </script>
 </body>
 </html>
+"""
 # ==============================================================================
 # انتهي هنا (لا تقم بتعديل أي شيء تحت هذا السطر)
 # ==============================================================================
@@ -2760,3 +2785,4 @@ with gr.Blocks(css=".gradio-container {display: block !important;}") as demo:
 
 # تشغيل التطبيق بالطريقة التقليدية التي يفهمها Hugging Face
 demo.launch()
+# This is a comment to force a rebuild
