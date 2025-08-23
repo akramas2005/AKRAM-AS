@@ -806,7 +806,77 @@
   .convo-panel-inner{ height:100%; display:flex; flex-direction:column; gap:12px; }
   .convo-panel-header{ display:flex; gap:8px; align-items:center; justify-content:space-between; }
   .convo-close{ border:none; background:transparent; font-size:22px; padding:6px 8px; border-radius:8px; cursor:pointer; }
-  .new-chat-btn{ padding:8px 12px; background: linear-gradient(90deg,var(--accent),#00aaff); color:#fff; border:none; border-radius:10px; font-weight:800; cursor:pointer; box-shadow: 0 10px 26px rgba(0,120,255,0.12); }
+  /* Modern, elevated "New Chat" button */
+/* UPDATED: New Chat button with animations + mobile touch support */
+/* زر New Chat بتصميم Gradient + أنيميشن */
+.new-chat-btn {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  background: linear-gradient(135deg,#6a5acd,#0078ff);
+  color:white;
+  border:none;
+  border-radius:30px;      /* استدارة كاملة */
+  padding:10px 20px;
+  font-size:14px;
+  font-weight:600;
+  cursor:pointer;
+  transition: transform .16s cubic-bezier(.2,9,25,1), 
+              box-shadow .16s ease, 
+              opacity .12s ease;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  will-change: transform, box-shadow;
+}
+
+/* SVG أيقونة */
+.new-chat-btn .icon {
+  width:16px;
+  height:16px;
+  transition: transform 0.28s ease;
+  display:inline-block;
+  vertical-align:middle;
+}
+
+/* Glow + دوران عند hover (Desktop) */
+.new-chat-btn:hover {
+  box-shadow: 0 0 12px #6a5acd, 0 0 28px #0078ff;
+  transform: translateY(-3px);
+}
+.new-chat-btn:hover .icon {
+  transform: rotate(90deg);
+}
+
+/* Active / Touch تأثير اهتزاز + Pulse */
+.new-chat-btn:active {
+  animation: nc-shake 0.34s, nc-pulse 0.34s;
+  transform: translateY(-1px);
+}
+.new-chat-btn:active .icon {
+  transform: rotate(90deg);
+}
+
+/* دعم الهواتف (.touched class من JS) */
+.new-chat-btn.touched {
+  animation: nc-shake 0.34s, nc-pulse 0.34s;
+  box-shadow: 0 0 12px #6a5acd, 0 0 28px #0078ff;
+}
+.new-chat-btn.touched .icon {
+  transform: rotate(90deg);
+}
+
+/* Keyframes */
+@keyframes nc-shake {
+  0% { transform: translateX(0); }
+  25% { transform: translateX(-2px); }
+  50% { transform: translateX(2px); }
+  75% { transform: translateX(-2px); }
+  100% { transform: translateX(0); }
+}
+@keyframes nc-pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+  100% { transform: scale(1); }
+}
 
   .convo-chips{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; padding:4px 2px; }
   .convo-chip{ padding:8px 12px; border-radius:999px; background:#eef6ff; color:#0b2633; border:1px solid #e6f2ff; font-weight:800; cursor:pointer; white-space:nowrap; }
@@ -906,7 +976,12 @@
         <div class="convo-panel-inner" role="navigation" aria-label="Saved conversations">
           <div class="convo-panel-header">
             <button class="convo-close" id="convoCloseBtn" aria-label="Close">×</button>
-            <button id="newChatBtn" class="new-chat-btn" title="New chat">New Chat</button>
+            <button id="newChatBtn" class="new-chat-btn" title="New chat" aria-label="New chat">
+  <svg class="icon" width="18" height="18" viewBox="0 0 24 24" stroke="white" fill="none" aria-hidden="true">
+    <path d="M12 5v14M5 12h14" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  New Chat
+</button>
           </div>
           <div class="convo-chips" id="convoChips" aria-hidden="false"></div>
           <div class="convo-list" id="convoList" role="list"></div>
@@ -1565,9 +1640,13 @@
 
       document.addEventListener('click', (e)=>{ if(attachPanel.classList.contains('open') && !attachPanel.contains(e.target) && !attachBtn.contains(e.target)) closeAttach(); }, true);
 
-      const STORAGE_KEY = 'chat_study';
-      const DRAFT_KEY = 'chat_study_draft';
-      const REPORTS_KEY = 'chat_study_reports';
+      // simple chat storage & keys
+const STORAGE_KEY = 'chat_study';
+const DRAFT_KEY = 'chat_study_draft';
+const REPORTS_KEY = 'chat_study_reports';
+
+// ==== Reports API (HF Space) ====
+const API_BASE = "https://akramas2005-as-space-ai.hf.space";
       let messages = [];
       let editIndex = null;
       function genId(){ return 'm-'+Math.random().toString(36).slice(2,9); }
@@ -1890,34 +1969,124 @@
         sendInsideBtn.classList.add('sending');
         setTimeout(()=>{
           sendInsideBtn.classList.remove('sending');
-          if(editIndex !== null && typeof editIndex === 'number'){
-            messages[editIndex].content = t;
-            for(let i = messages.length-1; i>editIndex; i--){
-              if(messages[i].role === 'assistant' && messages[i].parent === editIndex){
-                messages.splice(i,1);
-              }
-            }
-            const newReply = simulatedAssistantReply(t);
-            messages.splice(editIndex+1, 0, { id: genId(), role:'assistant', content: newReply, parent: editIndex, meta: {} });
-            saveSession();
-            renderMessages();
-            toast('Message updated and resent');
-            editIndex = null;
-            editCancelBtn.style.display = 'none';
-            composer.value = '';
-            updateSendVisibility();
-            autoGrowTextarea();
-          } else {
-            if(pendingAttachment){
-              sendAttachmentNow();
-            } else {
-              composer.value = '';
-              updateSendVisibility();
-              autoGrowTextarea();
-              sendMessage(t);
-            }
+        // ====== START: replace existing "edit" branch with this block ======
+if (editIndex !== null && editIndex >= 0) {
+  const t = composer.value.trim();
+
+  // 1) تحديث بيانات الرسالة (نحتفظ بأي مرفقات موجودة)
+  messages[editIndex].content = t;
+
+  // 2) تحديث فقاعـة الرسالة في الـ DOM من دون مسح الـ children (صور أو مرفقات)
+  const editedMsgEl = messagesEl.querySelector(`.msg[data-index="${editIndex}"] .bubble`);
+  if (editedMsgEl) {
+    // حاول إيجاد عنصر يحمل النص (أفضل إذا كان class="bubble-text")
+    let textHolder = editedMsgEl.querySelector('.bubble-text');
+
+    // إذا لم يوجد عنصر مخصص، نبحث عن عقدة نص أو عنصر غير وسائط (IMG/VIDEO/PICTURE)
+    if (!textHolder) {
+      for (let node of editedMsgEl.childNodes) {
+        if (node.nodeType === Node.TEXT_NODE && node.nodeValue.trim() !== '') {
+          textHolder = node;
+          break;
+        }
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          const tag = node.tagName.toUpperCase();
+          // تجاهل عناصر الوسائط و أزرار التحكم داخل الفقاعة
+          if (tag !== 'IMG' && tag !== 'PICTURE' && tag !== 'VIDEO'
+              && !node.classList.contains('msg-actions') && !node.classList.contains('feedback-row')) {
+            textHolder = node;
+            break;
           }
-          startRotatorIfNeeded();
+        }
+      }
+    }
+
+    // إذا وجدنا مكاناً للنص، نحدّثه (نستبدل، لا نضيف)
+    if (textHolder) {
+      if (textHolder.nodeType === Node.TEXT_NODE) {
+        textHolder.nodeValue = t;
+      } else {
+        textHolder.textContent = t;
+      }
+    } else {
+      // لا يوجد نص سابق: نُنشئ span مخصص وندرجه قبل أول ميديا إن وُجدت أو كبداية الفقاعة
+      const span = document.createElement('span');
+      span.className = 'bubble-text';
+      span.textContent = t;
+      const media = editedMsgEl.querySelector('img, picture, video');
+      if (media) editedMsgEl.insertBefore(span, media);
+      else editedMsgEl.insertBefore(span, editedMsgEl.firstChild);
+    }
+  }
+
+  // 3) حذف الردود التالية من المصفوفة
+  messages.splice(editIndex + 1);
+
+  // 4) حذف عناصر DOM المقابلة للرسائل التي بعد الرسالة المعدلة بسلاسة (بدون ومضة)
+  const nodes = [...messagesEl.querySelectorAll('.msg')];
+  const toRemove = [];
+  for (const el of nodes) {
+    const i = Number(el.dataset.index || -1);
+    if (i > editIndex) toRemove.push(el);
+  }
+  toRemove.forEach((el, idx) => {
+    el.style.transition = 'opacity .12s ease, transform .12s ease';
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(-6px)';
+    setTimeout(() => { el.remove(); }, 120 + idx * 10);
+  });
+
+  // 4b) إعادة ترقيم DOM إن وجدت دالة لهذا الغرض
+  if (typeof reindexDom === 'function') {
+    setTimeout(() => { reindexDom(); }, 160);
+  }
+
+  // 5) حفظ الحالة
+  saveSession();
+
+  // 6) تنظيف حالة التعديل في الواجهة
+  const oldIndex = editIndex;
+  editIndex = null;
+  editCancelBtn.style.display = 'none';
+  composer.value = '';
+  localStorage.removeItem(DRAFT_KEY);
+  updateSendVisibility();
+  autoGrowTextarea();
+
+  // 7) إظهار نقاط الكتابة ثم إضافة رد المساعد الجديد بسلاسة (appendMessage إن وُجد)
+  const typingEl = showTyping();
+  setTimeout(() => {
+    typingEl.remove();
+    const replyText = simulatedAssistantReply(t);
+    const assistantMsg = { id: genId(), role: 'assistant', content: replyText, parent: oldIndex, meta: {} };
+    messages.push(assistantMsg);
+
+    if (typeof appendMessage === 'function') {
+      appendMessage(assistantMsg, messages.length - 1);
+    } else {
+      // fallback: ريندر جزئي/كامل إذا لم توجد appendMessage
+      renderMessages();
+    }
+
+    saveSession();
+    if (typeof reindexDom === 'function') reindexDom();
+  }, 700 + Math.min(1500, t.length * 18));
+
+  return; // نهاية فرع التعديل
+}
+// ====== END: edit branch replacement ======
+ else {
+  if (pendingAttachment) {
+    sendAttachmentNow();
+  } else {
+    composer.value = '';
+    updateSendVisibility();
+    autoGrowTextarea();
+    sendMessage(t);
+  }
+}
+startRotatorIfNeeded();
+
         }, 260);
       });
 
@@ -2042,71 +2211,239 @@
           if(navigator.share){ try{ await navigator.share({ text }); }catch(_e){} }
           else { try{ const ok = await copyTextToClipboard(text); if(ok) toast('Copied for sharing'); else toast('Share not available'); }catch(_e){ toast('Share not available'); } }
         }
-        else if(act === 'regen'){
-          const parentIdx = typeof msg.parent === 'number' ? msg.parent : findPrevUserIndex(idx);
-          if(parentIdx === -1){ toast('No related user message'); return; }
-          const userText = messages[parentIdx].content;
-          el.disabled = true;
-          const typingEl = showTyping();
-          setTimeout(()=>{
-            typingEl.remove();
-            msg.content = simulatedAssistantReply(userText);
-            msg.meta = {};
-            saveSession();
-            updateThisMessage();
-            el.disabled = false;
-          }, 700 + Math.min(1500, userText.length*18));
-        }
-        else if(act === 'like'){
-          msg.meta = msg.meta || {};
-          if(msg.meta.locked) return;
-          msg.meta.liked = true;
-          msg.meta.locked = true;
-          msg.meta.disliked = false;
-          msg.meta.tempDisliked = false;
-          msg.meta.awaitingFeedback = false;
-          msg.meta.hideDislike = true;
-          saveSession();
-          updateThisMessage();
-        }
-        else if(act === 'dislike'){
-          msg.meta = msg.meta || {};
-          if(msg.meta.locked) return;
-          if(msg.meta.tempDisliked){
-            msg.meta.tempDisliked = false;
-            msg.meta.awaitingFeedback = false;
-          } else {
-            msg.meta.tempDisliked = true;
-            msg.meta.awaitingFeedback = true;
-          }
-          saveSession();
-          updateThisMessage();
-        }
-        else if(act === 'sendFeedback'){
-          const fr = container.querySelector('.feedback-row');
-          const input = fr?.querySelector('.feedback-input');
-          const val = (input?.value || '').trim();
-          msg.meta = msg.meta || {};
-          msg.meta.feedback = val;
-          msg.meta.awaitingFeedback = false;
-          msg.meta.disliked = true;
-          msg.meta.tempDisliked = false;
-          msg.meta.hideDislike = false;
-          msg.meta.locked = true;
-          saveSession();
-          updateThisMessage();
-          toast('Thank you for your report');
-          const logs = JSON.parse(localStorage.getItem(REPORTS_KEY) || '[]');
-          logs.push({ type:'dislike', messageId: msg.id, text: val, at: Date.now() });
-          localStorage.setItem(REPORTS_KEY, JSON.stringify(logs));
-        }
-        else if(act === 'cancelFeedback'){
-          msg.meta = msg.meta || {};
-          msg.meta.tempDisliked = false;
-          msg.meta.awaitingFeedback = false;
-          saveSession();
-          updateThisMessage();
-        }
+        else if (act === 'regen') {
+  // لا نعيد رسم الكل: نحذف هذه الفقاعة وما بعدها ثم نُظهر النقاط
+  const parentIdx = typeof msg.parent === 'number' ? msg.parent : findPrevUserIndex(idx);
+  if (parentIdx === -1) { toast('No related user message'); return; }
+  const userText = messages[parentIdx].content;
+
+  // نحافظ على موضع التمرير النسبي
+  const prevBottom = messagesEl.scrollHeight - messagesEl.scrollTop;
+
+  // 1) نحذف من البيانات
+  messages.splice(idx);
+
+  // 2) نحذف من الـ DOM كل العناصر من هذا الـ index فما بعده
+  [...messagesEl.querySelectorAll('.msg')].forEach(n => {
+    const i = Number(n.dataset.index || -1);
+    if (i >= idx) {
+      n.style.transition = 'opacity .12s ease, transform .12s ease';
+      n.style.opacity = '0';
+      n.style.transform = 'translateY(-2px)';
+      setTimeout(() => n.remove(), 120);
+    }
+  });
+
+  reindexDom(); // مهم: إعادة ترقيم data-index بعد الحذف
+  saveSession();
+
+  // 3) نقاط الكتابة
+  const typingEl = showTyping();
+
+  setTimeout(() => {
+    typingEl.remove();
+    const reply = simulatedAssistantReply(userText);
+    const assistantMsg = { id: genId(), role: 'assistant', content: reply, parent: parentIdx, meta: {} };
+    messages.push(assistantMsg);
+    // نفترض أن appendMessage موجودة لدينا من التعديل السابق
+    appendMessage(assistantMsg, messages.length - 1);
+    saveSession();
+  }, 700 + Math.min(1500, userText.length * 18));
+
+  // 4) استعادة وضع التمرير النسبي
+  messagesEl.scrollTop = messagesEl.scrollHeight - prevBottom;
+  return;
+}
+
+else if (act === 'like') {
+  // لا إعادة رسم – فقط تعديل DOM + أنيميشن خفيفة
+  msg.meta = msg.meta || {};
+  if (msg.meta.locked) return;
+
+  msg.meta.liked = true;
+  msg.meta.disliked = false;
+  msg.meta.hideDislike = true;
+  msg.meta.awaitingFeedback = false;
+
+  // --- أغلق feedback-row إن كان مفتوحاً (علاج المشكلة: Like لا يخفي الحقل) ---
+  const fr = container.querySelector('.feedback-row');
+  if (fr && fr.style.display !== 'none') {
+    fr.style.transition = 'opacity .14s ease, transform .14s ease';
+    fr.style.opacity = '0';
+    fr.style.transform = 'translateY(-2px)';
+    setTimeout(() => { fr.style.display = 'none'; }, 150);
+  }
+
+  // أوقف حالة الديسلايك المؤقتة
+  msg.meta.tempDisliked = false;
+
+  saveSession();
+
+  const actions = container.querySelector('.msg-actions');
+  const likeBtn = actions?.querySelector('[data-act="like"]');
+  const dislikeBtn = actions?.querySelector('[data-act="dislike"]');
+
+  // تفعيل اللايك + نبضة صغيرة + لون أزرق
+  if (likeBtn) {
+    likeBtn.setAttribute('data-active', 'true');
+    const svg = likeBtn.querySelector('svg');
+    if (svg) {
+      svg.setAttribute('stroke', '#0078ff');
+      svg.setAttribute('fill', '#0078ff');
+    }
+    likeBtn.style.transition = 'transform .12s ease, opacity .12s ease';
+    likeBtn.style.transform = 'scale(1.08)';
+    setTimeout(() => { if (likeBtn) likeBtn.style.transform = 'scale(1)'; }, 140);
+  }
+
+  // إخفاء الديسلايك بسلاسة
+  if (dislikeBtn) {
+    dislikeBtn.style.transition = 'opacity .14s ease, transform .14s ease';
+    dislikeBtn.style.opacity = '0';
+    dislikeBtn.style.transform = 'translateY(-2px)';
+    setTimeout(() => dislikeBtn.remove(), 150);
+  }
+  return;
+}
+
+else if (act === 'dislike') {
+  // إظهار/إخفاء حقل الإبلاغ بسلاسة بدون إعادة رسم
+  msg.meta = msg.meta || {};
+  if (msg.meta.locked) return;
+
+  msg.meta.tempDisliked = !msg.meta.tempDisliked;
+  msg.meta.awaitingFeedback = msg.meta.tempDisliked;
+  saveSession();
+
+  const dislikeBtn = container.querySelector('[data-act="dislike"]');
+  if (dislikeBtn) {
+    const svg = dislikeBtn.querySelector('svg');
+    if (msg.meta.tempDisliked) {
+      dislikeBtn.setAttribute('data-active', 'true');
+      if (svg) {
+        svg.setAttribute('stroke', '#ff4d4f');
+        svg.setAttribute('fill', '#ff4d4f');
+      }
+    } else {
+      dislikeBtn.removeAttribute('data-active');
+      if (svg) {
+        svg.setAttribute('stroke', '#0b2633');
+        svg.setAttribute('fill', 'none');
+      }
+    }
+  }
+
+  const fr = container.querySelector('.feedback-row');
+  if (!fr) return;
+
+  if (msg.meta.tempDisliked) {
+    fr.style.display = 'flex';
+    fr.style.opacity = '0';
+    fr.style.transform = 'translateY(4px)';
+    fr.style.transition = 'opacity .16s ease, transform .16s ease';
+    requestAnimationFrame(() => {
+      fr.style.opacity = '1';
+      fr.style.transform = 'translateY(0)';
+    });
+  } else {
+    fr.style.transition = 'opacity .14s ease, transform .14s ease';
+    fr.style.opacity = '0';
+    fr.style.transform = 'translateY(-2px)';
+    setTimeout(() => { fr.style.display = 'none'; }, 150);
+  }
+  return;
+}
+
+else if (act === 'sendFeedback') {
+  // إرسال التقرير: إخفاء الحقل + إبقاء الديسلايك فقط
+  const fr = container.querySelector('.feedback-row');
+  const input = fr?.querySelector('.feedback-input');
+  const val = (input?.value || '').trim();
+
+  msg.meta = msg.meta || {};
+  msg.meta.feedback = val;
+  msg.meta.awaitingFeedback = false;
+  msg.meta.disliked = true;
+  msg.meta.tempDisliked = false;
+  msg.meta.liked = false;
+  msg.meta.locked = true;
+  saveSession();
+
+  // إخفاء الحقل بسلاسة
+  if (fr) {
+    fr.style.transition = 'opacity .14s ease, transform .14s ease';
+    fr.style.opacity = '0';
+    fr.style.transform = 'translateY(-2px)';
+    setTimeout(() => { fr.style.display = 'none'; }, 150);
+  }
+
+  // إبقاء الديسلايك فقط
+  const actions = container.querySelector('.msg-actions');
+  const likeBtn = actions?.querySelector('[data-act="like"]');
+  const dislikeBtn = actions?.querySelector('[data-act="dislike"]');
+
+  if (likeBtn) {
+    likeBtn.style.transition = 'opacity .14s ease, transform .14s ease';
+    likeBtn.style.opacity = '0';
+    likeBtn.style.transform = 'translateY(-2px)';
+    setTimeout(() => likeBtn.remove(), 150);
+  }
+  if (dislikeBtn) {
+    dislikeBtn.setAttribute('data-active', 'true');
+  }
+
+  // حفظ محليًا كما هو
+  const logs = JSON.parse(localStorage.getItem(REPORTS_KEY) || '[]');
+  logs.push({ type:'dislike', messageId: msg.id, text: val, at: Date.now() });
+  localStorage.setItem(REPORTS_KEY, JSON.stringify(logs));
+
+  // ===== إرسال للباك-إند (non-blocking) =====
+  try {
+    fetch(`${API_BASE}/api/report`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "dislike",
+        messageId: msg.id,
+        originalMessage: msg.content,    // محتوى رد الشات المُقيّم
+        feedback: val,
+        sessionId: window.__session_id || null
+      })
+    }).then(r => r.json()).catch(() => {});
+  } catch (_) {}
+
+  toast('Thank you for your report');
+  return;
+}
+  else if (act === 'cancelFeedback') {
+  // إغلاق الحقل بنفس انيميشن الفتح
+  const fr = container.querySelector('.feedback-row');
+  if (fr) {
+    fr.style.transition = 'opacity .14s ease, transform .14s ease';
+    fr.style.opacity = '0';
+    fr.style.transform = 'translateY(-2px)';
+    setTimeout(() => { fr.style.display = 'none'; }, 150);
+  }
+
+  // إعادة ضبط الحالة في البيانات
+  msg.meta = msg.meta || {};
+  msg.meta.tempDisliked = false;
+  msg.meta.awaitingFeedback = false;
+  saveSession();
+
+  // إعادة زر الديسلايك لحالته الأصلية
+  const dislikeBtn = container.querySelector('[data-act="dislike"]');
+  if (dislikeBtn) {
+    dislikeBtn.removeAttribute('data-active');
+    const svg = dislikeBtn.querySelector('svg');
+    if (svg) {
+      svg.setAttribute('stroke', '#0b2633');
+      svg.setAttribute('fill', 'none');
+    }
+  }
+  return;
+}
+
         else if(act === 'user-delete'){
           pendingMessageDeleteIndex = idx;
           messageConfirmModal.classList.add('show');
@@ -2124,20 +2461,35 @@
 
       messageConfirmModal.addEventListener('click', (e)=>{ if(e.target === messageConfirmModal) messageConfirmModal.classList.remove('show'); });
       messageConfirmModal.querySelector('[data-msg-confirm="no"]').addEventListener('click', ()=>{ messageConfirmModal.classList.remove('show'); pendingMessageDeleteIndex = null; });
-      messageConfirmModal.querySelector('[data-msg-confirm="yes"]').addEventListener('click', ()=>{ 
-        if(typeof pendingMessageDeleteIndex === 'number'){
-          messages.splice(pendingMessageDeleteIndex);
-          saveSession(); renderMessages();
-          toast('Messages deleted');
-        }
-        pendingMessageDeleteIndex = null;
-        messageConfirmModal.classList.remove('show');
-      });
+     messageConfirmModal.querySelector('[data-msg-confirm="yes"]').addEventListener('click', ()=>{ 
+  if (typeof pendingMessageDeleteIndex === 'number') {
+    const start = pendingMessageDeleteIndex;
+
+    // حدّث البيانات
+    messages.splice(start);
+
+    // احذف عناصر DOM من نفس الموضع للأخير — بدون إعادة رندر كامل
+    const nodes = [...messagesEl.querySelectorAll('.msg')];
+    for (const el of nodes) {
+      const i = Number(el.dataset.index || -1);
+      if (i >= start) el.remove();
+    }
+
+    saveSession();
+    toast('Messages deleted');
+  }
+  pendingMessageDeleteIndex = null;
+  messageConfirmModal.classList.remove('show');
+});
 
       function findPrevUserIndex(i){
         for(let k=i-1; k>=0; k--){ if(messages[k].role==='user') return k; }
         return -1;
       }
+      function reindexDom(){
+  const nodes = messagesEl.querySelectorAll('.msg');
+  nodes.forEach((el, i) => { el.dataset.index = i; });
+}
       function closeMenus(){ closeAttach(); chatMenu.classList.remove('show'); }
 
       // chat menu button toggles 'show' (CSS handles fade)
@@ -2263,19 +2615,65 @@
         reportStep2.style.display = 'none';
         reportStep1.style.display = '';
       });
-      reportModal.querySelector('[data-report="send"]').addEventListener('click', ()=>{
-        const payload = {
-          reason: selectedReason,
-          details: (reportText.value || '').trim(),
-          at: Date.now(),
-          countMessages: messages.length
-        };
-        const logs = JSON.parse(localStorage.getItem(REPORTS_KEY) || '[]');
-        logs.push({ type:'conversation_report', ...payload });
-        localStorage.setItem(REPORTS_KEY, JSON.stringify(logs));
-        closeReport();
-        toast('Report sent, thank you');
-      });
+      reportModal.querySelector('[data-report="send"]').addEventListener('click', async ()=> {
+  const sendBtn = reportModal.querySelector('[data-report="send"]');
+  // prevent double-click
+  if(sendBtn.disabled) return;
+  sendBtn.disabled = true;
+  const prevLabel = sendBtn.textContent;
+  sendBtn.textContent = 'Sending...';
+
+  const payload = {
+    type: 'conversation_report',
+    reason: selectedReason,
+    details: (reportText.value || '').trim(),
+    at: Date.now(),
+    countMessages: messages.length
+  };
+
+  try {
+    // 1) حفظ محلي سريع (احتياطي)
+    const logsLocal = JSON.parse(localStorage.getItem(REPORTS_KEY) || '[]');
+    logsLocal.push(Object.assign({}, payload, { localSavedAt: Date.now(), sent: false }));
+    localStorage.setItem(REPORTS_KEY, JSON.stringify(logsLocal));
+
+    // 2) إرسال إلى HF Space backend
+    const res = await fetch(`${API_BASE}/api/report`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if(!res.ok){
+      // حاول قراءة رسالة الخطأ من الخادم إن وُجدت
+      let errText = await res.text().catch(()=>res.statusText || 'Error');
+      throw new Error(`HTTP ${res.status}: ${errText}`);
+    }
+
+    // 3) تحديث السجل المحلي للإشارة إلى أن البلاغ أُرسل
+    let updated = JSON.parse(localStorage.getItem(REPORTS_KEY) || '[]');
+    // نحدد آخر إدخال غير مرسل ونعلّمه كمرسل
+    for(let i = updated.length-1; i>=0; i--){
+      if(updated[i].type === 'conversation_report' && !updated[i].sent){
+        updated[i].sent = true;
+        updated[i].sentAt = Date.now();
+        break;
+      }
+    }
+    localStorage.setItem(REPORTS_KEY, JSON.stringify(updated));
+
+    // 4) اغلاق النافذة وإشعار المستخدم
+    closeReport();
+    toast('Report sent, thank you');
+
+  } catch (err) {
+    console.error('Report send failed', err);
+    toast('Failed to send report (see console)');
+  } finally {
+    sendBtn.disabled = false;
+    sendBtn.textContent = prevLabel;
+  }
+});
 
       // ===== Rotator logic =====
       const suggestions = [
@@ -2665,6 +3063,25 @@
           closeConvoPanel();
         }catch(e){ console.error(e); toast('Could not create new chat'); }
       });
+         // --- إضافة: دعم تأثير اللمس لـ New Chat button (place AFTER existing newChatBtn click handler) ---
+(function(){
+  const newChatBtnEl = document.getElementById('newChatBtn');
+  if (!newChatBtnEl) return;
+
+  // touchstart لضمان تفعيل التأثير بصراحة على iOS/Android
+  newChatBtnEl.addEventListener('touchstart', (e)=>{
+    newChatBtnEl.classList.add('touched');
+    // some browsers require a tiny delay to show animation nicely
+  }, {passive:true});
+
+  newChatBtnEl.addEventListener('touchend', ()=>{
+    // اترك التأثير يشتغل لفترة قصيرة ثم أزل الكلاس
+    setTimeout(()=> newChatBtnEl.classList.remove('touched'), 260);
+  });
+
+  // تنظيف للماوس/الخروج
+  newChatBtnEl.addEventListener('mouseleave', ()=> newChatBtnEl.classList.remove('touched'));
+})();
 
       // update popstate handling to close lightbox -> convoPanel -> chatPanel (ordered)
       window.addEventListener('popstate', (event) => {
