@@ -99,7 +99,7 @@ html_full = """
     position:relative;
     margin: 0 0 20px 0;
   }
-
+  
   .chat-header{display:flex; gap:12px; align-items:center; padding:12px 16px; border-bottom:1px solid #eef3f7;}
   .back-btn{border: none; background:transparent; font-size:18px; cursor:pointer; padding:8px; border-radius:8px;}
   .persona-name{font-weight:800; font-size:16px; color:#0b2633;}
@@ -133,7 +133,7 @@ html_full = """
   .msg-actions .act-btn:hover { transform: scale(1.1); }
   .msg-actions .act-btn[data-active="true"] { background: rgba(0,120,255,0.08); }
   .msg-actions .divider{ width:1px; height:14px; background:#e8eef3; margin:0 4px; }
-
+  
   .feedback-row{ margin-top:6px; display:none; flex-direction:column; gap:6px; width:100%;}
   .feedback-input{ width:100%; padding:8px 10px; border:1px solid #e6ecf3; border-radius:8px; font-size:13px; box-sizing:border-box;}
   .feedback-actions{ display:flex; gap:8px; justify-content:flex-end; }
@@ -148,7 +148,7 @@ html_full = """
     50% { transform: scale(1.4); }
     100% { transform: scale(1); }
   }
-
+  
   .msg.fading-out {
     opacity: 0 !important;
     transform: translateY(-10px) scale(0.95) !important;
@@ -161,7 +161,7 @@ html_full = """
   }
 
   .bubble-content.fading-out { opacity: 0; }
-
+  
   .msg.shrinking {
     width: 60px !important;
     min-height: 38px !important;
@@ -172,7 +172,7 @@ html_full = """
     align-items: center;
     justify-content: center;
   }
-
+  
   .typing .dots{ display:inline-flex; gap:6px; align-items:center; }
   .typing .dot{ width:8px; height:8px; border-radius:50%; background:#cbd8e3; opacity:.4; transform: translateY(0); animation: tip 900ms infinite ease-in-out; }
   .typing .dot:nth-child(2){ animation-delay:120ms; }
@@ -202,7 +202,7 @@ html_full = """
       </article>
     </main>
   </div>
-
+  
   <div class="chat-panel" id="chatPanel">
     <div class="chat-shell">
         <div class="chat-header">
@@ -210,7 +210,8 @@ html_full = """
         <div class="messages" id="messages"></div>
         <div class="composer">
             <textarea id="composerInput" placeholder="Ask something..."></textarea>
-            <button id="sendInsideBtn">Send</button> </div>
+            <button id="sendBtn">Send</button>
+        </div>
     </div>
   </div>
 
@@ -220,13 +221,15 @@ html_full = """
     const openChatBtn = document.getElementById('openChatBtn');
     const chatPanel = document.getElementById('chatPanel');
     const composer = document.getElementById('composerInput');
-    const sendInsideBtn = document.getElementById('sendInsideBtn'); // Changed to sendInsideBtn
-
-    const editCancelBtn = document.getElementById('editCancelBtn'); // Assuming it exists
+    const sendBtn = document.getElementById('sendBtn');
+    
+    // Fallback for elements that might not exist in the simplified HTML
+    const backBtn = document.getElementById('backBtn');
+    const editCancelBtn = document.getElementById('editCancelBtn');
 
     let messages = [];
     let editIndex = null;
-    let pendingAttachment = null;
+    let pendingAttachment = null; // Assuming no attachments for this simplified version
 
     function genId(){ return 'm-'+Math.random().toString(36).slice(2,9); }
     function escapeHtml(str){ if(!str) return ''; return String(str).replace(/[&<>"]/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s])); }
@@ -241,9 +244,9 @@ html_full = """
         }
         return -1;
     }
-
+    
     function simulatedAssistantReply(prompt) {
-        return "This is a new response to: '" + (prompt || "your last message") + "'.";
+        return "This is a new, smart, and insightful response to your query about: '" + (prompt || "your last message") + "'.";
     }
 
     function createMessageElement(m, idx) {
@@ -254,11 +257,11 @@ html_full = """
 
         const bubble = document.createElement('div');
         bubble.className = 'bubble';
-
+        
         const bubbleContent = document.createElement('div');
         bubbleContent.className = 'bubble-content';
         bubbleContent.innerHTML = escapeHtml(m.content).replace(/\n/g, '<br>');
-
+        
         bubble.appendChild(bubbleContent);
 
         if (m.role === 'assistant') {
@@ -281,7 +284,7 @@ html_full = """
               </div>
             `;
             if(meta.awaitingFeedback) feedbackRow.style.display = 'flex';
-
+            
             bubble.appendChild(actions);
             bubble.appendChild(feedbackRow);
         }
@@ -300,23 +303,26 @@ html_full = """
         messagesEl.scrollTop = messagesEl.scrollHeight;
         return messageEl;
     }
-
+    
     function showTypingIndicator() {
         const typingEl = document.createElement('div');
-        typingEl.className = 'msg assistant show';
+        typingEl.className = 'msg assistant typing show';
         typingEl.dataset.typing = 'true';
-        typingEl.innerHTML = '<div class="dots typing"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>';
+        typingEl.innerHTML = '<div class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>';
         messagesEl.appendChild(typingEl);
         messagesEl.scrollTop = messagesEl.scrollHeight;
         return typingEl;
     }
 
-    function sendMessage(text) {
+    function sendMessage() {
+        const text = composer.value.trim();
         if (!text) return;
-
+        
         const userMessage = {id: genId(), role: 'user', content: text};
         messages.push(userMessage);
         appendMessage(userMessage, messages.length - 1);
+        
+        composer.value = '';
 
         const typingEl = showTypingIndicator();
 
@@ -326,14 +332,13 @@ html_full = """
             const assistantMessage = {id: genId(), role: 'assistant', content: replyText, meta: {}};
             messages.push(assistantMessage);
             appendMessage(assistantMessage, messages.length - 1);
-            saveSession();
         }, 1500);
     }
-
+    
     function handleEditAndResend(editedIndex, newContent) {
         const editedMsgId = messages[editedIndex].id;
         messages[editedIndex].content = newContent;
-
+        
         const userMsgEl = messagesEl.querySelector(`.msg[data-id="${editedMsgId}"]`);
         if (userMsgEl) {
             const bubbleContent = userMsgEl.querySelector('.bubble-content');
@@ -350,14 +355,13 @@ html_full = """
         messages.splice(editedIndex + 1);
 
         const typingEl = showTypingIndicator();
-
+        
         setTimeout(() => {
             typingEl.remove();
             const newReplyText = simulatedAssistantReply(newContent);
             const newAssistantMessage = {id: genId(), role: 'assistant', content: newReplyText, meta: {}};
             messages.push(newAssistantMessage);
             appendMessage(newAssistantMessage, messages.length - 1);
-            saveSession();
         }, 2000);
     }
 
@@ -386,7 +390,7 @@ html_full = """
                 msg.meta.liked = false;
             }
             msg.meta.awaitingFeedback = act === 'dislike' && msg.meta.disliked;
-
+            
             const likeBtn = container.querySelector('[data-act="like"]');
             const dislikeBtn = container.querySelector('[data-act="dislike"]');
             const likeSvg = likeBtn.querySelector('svg');
@@ -396,7 +400,7 @@ html_full = """
             likeBtn.dataset.active = msg.meta.liked;
             likeSvg.style.stroke = msg.meta.liked ? 'var(--accent)' : '#0b2633';
             likeSvg.style.fill = msg.meta.liked ? 'var(--accent)' : 'none';
-
+            
             dislikeBtn.dataset.active = msg.meta.disliked;
             dislikeSvg.style.stroke = msg.meta.disliked ? 'var(--danger)' : '#0b2633';
             dislikeSvg.style.fill = msg.meta.disliked ? 'var(--danger)' : 'none';
@@ -406,15 +410,16 @@ html_full = """
 
         } else if (act === 'regen') {
             const userPromptMsg = messages.slice(0, idx).reverse().find(m => m.role === 'user');
-
+            
             const subsequentMessageElements = Array.from(messagesEl.querySelectorAll('.msg')).filter(m => parseInt(m.dataset.index, 10) > idx);
             subsequentMessageElements.forEach((m, i) => {
                 setTimeout(() => m.classList.add('fading-out'), i * 80);
             });
-
-            setTimeout(() => subsequentMessageElements.forEach(m => m.remove()), subsequentMessageElements.length * 80 + 400);
-
-            messages.splice(idx + 1);
+            
+            setTimeout(() => {
+                 messages.splice(idx + 1);
+                 subsequentMessageElements.forEach(m => m.remove());
+            }, subsequentMessageElements.length * 80 + 400);
 
             const bubbleContent = container.querySelector('.bubble-content');
             bubbleContent.classList.add('fading-out');
@@ -422,20 +427,20 @@ html_full = """
             setTimeout(() => {
                 bubbleContent.innerHTML = '';
                 container.classList.add('shrinking');
-
+                
                 setTimeout(() => {
                     bubbleContent.innerHTML = '<div class="dots typing"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>';
                     bubbleContent.classList.remove('fading-out');
                 }, 350);
             }, 300);
-
+            
             setTimeout(() => {
                 msg.content = simulatedAssistantReply(userPromptMsg?.content);
                 msg.meta = {};
-
+                
                 const newMsgEl = createMessageElement(msg, idx);
                 bubbleContent.classList.add('fading-out');
-
+                
                 setTimeout(() => {
                     container.classList.remove('shrinking');
                     container.innerHTML = newMsgEl.innerHTML;
@@ -465,52 +470,32 @@ html_full = """
             }
         });
     }
-
+    
     if (backBtn) {
         backBtn.addEventListener('click', () => {
             chatPanel.classList.remove('show');
         });
     }
-
-    if (sendInsideBtn) {
-        sendInsideBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            const t = composer.value.trim();
-            if ((editIndex === null && !t && !pendingAttachment) || (editIndex !== null && !t)) {
-                return;
+    
+    // Check if sendBtn exists before adding listener
+    if (sendBtn) {
+        sendBtn.addEventListener('click', sendMessage);
+    }
+    // Check if composer exists before adding listener
+    if (composer) {
+        composer.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                if(sendBtn) sendBtn.click();
+                else if(sendInsideBtn) sendInsideBtn.click();
             }
-
-            sendInsideBtn.classList.add('sending');
-
-            setTimeout(() => {
-                sendInsideBtn.classList.remove('sending');
-
-                if (editIndex !== null) {
-                    handleEditAndResend(editIndex, t);
-                    editIndex = null;
-                    if(editCancelBtn) editCancelBtn.style.display = 'none';
-                    composer.value = '';
-                    updateSendVisibility();
-                    autoGrowTextarea();
-                } else {
-                    if (pendingAttachment) {
-                        sendAttachmentNow();
-                    } else {
-                        sendMessage(t);
-                        composer.value = '';
-                        updateSendVisibility();
-                        autoGrowTextarea();
-                    }
-                }
-                startRotatorIfNeeded();
-            }, 260);
         });
     }
-
+    
     function initializeDemo() {
         messages = [
             {id: genId(), role: 'user', content: 'Explain photosynthesis.'},
-            {id: genId(), role: 'assistant', content: 'Photosynthesis is the process used by plants, algae, and some bacteria...', meta: {}},
+            {id: genId(), role: 'assistant', content: 'Photosynthesis is the process used by plants...', meta: {}},
             {id: genId(), role: 'user', content: 'Thanks!'},
         ];
         messagesEl.innerHTML = '';
@@ -518,10 +503,45 @@ html_full = """
             appendMessage(msg, idx);
         });
     }
+    
+    // Ensure the script only initializes the demo if the button is clicked, not on page load
+    // initializeDemo();
 
 })();
 </script>
 </body>
 </html>
 """
+
+# ==============================================================================
+# Python Backend Part (No changes needed here)
+# ==============================================================================
+def handle_report_function(report_json_string):
+    try:
+        if not report_json_string:
+            return "Empty request, ignored."
+        report_data = json.loads(report_json_string)
+        report_data['received_at'] = datetime.datetime.now().isoformat()
+        print("New report received:", report_data)
+        with open("reports.txt", "a", encoding="utf-8") as f:
+            f.write(json.dumps(report_data, ensure_ascii=False) + "\n")
+        return "Success"
+    except Exception as e:
+        print("Error processing report:", e)
+        return "Error"
+
+with gr.Blocks(css=".gradio-container {display: block !important;}") as demo:
+    gr.HTML(html_full)
+    with gr.Row(visible=False):
+        report_data_input = gr.Textbox(elem_id="report_data_input")
+        submit_report_button = gr.Button(elem_id="submit_report_button")
+        report_status_output = gr.Textbox(elem_id="report_status_output")
+    submit_report_button.click(
+        fn=handle_report_function, 
+        inputs=[report_data_input], 
+        outputs=[report_status_output]
+    )
+
+demo.launch()
+
 
