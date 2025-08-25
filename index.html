@@ -2392,26 +2392,24 @@ else if (act === 'sendFeedback') {
     dislikeBtn.setAttribute('data-active', 'true');
   }
 
-  // حفظ محليًا كما هو
-  const logs = JSON.parse(localStorage.getItem(REPORTS_KEY) || '[]');
-  logs.push({ type:'dislike', messageId: msg.id, text: val, at: Date.now() });
-  localStorage.setItem(REPORTS_KEY, JSON.stringify(logs));
-
   // ===== إرسال للباك-إند (non-blocking) =====
-  try {
-    fetch(`${API_BASE}/api/report`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-     body: JSON.stringify({
-  type: "dislike",
-  message: msg.content || "",        // ⚠️ الحقل المطلوب
-  messageId: msg.id,
-  feedback: val,
-  sessionId: window.__session_id || null,
-  at: Date.now()
-})
-    }).then(r => r.json()).catch(() => {});
-  } catch (_) {}
+try {
+  fetch(`${API_BASE}/api/report`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      type: "dislike",
+      message: msg.content || "",
+      messageId: msg.id,
+      feedback: val,
+      sessionId: window.__session_id || null,
+      at: Date.now()
+    })
+  })
+  .then(r => r.json())
+  .catch(() => {});
+} catch (_) {}
+
 
   toast('Thank you for your report');
   return;
