@@ -1646,7 +1646,7 @@ const DRAFT_KEY = 'chat_study_draft';
 const REPORTS_KEY = 'chat_study_reports';
 
 // ==== Reports API (HF Space) ====
-const API_BASE = "https://akramas2005-as-space-ai.hf.space";
+const API_BASE = "https://akramas2005-as-space-ai.hf.space:7860";
       let messages = [];
       let editIndex = null;
       function genId(){ return 'm-'+Math.random().toString(36).slice(2,9); }
@@ -2402,13 +2402,14 @@ else if (act === 'sendFeedback') {
     fetch(`${API_BASE}/api/report`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        type: "dislike",
-        messageId: msg.id,
-        originalMessage: msg.content,    // محتوى رد الشات المُقيّم
-        feedback: val,
-        sessionId: window.__session_id || null
-      })
+     body: JSON.stringify({
+  type: "dislike",
+  message: msg.content || "",        // ⚠️ الحقل المطلوب
+  messageId: msg.id,
+  feedback: val,
+  sessionId: window.__session_id || null,
+  at: Date.now()
+})
     }).then(r => r.json()).catch(() => {});
   } catch (_) {}
 
@@ -2623,26 +2624,28 @@ else if (act === 'sendFeedback') {
   const prevLabel = sendBtn.textContent;
   sendBtn.textContent = 'Sending...';
 
-  const payload = {
-    type: 'conversation_report',
-    reason: selectedReason,
-    details: (reportText.value || '').trim(),
-    at: Date.now(),
-    countMessages: messages.length
-  };
+  const details = (reportText.value || '').trim();
+const messageText = details || (selectedReason || ''); // النص الأساسي للبلاغ
 
-  try {
-    // 1) حفظ محلي سريع (احتياطي)
-    const logsLocal = JSON.parse(localStorage.getItem(REPORTS_KEY) || '[]');
-    logsLocal.push(Object.assign({}, payload, { localSavedAt: Date.now(), sent: false }));
-    localStorage.setItem(REPORTS_KEY, JSON.stringify(logsLocal));
+const payload = {
+  type: 'conversation_report',
+  message: messageText,              // ⚠️ الحقل المطلوب من الباك-إند
+  text: details,                     // التفاصيل الإضافية
+  reason: selectedReason || null,
+  messageId: currentSessionId || '', // أو آخر رسالة للمستخدم إذا عندك id
+  chatContext: (messages || []).map(m => ({
+    role: m.role,
+    content: m.content
+  })),
+  at: Date.now(),
+  countMessages: messages.length
+};
 
-    // 2) إرسال إلى HF Space backend
-    const res = await fetch(`${API_BASE}/api/report`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
+const res = await fetch(`${API_BASE}/api/report`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(payload)
+});
 
     if(!res.ok){
       // حاول قراءة رسالة الخطأ من الخادم إن وُجدت
