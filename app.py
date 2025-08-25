@@ -521,3 +521,5 @@ html_full = """
 
 })();
 </script>
+</body>
+</html>
