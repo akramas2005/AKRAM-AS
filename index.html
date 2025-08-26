@@ -1640,13 +1640,10 @@
 
       document.addEventListener('click', (e)=>{ if(attachPanel.classList.contains('open') && !attachPanel.contains(e.target) && !attachBtn.contains(e.target)) closeAttach(); }, true);
 
-      // simple chat storage & keys
-const STORAGE_KEY = 'chat_study';
-const DRAFT_KEY = 'chat_study_draft';
-const REPORTS_KEY = 'chat_study_reports';
-
-// ==== Reports API (HF Space) ====
-const API_BASE = "https://akramas2005-as-space-ai.hf.space:7860";
+      const STORAGE_KEY = 'chat_study';
+      const DRAFT_KEY = 'chat_study_draft';
+      const REPORTS_KEY = 'chat_study_reports';
+      const API_BASE = "https://backend-as-space.onrender.com";
       let messages = [];
       let editIndex = null;
       function genId(){ return 'm-'+Math.random().toString(36).slice(2,9); }
@@ -2390,9 +2387,19 @@ else if (act === 'sendFeedback') {
   }
   if (dislikeBtn) {
     dislikeBtn.setAttribute('data-active', 'true');
+    const svg = dislikeBtn.querySelector('svg');
+    if (svg) {
+      svg.setAttribute('stroke', '#ff4d4f');
+      svg.setAttribute('fill', '#ff4d4f');
+    }
   }
 
-  // ===== إرسال للباك-إند (non-blocking) =====
+  // حفظ محليًا (كما هو)
+const logs = JSON.parse(localStorage.getItem(REPORTS_KEY) || '[]');
+logs.push({ type: 'dislike', messageId: msg.id, text: val, at: Date.now() });
+localStorage.setItem(REPORTS_KEY, JSON.stringify(logs));
+
+// ===== إرسال للباك-إند (non-blocking) =====
 try {
   fetch(`${API_BASE}/api/report`, {
     method: "POST",
@@ -2406,11 +2413,15 @@ try {
       at: Date.now()
     })
   })
-  .then(r => r.json())
-  .catch(() => {});
-} catch (_) {}
-
-
+  .then(res => {
+    // احتياطي: لو أردت التحقق من الاستجابة
+    if (!res.ok) return res.text().then(t => { console.warn('dislike report failed', res.status, t); });
+    return res.json().catch(()=>{});
+  })
+  .catch(err => { /* لا ننهي واجهة المستخدم بسبب هذا الخطأ */ console.warn('dislike report error', err); });
+} catch (e) {
+  console.warn('fetch failed (dislike)', e);
+}
   toast('Thank you for your report');
   return;
 }
@@ -2614,59 +2625,55 @@ try {
         reportStep2.style.display = 'none';
         reportStep1.style.display = '';
       });
-      reportModal.querySelector('[data-report="send"]').addEventListener('click', async ()=> {
+      reportModal.querySelector('[data-report="send"]').addEventListener('click', async () => {
   const sendBtn = reportModal.querySelector('[data-report="send"]');
-  // prevent double-click
-  if(sendBtn.disabled) return;
+  if (sendBtn.disabled) return;
   sendBtn.disabled = true;
   const prevLabel = sendBtn.textContent;
   sendBtn.textContent = 'Sending...';
 
-  const details = (reportText.value || '').trim();
-const messageText = details || (selectedReason || ''); // النص الأساسي للبلاغ
+  const payload = {
+    type: 'conversation_report',
+    reason: selectedReason,
+    details: (reportText.value || '').trim(),
+    at: Date.now(),
+    countMessages: messages.length
+  };
 
-const payload = {
-  type: 'conversation_report',
-  message: messageText,              // ⚠️ الحقل المطلوب من الباك-إند
-  text: details,                     // التفاصيل الإضافية
-  reason: selectedReason || null,
-  messageId: currentSessionId || '', // أو آخر رسالة للمستخدم إذا عندك id
-  chatContext: (messages || []).map(m => ({
-    role: m.role,
-    content: m.content
-  })),
-  at: Date.now(),
-  countMessages: messages.length
-};
+  try {
+    // 1) حفظ محلي احتياطي
+    const logsLocal = JSON.parse(localStorage.getItem(REPORTS_KEY) || '[]');
+    logsLocal.push(Object.assign({}, payload, { localSavedAt: Date.now(), sent: false }));
+    localStorage.setItem(REPORTS_KEY, JSON.stringify(logsLocal));
 
-const res = await fetch(`${API_BASE}/api/report`, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify(payload)
-});
+    // 2) إرسال إلى backend (انتبه: API_BASE يجب أن يكون مضبوطاً)
+    const res = await fetch(`${API_BASE}/api/report`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
 
-    if(!res.ok){
-      // حاول قراءة رسالة الخطأ من الخادم إن وُجدت
-      let errText = await res.text().catch(()=>res.statusText || 'Error');
-      throw new Error(`HTTP ${res.status}: ${errText}`);
+    if (!res.ok) {
+      const txt = await res.text();
+      throw new Error(`HTTP ${res.status}: ${txt}`);
     }
 
-    // 3) تحديث السجل المحلي للإشارة إلى أن البلاغ أُرسل
-    let updated = JSON.parse(localStorage.getItem(REPORTS_KEY) || '[]');
-    // نحدد آخر إدخال غير مرسل ونعلّمه كمرسل
-    for(let i = updated.length-1; i>=0; i--){
-      if(updated[i].type === 'conversation_report' && !updated[i].sent){
-        updated[i].sent = true;
-        updated[i].sentAt = Date.now();
-        break;
+    // 3) تحديث محلي بسيط: علامة أن الرسالة أُرسلت (heuristic)
+    try {
+      const logsNow = JSON.parse(localStorage.getItem(REPORTS_KEY) || '[]');
+      for (let i = logsNow.length - 1; i >= 0; i--) {
+        if (logsNow[i].localSavedAt && logsNow[i].sent === false && logsNow[i].type === 'conversation_report') {
+          logsNow[i].sent = true;
+          logsNow[i].sentAt = Date.now();
+          break;
+        }
       }
-    }
-    localStorage.setItem(REPORTS_KEY, JSON.stringify(updated));
+      localStorage.setItem(REPORTS_KEY, JSON.stringify(logsNow));
+    } catch (e) { /* ignore local update errors */ }
 
-    // 4) اغلاق النافذة وإشعار المستخدم
+    // إغلاق وإعلام المستخدم
     closeReport();
     toast('Report sent, thank you');
-
   } catch (err) {
     console.error('Report send failed', err);
     toast('Failed to send report (see console)');
