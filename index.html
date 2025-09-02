@@ -1638,26 +1638,25 @@
           clearPreview();
 
           const typingEl = showTyping();
-          puter.ai.chat(text || ('Sent ' + (userMessage.attachment.name || userMessage.attachment.type)))
-          .then(reply => {
-            typingEl.remove();
-            const userIndex = messages.length - 1;
-            
-            const assistantMessage = {id:genId(), role:'assistant', content:reply, parent: userIndex, meta:{}};
-            messages.push(assistantMessage);
-            appendMessage(assistantMessage, messages.length - 1);
-            saveSession();
-          })
-          .catch(error => {
-            typingEl.remove();
-            const userIndex = messages.length - 1;
-            
-            const errorMessage = {id:genId(), role:'assistant', content:`Error: ${error.message}`, parent:userIndex, meta:{hideReactionButtons:true, locked:true}};
-            messages.push(errorMessage);
-            appendMessage(errorMessage, messages.length - 1);
-            saveSession();
-            console.error(error);
-          });
+puter.ai.chat(text, { model: "gpt-5-nano" })
+.then(reply => {
+  typingEl.remove();
+  const userIndex = messages.length - 1;
+
+  const assistantMessage = {id:genId(), role:'assistant', content:reply, parent:userIndex, meta:{}};
+  messages.push(assistantMessage);
+  appendMessage(assistantMessage, messages.length - 1);
+  saveSession();
+}).catch(error => {
+  typingEl.remove();
+  const userIndex = messages.length - 1;
+
+  const errorMessage = {id:genId(), role:'assistant', content:`Error: ${error.message}`, parent:userIndex, meta:{hideReactionButtons:true, locked:true}};
+  messages.push(errorMessage);
+  appendMessage(errorMessage, messages.length - 1);
+  saveSession();
+  console.error(error);
+});
 
         } catch(e){
           console.error(e);
@@ -1858,16 +1857,16 @@
         return t; 
       }
 
-      function sendMessage(text) {
-        text = (text || '').trim();
-        if (!text && !pendingAttachment) return;
+      function sendMessage(text){
+        text = (text||'').trim();
+        if(!text && !pendingAttachment) return;
 
-        if (pendingAttachment) {
+        if(pendingAttachment){
           sendAttachmentNow();
           return;
         }
 
-        const userMessage = {id: genId(), role: 'user', content: text};
+        const userMessage = {id:genId(), role:'user', content:text};
         messages.push(userMessage);
         appendMessage(userMessage, messages.length - 1);
         saveSession();
@@ -1876,35 +1875,28 @@
         updateWelcomeVisibility();
 
         const typingEl = showTyping();
+puter.ai.chat(text || ('Sent ' + (userMessage.attachment.name || userMessage.attachment.type)), { model: "gpt-5-nano" })
+.then(reply => {
+  typingEl.remove();
+  const userIndex = messages.length - 1;
 
-        // New, robust API call
-        puter.ai.chat(text)
-          .then(reply => {
-            typingEl.remove();
-            const userIndex = messages.length - 1;
+  const assistantMessage = {id:genId(), role:'assistant', content:reply, parent: userIndex, meta:{}};
+  messages.push(assistantMessage);
+  appendMessage(assistantMessage, messages.length - 1);
+  saveSession();
+})
+.catch(error => {
+  typingEl.remove();
+  const userIndex = messages.length - 1;
 
-            const assistantMessage = {id: genId(), role: 'assistant', content: reply, parent: userIndex, meta: {}};
-            messages.push(assistantMessage);
-            appendMessage(assistantMessage, messages.length - 1);
-            saveSession();
-          })
-          .catch(error => {
-            typingEl.remove();
-            console.error('Puter.js API Error:', error);
-            
-            // Display an error message to the user
-            const errorMessage = {
-              id: genId(),
-              role: 'assistant',
-              content: 'Sorry, I am unable to connect to the AI service at the moment. Please try again later.',
-              parent: messages.length - 1,
-              meta: {hideReactionButtons: true, locked: true}
-            };
-            messages.push(errorMessage);
-            appendMessage(errorMessage, messages.length - 1);
-            saveSession();
-          });
+  const errorMessage = {id:genId(), role:'assistant', content:`Error: ${error.message}`, parent:userIndex, meta:{hideReactionButtons:true, locked:true}};
+  messages.push(errorMessage);
+  appendMessage(errorMessage, messages.length - 1);
+  saveSession();
+  console.error(error);
+});
       }
+
       // OPEN/CLOSE CHAT (use history for back-button order)
       function openChatSimple(){
         try {
