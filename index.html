@@ -4,7 +4,6 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Às Space - AI Tools (Study Assistant slice)</title>
-<script src="https://js.puter.com/v2/"></script>
 <style>
   :root { --kbd: 0px; --accent:#0078ff; --bg:#f7f9fc; --muted:#7b8a93; --danger:#ff4d4f; }
 
@@ -441,7 +440,7 @@
     width:52px; height:52px; border-radius:8px; display:flex; align-items:center; justify-content:center; background:#fff; box-shadow:0 8px 20px rgba(6,30,60,0.06);
     font-weight:800; color:var(--accent); font-size:14px;
   }
-  .file-meta { display:flex; flex-direction:column; gap:4px; }
+  .file-meta { display:flex; flex-direction:column; }
   .file-name { font-weight:800; color:#0b2633; }
   .file-size { font-size:12px; color:var(--muted); }
 
@@ -922,6 +921,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
 <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-firestore.js"></script>
+<script src="https://js.puter.com/v2/"></script>
 </head>
 <body>
   <div class="wrap">
@@ -1638,25 +1638,14 @@
           clearPreview();
 
           const typingEl = showTyping();
-puter.ai.chat(text, { model: "gpt-5-nano" })
-.then(reply => {
-  typingEl.remove();
-  const userIndex = messages.length - 1;
-
-  const assistantMessage = {id:genId(), role:'assistant', content:reply, parent:userIndex, meta:{}};
-  messages.push(assistantMessage);
-  appendMessage(assistantMessage, messages.length - 1);
-  saveSession();
-}).catch(error => {
-  typingEl.remove();
-  const userIndex = messages.length - 1;
-
-  const errorMessage = {id:genId(), role:'assistant', content:`Error: ${error.message}`, parent:userIndex, meta:{hideReactionButtons:true, locked:true}};
-  messages.push(errorMessage);
-  appendMessage(errorMessage, messages.length - 1);
-  saveSession();
-  console.error(error);
-});
+          setTimeout(()=>{
+            typingEl.remove();
+            const reply = simulatedAssistantReply(text || ('Sent ' + (userMessage.attachment.name || userMessage.attachment.type)));
+            const assistantMessage = {id:genId(), role:'assistant', content:reply, parent: messages.length - 1, meta:{}};
+            messages.push(assistantMessage);
+            appendMessage(assistantMessage, messages.length - 1);
+            saveSession();
+          }, 700 + Math.min(1500, (text || '').length*18));
 
         } catch(e){
           console.error(e);
@@ -1857,7 +1846,7 @@ puter.ai.chat(text, { model: "gpt-5-nano" })
         return t; 
       }
 
-      function sendMessage(text){
+      async function sendMessage(text){
         text = (text||'').trim();
         if(!text && !pendingAttachment) return;
 
@@ -1875,26 +1864,26 @@ puter.ai.chat(text, { model: "gpt-5-nano" })
         updateWelcomeVisibility();
 
         const typingEl = showTyping();
-puter.ai.chat(text || ('Sent ' + (userMessage.attachment.name || userMessage.attachment.type)), { model: "gpt-5-nano" })
-.then(reply => {
-  typingEl.remove();
-  const userIndex = messages.length - 1;
 
-  const assistantMessage = {id:genId(), role:'assistant', content:reply, parent: userIndex, meta:{}};
-  messages.push(assistantMessage);
-  appendMessage(assistantMessage, messages.length - 1);
-  saveSession();
-})
-.catch(error => {
-  typingEl.remove();
-  const userIndex = messages.length - 1;
+        try {
+          // Puter.js call to get a real response
+          const response = await puter.ai.chat(text, { model: 'gpt-5-chat-latest' });
 
-  const errorMessage = {id:genId(), role:'assistant', content:`Error: ${error.message}`, parent:userIndex, meta:{hideReactionButtons:true, locked:true}};
-  messages.push(errorMessage);
-  appendMessage(errorMessage, messages.length - 1);
-  saveSession();
-  console.error(error);
-});
+          typingEl.remove();
+          const assistantMessage = {id:genId(), role:'assistant', content:response, parent: messages.length - 1, meta:{}};
+          messages.push(assistantMessage);
+          appendMessage(assistantMessage, messages.length - 1);
+          saveSession();
+
+        } catch(error) {
+          console.error("Puter.js error:", error);
+          typingEl.remove();
+          const errorMessage = "Sorry, I encountered an error. Please try again.";
+          const assistantMessage = {id:genId(), role:'assistant', content:errorMessage, parent: messages.length - 1, meta:{ hideReactionButtons: true, hideDislike: true }};
+          messages.push(assistantMessage);
+          appendMessage(assistantMessage, messages.length - 1);
+          saveSession();
+        }
       }
 
       // OPEN/CLOSE CHAT (use history for back-button order)
@@ -2081,19 +2070,27 @@ if (editIndex !== null && editIndex >= 0) {
   const typingEl = showTyping();
   setTimeout(() => {
     typingEl.remove();
-    const replyText = simulatedAssistantReply(t);
-    const assistantMsg = { id: genId(), role: 'assistant', content: replyText, parent: oldIndex, meta: {} };
-    messages.push(assistantMsg);
-
-    if (typeof appendMessage === 'function') {
+    
+    // Puter.js call to get a real response
+    puter.ai.chat(t, { model: 'gpt-5-chat-latest' }).then(response => {
+      const assistantMsg = { id: genId(), role: 'assistant', content: response, parent: oldIndex, meta: {} };
+      messages.push(assistantMsg);
+      if (typeof appendMessage === 'function') {
+        appendMessage(assistantMsg, messages.length - 1);
+      } else {
+        renderMessages();
+      }
+      saveSession();
+      if (typeof reindexDom === 'function') reindexDom();
+    }).catch(error => {
+      console.error("Puter.js error:", error);
+      const errorMessage = "Sorry, I encountered an error. Please try again.";
+      const assistantMsg = { id: genId(), role: 'assistant', content: errorMessage, parent: oldIndex, meta: { hideReactionButtons: true, hideDislike: true } };
+      messages.push(assistantMsg);
       appendMessage(assistantMsg, messages.length - 1);
-    } else {
-      // fallback: ريندر جزئي/كامل إذا لم توجد appendMessage
-      renderMessages();
-    }
-
-    saveSession();
-    if (typeof reindexDom === 'function') reindexDom();
+      saveSession();
+      if (typeof reindexDom === 'function') reindexDom();
+    });
   }, 700 + Math.min(1500, t.length * 18));
 
   return; // نهاية فرع التعديل
@@ -2236,239 +2233,225 @@ startRotatorIfNeeded();
           else { try{ const ok = await copyTextToClipboard(text); if(ok) toast('Copied for sharing'); else toast('Share not available'); }catch(_e){ toast('Share not available'); } }
         }
         else if (act === 'regen') {
-  // لا نعيد رسم الكل: نحذف هذه الفقاعة وما بعدها ثم نُظهر النقاط
-  const parentIdx = typeof msg.parent === 'number' ? msg.parent : findPrevUserIndex(idx);
-  if (parentIdx === -1) { toast('No related user message'); return; }
-  const userText = messages[parentIdx].content;
+          const parentIdx = typeof msg.parent === 'number' ? msg.parent : findPrevUserIndex(idx);
+          if (parentIdx === -1) { toast('No related user message'); return; }
+          const userText = messages[parentIdx].content;
 
-  // نحافظ على موضع التمرير النسبي
-  const prevBottom = messagesEl.scrollHeight - messagesEl.scrollTop;
+          const prevBottom = messagesEl.scrollHeight - messagesEl.scrollTop;
 
-  // 1) نحذف من البيانات
-  messages.splice(idx);
+          messages.splice(idx);
 
-  // 2) نحذف من الـ DOM كل العناصر من هذا الـ index فما بعده
-  [...messagesEl.querySelectorAll('.msg')].forEach(n => {
-    const i = Number(n.dataset.index || -1);
-    if (i >= idx) {
-      n.style.transition = 'opacity .12s ease, transform .12s ease';
-      n.style.opacity = '0';
-      n.style.transform = 'translateY(-2px)';
-      setTimeout(() => n.remove(), 120);
-    }
-  });
+          [...messagesEl.querySelectorAll('.msg')].forEach(n => {
+            const i = Number(n.dataset.index || -1);
+            if (i >= idx) {
+              n.style.transition = 'opacity .12s ease, transform .12s ease';
+              n.style.opacity = '0';
+              n.style.transform = 'translateY(-2px)';
+              setTimeout(() => n.remove(), 120);
+            }
+          });
 
-  reindexDom(); // مهم: إعادة ترقيم data-index بعد الحذف
-  saveSession();
+          reindexDom(); 
+          saveSession();
 
-  // 3) نقاط الكتابة
-  const typingEl = showTyping();
+          const typingEl = showTyping();
 
-  setTimeout(() => {
-    typingEl.remove();
-    const reply = simulatedAssistantReply(userText);
-    const assistantMsg = { id: genId(), role: 'assistant', content: reply, parent: parentIdx, meta: {} };
-    messages.push(assistantMsg);
-    // نفترض أن appendMessage موجودة لدينا من التعديل السابق
-    appendMessage(assistantMsg, messages.length - 1);
-    saveSession();
-  }, 700 + Math.min(1500, userText.length * 18));
+          puter.ai.chat(userText, { model: 'gpt-5-chat-latest' }).then(response => {
+            typingEl.remove();
+            const assistantMsg = { id: genId(), role: 'assistant', content: response, parent: parentIdx, meta: {} };
+            messages.push(assistantMsg);
+            appendMessage(assistantMsg, messages.length - 1);
+            saveSession();
+          }).catch(error => {
+            console.error("Puter.js error:", error);
+            typingEl.remove();
+            const errorMessage = "Sorry, I encountered an error. Please try again.";
+            const assistantMessage = {id:genId(), role:'assistant', content:errorMessage, parent: parentIdx, meta:{ hideReactionButtons: true, hideDislike: true }};
+            messages.push(assistantMessage);
+            appendMessage(assistantMessage, messages.length - 1);
+            saveSession();
+          });
+          
+          messagesEl.scrollTop = messagesEl.scrollHeight - prevBottom;
+          return;
+        }
+        else if (act === 'like') {
+          msg.meta = msg.meta || {};
+          if (msg.meta.locked) return;
 
-  // 4) استعادة وضع التمرير النسبي
-  messagesEl.scrollTop = messagesEl.scrollHeight - prevBottom;
-  return;
-}
+          msg.meta.liked = true;
+          msg.meta.disliked = false;
+          msg.meta.hideDislike = true;
+          msg.meta.awaitingFeedback = false;
 
-else if (act === 'like') {
-  // لا إعادة رسم – فقط تعديل DOM + أنيميشن خفيفة
-  msg.meta = msg.meta || {};
-  if (msg.meta.locked) return;
+          const fr = container.querySelector('.feedback-row');
+          if (fr && fr.style.display !== 'none') {
+            fr.style.transition = 'opacity .14s ease, transform .14s ease';
+            fr.style.opacity = '0';
+            fr.style.transform = 'translateY(-2px)';
+            setTimeout(() => { fr.style.display = 'none'; }, 150);
+          }
 
-  msg.meta.liked = true;
-  msg.meta.disliked = false;
-  msg.meta.hideDislike = true;
-  msg.meta.awaitingFeedback = false;
+          msg.meta.tempDisliked = false;
 
-  // --- أغلق feedback-row إن كان مفتوحاً (علاج المشكلة: Like لا يخفي الحقل) ---
-  const fr = container.querySelector('.feedback-row');
-  if (fr && fr.style.display !== 'none') {
-    fr.style.transition = 'opacity .14s ease, transform .14s ease';
-    fr.style.opacity = '0';
-    fr.style.transform = 'translateY(-2px)';
-    setTimeout(() => { fr.style.display = 'none'; }, 150);
-  }
+          saveSession();
 
-  // أوقف حالة الديسلايك المؤقتة
-  msg.meta.tempDisliked = false;
+          const actions = container.querySelector('.msg-actions');
+          const likeBtn = actions?.querySelector('[data-act="like"]');
+          const dislikeBtn = actions?.querySelector('[data-act="dislike"]');
 
-  saveSession();
+          if (likeBtn) {
+            likeBtn.setAttribute('data-active', 'true');
+            const svg = likeBtn.querySelector('svg');
+            if (svg) {
+              svg.setAttribute('stroke', '#0078ff');
+              svg.setAttribute('fill', '#0078ff');
+            }
+            likeBtn.style.transition = 'transform .12s ease, opacity .12s ease';
+            likeBtn.style.transform = 'scale(1.08)';
+            setTimeout(() => { if (likeBtn) likeBtn.style.transform = 'scale(1)'; }, 140);
+          }
 
-  const actions = container.querySelector('.msg-actions');
-  const likeBtn = actions?.querySelector('[data-act="like"]');
-  const dislikeBtn = actions?.querySelector('[data-act="dislike"]');
+          if (dislikeBtn) {
+            dislikeBtn.style.transition = 'opacity .14s ease, transform .14s ease';
+            dislikeBtn.style.opacity = '0';
+            dislikeBtn.style.transform = 'translateY(-2px)';
+            setTimeout(() => dislikeBtn.remove(), 150);
+          }
+          return;
+        }
 
-  // تفعيل اللايك + نبضة صغيرة + لون أزرق
-  if (likeBtn) {
-    likeBtn.setAttribute('data-active', 'true');
-    const svg = likeBtn.querySelector('svg');
-    if (svg) {
-      svg.setAttribute('stroke', '#0078ff');
-      svg.setAttribute('fill', '#0078ff');
-    }
-    likeBtn.style.transition = 'transform .12s ease, opacity .12s ease';
-    likeBtn.style.transform = 'scale(1.08)';
-    setTimeout(() => { if (likeBtn) likeBtn.style.transform = 'scale(1)'; }, 140);
-  }
+        else if (act === 'dislike') {
+          msg.meta = msg.meta || {};
+          if (msg.meta.locked) return;
 
-  // إخفاء الديسلايك بسلاسة
-  if (dislikeBtn) {
-    dislikeBtn.style.transition = 'opacity .14s ease, transform .14s ease';
-    dislikeBtn.style.opacity = '0';
-    dislikeBtn.style.transform = 'translateY(-2px)';
-    setTimeout(() => dislikeBtn.remove(), 150);
-  }
-  return;
-}
+          msg.meta.tempDisliked = !msg.meta.tempDisliked;
+          msg.meta.awaitingFeedback = msg.meta.tempDisliked;
+          saveSession();
 
-else if (act === 'dislike') {
-  // إظهار/إخفاء حقل الإبلاغ بسلاسة بدون إعادة رسم
-  msg.meta = msg.meta || {};
-  if (msg.meta.locked) return;
+          const dislikeBtn = container.querySelector('[data-act="dislike"]');
+          if (dislikeBtn) {
+            const svg = dislikeBtn.querySelector('svg');
+            if (msg.meta.tempDisliked) {
+              dislikeBtn.setAttribute('data-active', 'true');
+              if (svg) {
+                svg.setAttribute('stroke', '#ff4d4f');
+                svg.setAttribute('fill', '#ff4d4f');
+              }
+            } else {
+              dislikeBtn.removeAttribute('data-active');
+              if (svg) {
+                svg.setAttribute('stroke', '#0b2633');
+                svg.setAttribute('fill', 'none');
+              }
+            }
+          }
 
-  msg.meta.tempDisliked = !msg.meta.tempDisliked;
-  msg.meta.awaitingFeedback = msg.meta.tempDisliked;
-  saveSession();
+          const fr = container.querySelector('.feedback-row');
+          if (!fr) return;
 
-  const dislikeBtn = container.querySelector('[data-act="dislike"]');
-  if (dislikeBtn) {
-    const svg = dislikeBtn.querySelector('svg');
-    if (msg.meta.tempDisliked) {
-      dislikeBtn.setAttribute('data-active', 'true');
-      if (svg) {
-        svg.setAttribute('stroke', '#ff4d4f');
-        svg.setAttribute('fill', '#ff4d4f');
-      }
-    } else {
-      dislikeBtn.removeAttribute('data-active');
-      if (svg) {
-        svg.setAttribute('stroke', '#0b2633');
-        svg.setAttribute('fill', 'none');
-      }
-    }
-  }
+          if (msg.meta.tempDisliked) {
+            fr.style.display = 'flex';
+            fr.style.opacity = '0';
+            fr.style.transform = 'translateY(4px)';
+            fr.style.transition = 'opacity .16s ease, transform .16s ease';
+            requestAnimationFrame(() => {
+              fr.style.opacity = '1';
+              fr.style.transform = 'translateY(0)';
+            });
+          } else {
+            fr.style.transition = 'opacity .14s ease, transform .14s ease';
+            fr.style.opacity = '0';
+            fr.style.transform = 'translateY(-2px)';
+            setTimeout(() => { fr.style.display = 'none'; }, 150);
+          }
+          return;
+        }
 
-  const fr = container.querySelector('.feedback-row');
-  if (!fr) return;
+        else if (act === 'sendFeedback') {
+          const fr = container.querySelector('.feedback-row');
+          const input = fr?.querySelector('.feedback-input');
+          const val = (input?.value || '').trim();
 
-  if (msg.meta.tempDisliked) {
-    fr.style.display = 'flex';
-    fr.style.opacity = '0';
-    fr.style.transform = 'translateY(4px)';
-    fr.style.transition = 'opacity .16s ease, transform .16s ease';
-    requestAnimationFrame(() => {
-      fr.style.opacity = '1';
-      fr.style.transform = 'translateY(0)';
-    });
-  } else {
-    fr.style.transition = 'opacity .14s ease, transform .14s ease';
-    fr.style.opacity = '0';
-    fr.style.transform = 'translateY(-2px)';
-    setTimeout(() => { fr.style.display = 'none'; }, 150);
-  }
-  return;
-}
+          msg.meta = msg.meta || {};
+          msg.meta.feedback = val;
+          msg.meta.awaitingFeedback = false;
+          msg.meta.disliked = true;
+          msg.meta.tempDisliked = false;
+          msg.meta.liked = false;
+          msg.meta.locked = true;
+          saveSession();
 
-else if (act === 'sendFeedback') {
-  // إرسال التقرير: إخفاء الحقل + إبقاء الديسلايك فقط
-  const fr = container.querySelector('.feedback-row');
-  const input = fr?.querySelector('.feedback-input');
-  const val = (input?.value || '').trim();
+          if (fr) {
+            fr.style.transition = 'opacity .14s ease, transform .14s ease';
+            fr.style.opacity = '0';
+            fr.style.transform = 'translateY(-2px)';
+            setTimeout(() => { fr.style.display = 'none'; }, 150);
+          }
 
-  msg.meta = msg.meta || {};
-  msg.meta.feedback = val;
-  msg.meta.awaitingFeedback = false;
-  msg.meta.disliked = true;
-  msg.meta.tempDisliked = false;
-  msg.meta.liked = false;
-  msg.meta.locked = true;
-  saveSession();
+          const actions = container.querySelector('.msg-actions');
+          const likeBtn = actions?.querySelector('[data-act="like"]');
+          const dislikeBtn = actions?.querySelector('[data-act="dislike"]');
 
-  // إخفاء الحقل بسلاسة
-  if (fr) {
-    fr.style.transition = 'opacity .14s ease, transform .14s ease';
-    fr.style.opacity = '0';
-    fr.style.transform = 'translateY(-2px)';
-    setTimeout(() => { fr.style.display = 'none'; }, 150);
-  }
+          if (likeBtn) {
+            likeBtn.style.transition = 'opacity .14s ease, transform .14s ease';
+            likeBtn.style.opacity = '0';
+            likeBtn.style.transform = 'translateY(-2px)';
+            setTimeout(() => likeBtn.remove(), 150);
+          }
+          if (dislikeBtn) {
+            dislikeBtn.setAttribute('data-active', 'true');
+            const svg = dislikeBtn.querySelector('svg');
+            if (svg) {
+              svg.setAttribute('stroke', '#ff4d4f');
+              svg.setAttribute('fill', '#ff4d4f');
+            }
+          }
 
-  // إبقاء الديسلايك فقط
-  const actions = container.querySelector('.msg-actions');
-  const likeBtn = actions?.querySelector('[data-act="like"]');
-  const dislikeBtn = actions?.querySelector('[data-act="dislike"]');
+          const reportPayload = {
+            type: "message_dislike",
+            messageContent: msg.content || "",
+            messageId: msg.id,
+            feedback: val,
+            sessionId: currentSessionId,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+          };
 
-  if (likeBtn) {
-    likeBtn.style.transition = 'opacity .14s ease, transform .14s ease';
-    likeBtn.style.opacity = '0';
-    likeBtn.style.transform = 'translateY(-2px)';
-    setTimeout(() => likeBtn.remove(), 150);
-  }
-  if (dislikeBtn) {
-    dislikeBtn.setAttribute('data-active', 'true');
-    const svg = dislikeBtn.querySelector('svg');
-    if (svg) {
-      svg.setAttribute('stroke', '#ff4d4f');
-      svg.setAttribute('fill', '#ff4d4f');
-    }
-  }
+          db.collection("sections").doc("study_assistant").collection("message_reports").add(reportPayload)
+          .then(() => {
+              toast('Thank you for your report');
+          })
+          .catch((error) => {
+              console.error("Error sending message report: ", error);
+              toast('Failed to send report');
+          });
+          return;
+        }
+          else if (act === 'cancelFeedback') {
+          const fr = container.querySelector('.feedback-row');
+          if (fr) {
+            fr.style.transition = 'opacity .14s ease, transform .14s ease';
+            fr.style.opacity = '0';
+            fr.style.transform = 'translateY(-2px)';
+            setTimeout(() => { fr.style.display = 'none'; }, 150);
+          }
 
- // إرسال بلاغ الرسالة إلى Firestore
-  const reportPayload = {
-    type: "message_dislike",
-    messageContent: msg.content || "",
-    messageId: msg.id,
-    feedback: val,
-    sessionId: currentSessionId,
-    timestamp: firebase.firestore.FieldValue.serverTimestamp()
-  };
+          msg.meta = msg.meta || {};
+          msg.meta.tempDisliked = false;
+          msg.meta.awaitingFeedback = false;
+          saveSession();
 
-  db.collection("sections").doc("study_assistant").collection("message_reports").add(reportPayload)
-  .then(() => {
-      toast('Thank you for your report');
-  })
-  .catch((error) => {
-      console.error("Error sending message report: ", error);
-      toast('Failed to send report');
-  });
-  return;
-}
-  else if (act === 'cancelFeedback') {
-  // إغلاق الحقل بنفس انيميشن الفتح
-  const fr = container.querySelector('.feedback-row');
-  if (fr) {
-    fr.style.transition = 'opacity .14s ease, transform .14s ease';
-    fr.style.opacity = '0';
-    fr.style.transform = 'translateY(-2px)';
-    setTimeout(() => { fr.style.display = 'none'; }, 150);
-  }
-
-  // إعادة ضبط الحالة في البيانات
-  msg.meta = msg.meta || {};
-  msg.meta.tempDisliked = false;
-  msg.meta.awaitingFeedback = false;
-  saveSession();
-
-  // إعادة زر الديسلايك لحالته الأصلية
-  const dislikeBtn = container.querySelector('[data-act="dislike"]');
-  if (dislikeBtn) {
-    dislikeBtn.removeAttribute('data-active');
-    const svg = dislikeBtn.querySelector('svg');
-    if (svg) {
-      svg.setAttribute('stroke', '#0b2633');
-      svg.setAttribute('fill', 'none');
-    }
-  }
-  return;
-}
+          const dislikeBtn = container.querySelector('[data-act="dislike"]');
+          if (dislikeBtn) {
+            dislikeBtn.removeAttribute('data-active');
+            const svg = dislikeBtn.querySelector('svg');
+            if (svg) {
+              svg.setAttribute('stroke', '#0b2633');
+              svg.setAttribute('fill', 'none');
+            }
+          }
+          return;
+        }
 
         else if(act === 'user-delete'){
           pendingMessageDeleteIndex = idx;
@@ -2491,10 +2474,8 @@ else if (act === 'sendFeedback') {
   if (typeof pendingMessageDeleteIndex === 'number') {
     const start = pendingMessageDeleteIndex;
 
-    // حدّث البيانات
     messages.splice(start);
 
-    // احذف عناصر DOM من نفس الموضع للأخير — بدون إعادة رندر كامل
     const nodes = [...messagesEl.querySelectorAll('.msg')];
     for (const el of nodes) {
       const i = Number(el.dataset.index || -1);
@@ -2518,11 +2499,9 @@ else if (act === 'sendFeedback') {
 }
       function closeMenus(){ closeAttach(); chatMenu.classList.remove('show'); }
 
-      // chat menu button toggles 'show' (CSS handles fade)
       chatMenuBtn.addEventListener('click', (e)=>{ e.stopPropagation(); chatMenu.classList.toggle('show'); });
       document.addEventListener('click', (e)=>{ if(chatMenu.classList.contains('show') && !chatMenu.contains(e.target) && !chatMenuBtn.contains(e.target)) chatMenu.classList.remove('show'); }, true);
 
-      // ---- Export as HTML (readable) ----
       function buildConversationHTML(msgs, docTitle){
         const sanitized = msgs.map(m => ({ role: m.role, content: escapeHtml(m.content || ''), attachment: m.attachment }));
         const rows = sanitized.map(m => {
@@ -2580,7 +2559,6 @@ else if (act === 'sendFeedback') {
         }
       }
 
-      // chat menu wiring (Download/Report/Delete)
       chatMenu.addEventListener('click', (e)=>{
         const btn = e.target.closest('button'); if(!btn) return;
         const cmd = btn.dataset.cmd;
@@ -2648,7 +2626,6 @@ else if (act === 'sendFeedback') {
         const prevLabel = sendBtn.textContent;
         sendBtn.textContent = 'Sending...';
 
-        // --- هنا يتم إرسال البيانات إلى Firebase (هذا هو الكود الجديد) ---
         const payload = {
           type: 'conversation_report',
           reason: selectedReason,
@@ -2667,7 +2644,6 @@ else if (act === 'sendFeedback') {
             toast('Failed to send report');
         });
 
-        // هذا الجزء يتم إضافته لضمان إعادة الزر لحالته الطبيعية
         sendBtn.disabled = false;
         sendBtn.textContent = prevLabel;
       });
@@ -2682,7 +2658,6 @@ else if (act === 'sendFeedback') {
           "Highlight key formulas",
           "Make bullet-point notes",
           "Give a short definition",
-          // + new suggestions (added per request)
           "Convert to mnemonics",
           "List pros and cons",
           "Create step-by-step solution",
@@ -2705,8 +2680,8 @@ else if (act === 'sendFeedback') {
       let rotExitTimeout = null;
       let rotRunning = false;
 
-      const VISIBLE_MS = 2400; // how long suggestion stays visible
-      const EXIT_MS = 420; // exit animation duration (matches CSS)
+      const VISIBLE_MS = 2400;
+      const EXIT_MS = 420;
 
       function showRotatorOnce(idx){
           if(!rotator || !rotatorText) return;
@@ -2768,7 +2743,6 @@ else if (act === 'sendFeedback') {
           }, 300);
       });
 
-      // ===== Welcome banner visibility control (English + fade) =====
       function updateWelcomeVisibility(){
         try{
           const userName = (localStorage.getItem('study_user_name') || '').trim();
@@ -2800,7 +2774,6 @@ else if (act === 'sendFeedback') {
         } catch(e){}
       }
 
-      // ===== Image Lightbox =====
       function openImageLightbox(src, alt){
         try{
           if(!imageLightboxRoot) return;
@@ -2823,7 +2796,6 @@ else if (act === 'sendFeedback') {
         imageLightboxRoot.setAttribute('aria-hidden','true');
       }
 
-      // ========== CONVERSATIONS SIDEBAR LOGIC ==========
       function openConvoPanel(){
         if(convoPanel.classList.contains('open')) return;
         convoPanel.classList.add('open');
@@ -2851,7 +2823,6 @@ else if (act === 'sendFeedback') {
       });
       convoCloseBtn.addEventListener('click', ()=> closeConvoPanel());
 
-      // click outside to close convoPanel (requirement)
       document.addEventListener('pointerdown', (e)=>{
         try{
           if(convoPanel && convoPanel.classList.contains('open')){
@@ -2863,7 +2834,6 @@ else if (act === 'sendFeedback') {
         }catch(e){}
       });
 
-      // generate title from messages (first user message trimmed to up to 4 words)
       function generateConversationTitle(msgs){
         try{
           if(!Array.isArray(msgs) || msgs.length===0) return 'Conversation';
@@ -2879,12 +2849,6 @@ else if (act === 'sendFeedback') {
         }
       }
 
-      /* ---------------------------
-         renderHistoryPanel changes:
-         - top chips show max 6 most recent (savedConvos[0..5])
-         - chips: single tap = load conversation (no long-press)
-         - list items: normal tap loads convo; long-press or right-click opens contextual menu (Rename/Delete/Lock soon)
-      --------------------------- */
       function renderHistoryPanel(){
         loadHistory();
         convoChips.innerHTML = '';
@@ -2896,24 +2860,20 @@ else if (act === 'sendFeedback') {
           convoList.appendChild(emp);
           return;
         }
-        // chips (top) — only latest 6
         const chips = savedConvos.slice(0,6);
         chips.forEach((c, i) => {
           const chip = document.createElement('button');
           chip.className = 'convo-chip';
           chip.textContent = c.title || ('Chat ' + (i+1));
-          // load conversation on click (no long-press)
           chip.addEventListener('click', ()=> loadSavedConversation(i));
           convoChips.appendChild(chip);
         });
 
-        // list entries (all savedConvos)
         savedConvos.forEach((c, i) => {
           const it = document.createElement('div');
           it.className = 'convo-item';
           it.dataset.idx = i;
           it.innerHTML = `<div class="left"><div class="title"><span style="margin-left:6px">${escapeHtml(c.title||'Conversation')}</span></div></div><div class="meta">${new Date(c.createdAt||Date.now()).toLocaleString()}</div>`;
-          // short click loads conversation
           it.addEventListener('click', (ev)=>{
             if(it.dataset._suppressClick === 'true'){ it.dataset._suppressClick = 'false'; return; }
             loadSavedConversation(i);
@@ -2923,7 +2883,6 @@ else if (act === 'sendFeedback') {
         });
       }
 
-      // long-press / right-click for list items -> open contextual menu (Rename/Delete/Lock soon)
       function attachConvoListItemHandlers(el, idx){
         let longTimer = null;
         const LONG_MS = 600;
@@ -2943,25 +2902,21 @@ else if (act === 'sendFeedback') {
         });
         el.addEventListener('pointercancel', clearTimer);
         el.addEventListener('pointerleave', clearTimer);
-        // right-click also
         el.addEventListener('contextmenu', (ev)=>{
           ev.preventDefault();
           showConvoItemMenuAtEvent(ev, idx);
         });
       }
 
-      // position and show menu
       function showConvoItemMenuAtEvent(ev, idx){
         const menu = convoItemMenu;
         convoMenuTargetIndex = idx;
         const x = ev.clientX || (ev.touches && ev.touches[0] && ev.touches[0].clientX) || 100;
         const y = ev.clientY || (ev.touches && ev.touches[0] && ev.touches[0].clientY) || 100;
-        // compute menu placement to not overflow
         menu.style.left = (x + 6) + 'px';
         menu.style.top = (y + 6) + 'px';
         menu.classList.add('show');
         menu.setAttribute('aria-hidden','false');
-        // close when clicking elsewhere
         setTimeout(()=> {
           const onDoc = (e) => {
             if(!menu.contains(e.target)) {
@@ -2974,7 +2929,6 @@ else if (act === 'sendFeedback') {
         }, 10);
       }
 
-      // menu actions: Rename, Delete, Lock soon
       menuRenameBtn.addEventListener('click', ()=>{
         convoItemMenu.classList.remove('show');
         const idx = convoMenuTargetIndex;
@@ -2997,18 +2951,15 @@ else if (act === 'sendFeedback') {
         convoItemMenu.classList.remove('show');
         const idx = convoMenuTargetIndex;
         if(typeof idx !== 'number' || !savedConvos[idx]) return;
-        // show small delete confirmation
         deleteSavedModal.classList.add('show');
         deleteSavedModal.dataset.idx = idx;
       });
 
       menuLockSoonBtn.addEventListener('click', ()=>{
         convoItemMenu.classList.remove('show');
-        // show short note for 3 seconds
         toast('This option will be available soon...', 3000);
       });
 
-      // delete saved modal wiring
       deleteSavedModal.addEventListener('click', (e)=>{ if(e.target === deleteSavedModal) deleteSavedModal.classList.remove('show'); });
       deleteSavedModal.querySelector('[data-delete="no"]').addEventListener('click', ()=> deleteSavedModal.classList.remove('show'));
       deleteSavedModal.querySelector('[data-delete="yes"]').addEventListener('click', ()=>{
@@ -3022,7 +2973,6 @@ else if (act === 'sendFeedback') {
         deleteSavedModal.classList.remove('show');
       });
 
-      // loadSavedConversation (no locking - lock feature removed)
       function loadSavedConversation(idx){
         if(!savedConvos[idx]) return;
         try{
@@ -3040,7 +2990,6 @@ else if (act === 'sendFeedback') {
         }
       }
 
-      // new chat: save current into history (if not empty), then clear messages and create a new currentSessionId
       newChatBtn.addEventListener('click', ()=>{
         try{
           if(Array.isArray(messages) && messages.length>0){
@@ -3060,49 +3009,39 @@ else if (act === 'sendFeedback') {
           closeConvoPanel();
         }catch(e){ console.error(e); toast('Could not create new chat'); }
       });
-         // --- إضافة: دعم تأثير اللمس لـ New Chat button (place AFTER existing newChatBtn click handler) ---
+         
 (function(){
   const newChatBtnEl = document.getElementById('newChatBtn');
   if (!newChatBtnEl) return;
 
-  // touchstart لضمان تفعيل التأثير بصراحة على iOS/Android
   newChatBtnEl.addEventListener('touchstart', (e)=>{
     newChatBtnEl.classList.add('touched');
-    // some browsers require a tiny delay to show animation nicely
   }, {passive:true});
 
   newChatBtnEl.addEventListener('touchend', ()=>{
-    // اترك التأثير يشتغل لفترة قصيرة ثم أزل الكلاس
     setTimeout(()=> newChatBtnEl.classList.remove('touched'), 260);
   });
 
-  // تنظيف للماوس/الخروج
   newChatBtnEl.addEventListener('mouseleave', ()=> newChatBtnEl.classList.remove('touched'));
 })();
 
-      // update popstate handling to close lightbox -> convoPanel -> chatPanel (ordered)
       window.addEventListener('popstate', (event) => {
         try {
-          // If lightbox open, close it first
           if(imageLightboxRoot && imageLightboxRoot.hasChildNodes()){
             closeImageLightbox();
             return;
           }
-          // If convo panel open, close
           if(convoPanel && convoPanel.classList.contains('open')){
             closeConvoPanelInternal();
             return;
           }
-          // If chat open, close
           if(chatPanel.classList.contains('show')){
             closeChatSimple();
             return;
           }
-          // otherwise, allow default browser behavior (e.g., go back to previous page)
         } catch(e){ console.error('popstate handler', e); }
       });
 
-      // area click handlers and keyboard-friendly close for panel
       document.addEventListener('keydown', (e)=>{
         if(e.key === 'Escape'){
           if(imageLightboxRoot && imageLightboxRoot.hasChildNodes()){ closeImageLightbox(); return; }
@@ -3111,7 +3050,6 @@ else if (act === 'sendFeedback') {
         }
       });
 
-      // ensure history and savedConvos are up-to-date on load
       loadHistory();
       renderHistoryPanel();
 
