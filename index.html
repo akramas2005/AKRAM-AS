@@ -1093,6 +1093,7 @@
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+<script src="https://js.puter.com/v2/"></script>  
 <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-firestore.js"></script>  
 <script>
@@ -1667,12 +1668,20 @@
 
       // Load session
       function loadSession(){
-        try{
-          const raw = localStorage.getItem(STORAGE_KEY);
-          if(raw) messages = JSON.parse(raw);
-          else { messages = []; }
-        }catch(e){ messages = []; }
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        messages = parsed;
+      } else {
+        messages = [];
       }
+    } else {
+      messages = [];
+    }
+  }catch(e){ messages = []; }
+}
       // saveSession now also triggers autosave into savedConvos
       function saveSession(){ 
         try {
@@ -3112,4 +3121,5 @@ else if (act === 'sendFeedback') {
 </body>
 
 </html>
+
 
