@@ -1695,11 +1695,11 @@
         const bubble = document.createElement('div');
         bubble.className = 'bubble';
 
-        if(m.content && m.content.trim()){
-          const txt = document.createElement('div');
-          txt.innerHTML = escapeHtml(m.content).replace(/\n/g,'<br>');
-          bubble.appendChild(txt);
-        }
+        if (m.content && typeof m.content === 'string' && m.content.trim()) {
+  const txt = document.createElement('div');
+  txt.innerHTML = escapeHtml(m.content).replace(/\n/g,'<br>');
+  bubble.appendChild(txt);
+}
 
         if(m.attachment){
           if(m.attachment.type === 'image'){
@@ -3112,3 +3112,4 @@ else if (act === 'sendFeedback') {
 </body>
 
 </html>
+
