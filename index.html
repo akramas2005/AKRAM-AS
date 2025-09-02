@@ -1665,6 +1665,7 @@
       let editIndex = null;
       function genId(){ return 'm-'+Math.random().toString(36).slice(2,9); }
       function escapeHtml(str){ return String(str).replace(/[&<>"]/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s])); }
+      let rotRunning = false;
 
       // Load session
       function loadSession(){
@@ -1956,7 +1957,7 @@ function simulatedAssistantReply(prompt){
       // 5) If we have a target index, update the messages array and DOM safely
       if(targetIdx !== -1){
         if(window.messages && window.messages[targetIdx]){
-          window.messages[targetIdx].content = realText;
+          window.messages[targetIdx].content = String(realText);
         }
         try {
           if(typeof window.createMessageElement === 'function'){
