@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Às Space - AI Tools (Study Assistant slice)</title>
+<script src="https://js.puter.com/v2/" defer></script>
 <style>
   :root { --kbd: 0px; --accent:#0078ff; --bg:#f7f9fc; --muted:#7b8a93; --danger:#ff4d4f; }
 
@@ -1831,16 +1832,162 @@
         messagesEl.scrollTop = messagesEl.scrollHeight;
       }
 
-      function simulatedAssistantReply(prompt){
-        prompt = (prompt||'').trim();
-        if(!prompt) return "Could you provide a little more detail on what you want?";
-        const low = prompt.toLowerCase();
-        if(low.includes('summarize')) return "Here's a concise summary: ...";
-        if(low.includes('quiz')) return "Short quiz:\n1) ...\n2) ...\n3) ...";
-        if(low.includes('explain')) return "I'll explain step-by-step: ...";
-        if(low.includes('plan')) return "Two-week study plan: Week 1 ... Week 2 ...";
-        return "Focused answer:\n• Key idea: " + prompt.split('.').slice(0,1).join('');
+      /* ====== Start replacement: simulatedAssistantReply (non-blocking, updates later with Puter) ====== */
+async function _ensurePuterLoaded(timeout = 15000){
+  if(window.puter && window.puter.ai && window.puter.ai.chat) return window.puter;
+  if(window._puterLoading) return window._puterLoading;
+  window._puterLoading = new Promise((resolve, reject) => {
+    try {
+      const s = document.createElement('script');
+      s.src = 'https://js.puter.com/v2/';
+      s.async = true;
+      s.onload = () => {
+        // small delay to allow puter init
+        setTimeout(()=> (window.puter && window.puter.ai) ? resolve(window.puter) : reject(new Error('Puter did not initialize')), 200);
+      };
+      s.onerror = () => reject(new Error('Failed to load Puter.js'));
+      document.head.appendChild(s);
+    } catch(err){
+      reject(err);
+    }
+  });
+  return window._puterLoading;
+}
+
+async function _extractPuterText(resp){
+  try{
+    if(resp == null) return '';
+    if(typeof resp === 'string') return resp;
+    if(resp.message && typeof resp.message.content === 'string') return resp.message.content;
+    if(resp.choices && resp.choices[0] && resp.choices[0].message && typeof resp.choices[0].message.content === 'string') return resp.choices[0].message.content;
+    // handle async iterable (stream)
+    if(Symbol.asyncIterator in Object(resp)){
+      let acc = '';
+      for await (const part of resp){
+        acc += (part?.text || part?.message?.content || '');
       }
+      return acc;
+    }
+    if(Array.isArray(resp)) return resp.join('');
+    return String(resp);
+  }catch(e){
+    return String(resp || '');
+  }
+}
+
+function simulatedAssistantReply(prompt){
+  // KEEP original placeholder logic exactly (so UI/behavior is unchanged)
+  prompt = (prompt||'').trim();
+  if(!prompt) {
+    // No async call for empty prompt; keep behavior identical
+    return "Could you provide a little more detail on what you want?";
+  }
+  const low = prompt.toLowerCase();
+  let placeholder;
+  if(low.includes('summarize')) placeholder = "Here's a concise summary: ...";
+  else if(low.includes('quiz')) placeholder = "Short quiz:\n1) ...\n2) ...\n3) ...";
+  else if(low.includes('explain')) placeholder = "I'll explain step-by-step: ...";
+  else if(low.includes('plan')) placeholder = "Two-week study plan: Week 1 ... Week 2 ...";
+  else placeholder = "Focused answer:\n• Key idea: " + prompt.split('.').slice(0,1).join('');
+
+  // Fire-and-forget: ask Puter in background, then replace placeholder when real reply arrives.
+  (async () => {
+    try {
+      // 1) ensure Puter loaded (if you added the <script> in head this will be fast)
+      try { await _ensurePuterLoaded(); } catch(e){
+        // If cannot load Puter, just leave placeholder (no visible error to user)
+        console.error('Puter load failed:', e);
+        return;
+      }
+
+      // 2) call Puter (gpt-5-nano as requested)
+      let resp;
+      try {
+        resp = await window.puter.ai.chat(String(prompt || ''), { model: 'gpt-5-nano' });
+      } catch(err) {
+        console.error('Puter.ai.chat error', err);
+        return;
+      }
+
+      const realText = (await _extractPuterText(resp)).trim();
+      if(!realText) return;
+
+      // 3) Find the assistant message to update. Prefer messages[] if available.
+      let targetIdx = -1;
+      const trimmedPrompt = String(prompt || '').trim();
+
+      if(Array.isArray(window.messages)){
+        for(let i = window.messages.length - 1; i >= 0; i--){
+          const m = window.messages[i];
+          if(!m) continue;
+          if(m.role === 'assistant' && (String(m.content || '') === placeholder)){
+            // prefer matching parent whose content equals the user prompt
+            const pidx = (typeof m.parent === 'number') ? m.parent : null;
+            const parent = (pidx !== null && window.messages[pidx]) ? window.messages[pidx] : null;
+            if(parent && String(parent.content || '').trim() === trimmedPrompt){
+              targetIdx = i;
+              break;
+            }
+            if(targetIdx === -1) targetIdx = i; // fallback to first found
+          }
+        }
+      }
+
+      // 4) If still not found via messages[], fall back to DOM search for a bubble that has placeholder text
+      if(targetIdx === -1){
+        const bubbles = document.querySelectorAll('.msg.assistant .bubble');
+        for(let i = bubbles.length - 1; i >= 0; i--){
+          const b = bubbles[i];
+          if(!b) continue;
+          if(String((b.textContent||'').trim()) === String(placeholder).trim()){
+            const parentMsg = b.closest('.msg');
+            // try to read data-index attribute if present
+            const di = parentMsg ? parentMsg.getAttribute('data-index') : null;
+            if(di !== null && !isNaN(Number(di))) { targetIdx = Number(di); break; }
+            // else just replace bubble text content and return
+            b.textContent = realText;
+            // saveSession if exists
+            if(typeof window.saveSession === 'function') try{ window.saveSession(); }catch(e){}
+            return;
+          }
+        }
+      }
+
+      // 5) If we have a target index, update the messages array and DOM safely
+      if(targetIdx !== -1){
+        if(window.messages && window.messages[targetIdx]){
+          window.messages[targetIdx].content = realText;
+        }
+        try {
+          if(typeof window.createMessageElement === 'function'){
+            const oldEl = document.querySelector('.msg[data-index="'+targetIdx+'"]') || document.querySelector('.msg[data-id="'+(window.messages[targetIdx] && window.messages[targetIdx].id)+'"]');
+            const newEl = window.createMessageElement(window.messages[targetIdx], targetIdx);
+            if(oldEl && newEl){
+              oldEl.replaceWith(newEl);
+              requestAnimationFrame(()=> setTimeout(()=> newEl.classList.add('show'), 20));
+            } else if(typeof window.renderMessages === 'function'){
+              window.renderMessages(true);
+            }
+          } else if(typeof window.renderMessages === 'function'){
+            window.renderMessages(true);
+          }
+        } catch(e){ 
+          console.error('Failed updating DOM with real reply', e);
+          if(typeof window.renderMessages === 'function') try{ window.renderMessages(true); }catch(_){}
+        }
+        if(typeof window.saveSession === 'function'){
+          try{ window.saveSession(); }catch(_){}
+        }
+      }
+    } catch(e){
+      console.error('Unexpected error in simulatedAssistantReply async updater', e);
+    }
+  })();
+
+  // return placeholder immediately (keeps UI unchanged)
+  return placeholder;
+}
+/* ====== End replacement: simulatedAssistantReply ====== */
 
       // Typing indicator — do not force scroll if user is scrolled up (autoScrollEnabled will control)
       function showTyping(){ 
@@ -3108,174 +3255,6 @@ else if (act === 'sendFeedback') {
 
     });
   })();
-</script>
-
-<!-- Puter.js integration (injected) - replaces placeholder replies with real replies from Puter.ai (gpt-5-nano)
-     Non-destructive: does not change HTML/CSS/structure. It only appends a script that patches
-     `simulatedAssistantReply` to fetch a real reply asynchronously and replace the placeholder in-place.
--->
-<script>
-(function(){
-  try{
-    if(window.__puter_patched) return;
-    window.__puter_patched = true;
-    if(typeof window.simulatedAssistantReply === 'function'){
-      window._orig_simulatedAssistantReply = window.simulatedAssistantReply.bind(window);
-    } else {
-      window._orig_simulatedAssistantReply = (p)=>('Processing: ' + (p||''));
-    }
-
-    function loadPuterScript(){
-      return new Promise((resolve, reject)=>{
-        if(window.puter && window.puter.ai) return resolve(window.puter);
-        if(document.querySelector('script[data-puter-injected]')) {
-          const start = Date.now();
-          (function waitForPuter(){
-            if(window.puter && window.puter.ai) return resolve(window.puter);
-            if(Date.now() - start > 15000) return reject(new Error('Puter load timeout'));
-            setTimeout(waitForPuter, 120);
-          })();
-          return;
-        }
-        const s = document.createElement('script');
-        s.setAttribute('data-puter-injected','1');
-        s.src = 'https://js.puter.com/v2/';
-        s.async = true;
-        s.onload = function(){ 
-          if(window.puter && window.puter.ai) resolve(window.puter);
-          else {
-            setTimeout(()=> (window.puter && window.puter.ai) ? resolve(window.puter) : reject(new Error('Puter did not initialize')), 200);
-          }
-        };
-        s.onerror = function(e){ reject(new Error('Failed to load Puter.js')); };
-        document.head.appendChild(s);
-      });
-    }
-
-    async function toStringFromPuterResponse(resp){
-      try {
-        if(resp == null) return '';
-        if(typeof resp === 'string') return resp;
-        if(typeof resp.text === 'string') return resp.text;
-        if(Symbol.asyncIterator in Object(resp)){
-          let acc = '';
-          for await (const part of resp){
-            acc += (part?.text || part || '');
-          }
-          return acc;
-        }
-        if(Array.isArray(resp)) return resp.join('');
-        return String(resp);
-      } catch(e){ return String(resp); }
-    }
-
-    window.simulatedAssistantReply = function(prompt){
-      try{
-        const placeholder = (typeof window._orig_simulatedAssistantReply === 'function') ? window._orig_simulatedAssistantReply(prompt) : ('Processing...');
-
-        (async function(){
-          let puter;
-          try{
-            puter = await loadPuterScript();
-          } catch(err){
-            console.error('Puter.js load failed (injected).', err);
-            return;
-          }
-
-          let realResp;
-          try{
-            const r = await puter.ai.chat(String(prompt||''), { model: 'gpt-5-nano' });
-            realResp = await toStringFromPuterResponse(r);
-            if(typeof realResp !== 'string') realResp = String(realResp || '');
-          } catch(err){
-            console.error('Puter.ai.chat failed', err);
-            return;
-          }
-
-          try{
-            function findPrevUserIndex(i){
-              if(typeof window.findPrevUserIndex === 'function') return window.findPrevUserIndex(i);
-              for(let k=i-1;k>=0;k--){ if(window.messages && window.messages[k] && window.messages[k].role === 'user') return k; }
-              return -1;
-            }
-
-            const trimmedPrompt = String(prompt || '').trim();
-            let targetIdx = -1;
-            for(let i=(window.messages ? window.messages.length -1 : -1); i>=0; i--){
-              const m = window.messages[i];
-              if(!m) continue;
-              if(m.role === 'assistant' && m.content === placeholder){
-                const pidx = (typeof m.parent === 'number') ? m.parent : findPrevUserIndex(i);
-                const parent = (window.messages && window.messages[pidx]) ? window.messages[pidx] : null;
-                if(parent && String(parent.content||'').trim() === trimmedPrompt){
-                  targetIdx = i;
-                  break;
-                }
-                if(targetIdx === -1) targetIdx = i;
-              }
-            }
-
-            const start = Date.now();
-            while(targetIdx === -1 && Date.now() - start < 12000){
-              await new Promise(r=>setTimeout(r, 120));
-              for(let i=(window.messages ? window.messages.length -1 : -1); i>=0; i--){
-                const m = window.messages[i];
-                if(!m) continue;
-                if(m.role === 'assistant' && m.content === placeholder){
-                  const pidx = (typeof m.parent === 'number') ? m.parent : findPrevUserIndex(i);
-                  const parent = (window.messages && window.messages[pidx]) ? window.messages[pidx] : null;
-                  if(parent && String(parent.content||'').trim() === trimmedPrompt){
-                    targetIdx = i;
-                    break;
-                  }
-                  if(targetIdx === -1) targetIdx = i;
-                }
-              }
-            }
-
-            if(targetIdx === -1){
-              console.warn('Injected Puter integration: could not locate assistant message to replace (prompt may have been removed).');
-              return;
-            }
-
-            if(window.messages && window.messages[targetIdx]){
-              window.messages[targetIdx].content = realResp;
-            }
-
-            try{
-              const oldEl = document.querySelector('.messages .msg[data-index="'+targetIdx+'"]') || document.querySelector('.msg[data-index="'+targetIdx+'"]');
-              if(oldEl && typeof window.createMessageElement === 'function'){
-                const newEl = window.createMessageElement(window.messages[targetIdx], targetIdx);
-                oldEl.replaceWith(newEl);
-                requestAnimationFrame(()=> setTimeout(()=> newEl.classList.add('show'), 20));
-                if(typeof window.reindexDom === 'function') try{ window.reindexDom(); }catch(e){/*ignore*/};
-              } else {
-                if(typeof window.renderMessages === 'function') try{ window.renderMessages(true); }catch(e){/*ignore*/};
-              }
-            } catch(err){
-              console.error('Injected Puter integration: failed to replace DOM message', err);
-            }
-
-            if(typeof window.saveSession === 'function'){
-              try{ window.saveSession(); }catch(e){}
-            }
-          } catch(err){
-            console.error('Injected Puter integration: unexpected error', err);
-            return;
-          }
-        })();
-
-        return placeholder;
-      } catch(e){
-        try { return window._orig_simulatedAssistantReply(prompt); } catch(_) { return String(prompt || ''); }
-      }
-    };
-
-    console.info('Injected Puter.js reply-patcher (non-destructive).');
-  } catch(e){
-    console.error('Puter injection failed', e);
-  }
-})();
 </script>
 </body>
 </html>
