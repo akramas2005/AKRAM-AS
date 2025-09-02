@@ -1846,28 +1846,27 @@
         return t; 
       }
 
-      async function sendMessage(text){
-        text = (text||'').trim();
-        if(!text && !pendingAttachment) return;
-
+      // The corrected and final sendMessage function
+      async function sendMessage(text, parentIndex = null){
+        let textToUse = (text||'').trim();
+        if(!textToUse && !pendingAttachment) return;
+        
         if(pendingAttachment){
           sendAttachmentNow();
           return;
         }
 
-        const userMessage = {id:genId(), role:'user', content:text};
+        const userMessage = {id:genId(), role:'user', content:textToUse, parent: parentIndex};
         messages.push(userMessage);
         appendMessage(userMessage, messages.length - 1);
         saveSession();
         localStorage.removeItem(DRAFT_KEY);
-
         updateWelcomeVisibility();
 
         const typingEl = showTyping();
 
         try {
-          // Puter.js call to get a real response
-          const response = await puter.ai.chat(text, { model: 'gpt-5-chat-latest' });
+          const response = await puter.ai.chat(textToUse, { model: 'gpt-5-chat-latest' });
 
           typingEl.remove();
           const assistantMessage = {id:genId(), role:'assistant', content:response, parent: messages.length - 1, meta:{}};
@@ -1982,132 +1981,104 @@
         sendInsideBtn.classList.add('sending');
         setTimeout(()=>{
           sendInsideBtn.classList.remove('sending');
-        // ====== START: replace existing "edit" branch with this block ======
-if (editIndex !== null && editIndex >= 0) {
-  const t = composer.value.trim();
-
-  // 1) تحديث بيانات الرسالة (نحتفظ بأي مرفقات موجودة)
-  messages[editIndex].content = t;
-
-  // 2) تحديث فقاعـة الرسالة في الـ DOM من دون مسح الـ children (صور أو مرفقات)
-  const editedMsgEl = messagesEl.querySelector(`.msg[data-index="${editIndex}"] .bubble`);
-  if (editedMsgEl) {
-    // حاول إيجاد عنصر يحمل النص (أفضل إذا كان class="bubble-text")
-    let textHolder = editedMsgEl.querySelector('.bubble-text');
-
-    // إذا لم يوجد عنصر مخصص، نبحث عن عقدة نص أو عنصر غير وسائط (IMG/VIDEO/PICTURE)
-    if (!textHolder) {
-      for (let node of editedMsgEl.childNodes) {
-        if (node.nodeType === Node.TEXT_NODE && node.nodeValue.trim() !== '') {
-          textHolder = node;
-          break;
+        // The corrected edit branch
+        if (editIndex !== null && editIndex >= 0) {
+          const t = composer.value.trim();
+          messages[editIndex].content = t;
+          const editedMsgEl = messagesEl.querySelector(`.msg[data-index="${editIndex}"] .bubble`);
+          if (editedMsgEl) {
+            let textHolder = editedMsgEl.querySelector('.bubble-text');
+            if (!textHolder) {
+              for (let node of editedMsgEl.childNodes) {
+                if (node.nodeType === Node.TEXT_NODE && node.nodeValue.trim() !== '') {
+                  textHolder = node;
+                  break;
+                }
+                if (node.nodeType === Node.ELEMENT_NODE) {
+                  const tag = node.tagName.toUpperCase();
+                  if (tag !== 'IMG' && tag !== 'PICTURE' && tag !== 'VIDEO'
+                      && !node.classList.contains('msg-actions') && !node.classList.contains('feedback-row')) {
+                    textHolder = node;
+                    break;
+                  }
+                }
+              }
+            }
+            if (textHolder) {
+              if (textHolder.nodeType === Node.TEXT_NODE) {
+                textHolder.nodeValue = t;
+              } else {
+                textHolder.textContent = t;
+              }
+            } else {
+              const span = document.createElement('span');
+              span.className = 'bubble-text';
+              span.textContent = t;
+              const media = editedMsgEl.querySelector('img, picture, video');
+              if (media) editedMsgEl.insertBefore(span, media);
+              else editedMsgEl.insertBefore(span, editedMsgEl.firstChild);
+            }
+          }
+          messages.splice(editIndex + 1);
+          const nodes = [...messagesEl.querySelectorAll('.msg')];
+          const toRemove = [];
+          for (const el of nodes) {
+            const i = Number(el.dataset.index || -1);
+            if (i > editIndex) toRemove.push(el);
+          }
+          toRemove.forEach((el, idx) => {
+            el.style.transition = 'opacity .12s ease, transform .12s ease';
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(-6px)';
+            setTimeout(() => { el.remove(); }, 120 + idx * 10);
+          });
+          if (typeof reindexDom === 'function') {
+            setTimeout(() => { reindexDom(); }, 160);
+          }
+          saveSession();
+          const oldIndex = editIndex;
+          editIndex = null;
+          editCancelBtn.style.display = 'none';
+          composer.value = '';
+          localStorage.removeItem(DRAFT_KEY);
+          updateSendVisibility();
+          autoGrowTextarea();
+          const typingEl = showTyping();
+          setTimeout(() => {
+            typingEl.remove();
+            puter.ai.chat(t, { model: 'gpt-5-chat-latest' }).then(response => {
+              const assistantMsg = { id: genId(), role: 'assistant', content: response, parent: oldIndex, meta: {} };
+              messages.push(assistantMsg);
+              if (typeof appendMessage === 'function') {
+                appendMessage(assistantMsg, messages.length - 1);
+              } else {
+                renderMessages();
+              }
+              saveSession();
+              if (typeof reindexDom === 'function') reindexDom();
+            }).catch(error => {
+              console.error("Puter.js error:", error);
+              const errorMessage = "Sorry, I encountered an error. Please try again.";
+              const assistantMsg = { id: genId(), role: 'assistant', content: errorMessage, parent: oldIndex, meta: { hideReactionButtons: true, hideDislike: true } };
+              messages.push(assistantMsg);
+              appendMessage(assistantMsg, messages.length - 1);
+              saveSession();
+              if (typeof reindexDom === 'function') reindexDom();
+            });
+          }, 700 + Math.min(1500, t.length * 18));
+          return;
         }
-        if (node.nodeType === Node.ELEMENT_NODE) {
-          const tag = node.tagName.toUpperCase();
-          // تجاهل عناصر الوسائط و أزرار التحكم داخل الفقاعة
-          if (tag !== 'IMG' && tag !== 'PICTURE' && tag !== 'VIDEO'
-              && !node.classList.contains('msg-actions') && !node.classList.contains('feedback-row')) {
-            textHolder = node;
-            break;
+        else {
+          if (pendingAttachment) {
+            sendAttachmentNow();
+          } else {
+            composer.value = '';
+            updateSendVisibility();
+            autoGrowTextarea();
+            sendMessage(t);
           }
         }
-      }
-    }
-
-    // إذا وجدنا مكاناً للنص، نحدّثه (نستبدل، لا نضيف)
-    if (textHolder) {
-      if (textHolder.nodeType === Node.TEXT_NODE) {
-        textHolder.nodeValue = t;
-      } else {
-        textHolder.textContent = t;
-      }
-    } else {
-      // لا يوجد نص سابق: نُنشئ span مخصص وندرجه قبل أول ميديا إن وُجدت أو كبداية الفقاعة
-      const span = document.createElement('span');
-      span.className = 'bubble-text';
-      span.textContent = t;
-      const media = editedMsgEl.querySelector('img, picture, video');
-      if (media) editedMsgEl.insertBefore(span, media);
-      else editedMsgEl.insertBefore(span, editedMsgEl.firstChild);
-    }
-  }
-
-  // 3) حذف الردود التالية من المصفوفة
-  messages.splice(editIndex + 1);
-
-  // 4) حذف عناصر DOM المقابلة للرسائل التي بعد الرسالة المعدلة بسلاسة (بدون ومضة)
-  const nodes = [...messagesEl.querySelectorAll('.msg')];
-  const toRemove = [];
-  for (const el of nodes) {
-    const i = Number(el.dataset.index || -1);
-    if (i > editIndex) toRemove.push(el);
-  }
-  toRemove.forEach((el, idx) => {
-    el.style.transition = 'opacity .12s ease, transform .12s ease';
-    el.style.opacity = '0';
-    el.style.transform = 'translateY(-6px)';
-    setTimeout(() => { el.remove(); }, 120 + idx * 10);
-  });
-
-  // 4b) إعادة ترقيم DOM إن وجدت دالة لهذا الغرض
-  if (typeof reindexDom === 'function') {
-    setTimeout(() => { reindexDom(); }, 160);
-  }
-
-  // 5) حفظ الحالة
-  saveSession();
-
-  // 6) تنظيف حالة التعديل في الواجهة
-  const oldIndex = editIndex;
-  editIndex = null;
-  editCancelBtn.style.display = 'none';
-  composer.value = '';
-  localStorage.removeItem(DRAFT_KEY);
-  updateSendVisibility();
-  autoGrowTextarea();
-
-  // 7) إظهار نقاط الكتابة ثم إضافة رد المساعد الجديد بسلاسة (appendMessage إن وُجد)
-  const typingEl = showTyping();
-  setTimeout(() => {
-    typingEl.remove();
-    
-    // Puter.js call to get a real response
-    puter.ai.chat(t, { model: 'gpt-5-chat-latest' }).then(response => {
-      const assistantMsg = { id: genId(), role: 'assistant', content: response, parent: oldIndex, meta: {} };
-      messages.push(assistantMsg);
-      if (typeof appendMessage === 'function') {
-        appendMessage(assistantMsg, messages.length - 1);
-      } else {
-        renderMessages();
-      }
-      saveSession();
-      if (typeof reindexDom === 'function') reindexDom();
-    }).catch(error => {
-      console.error("Puter.js error:", error);
-      const errorMessage = "Sorry, I encountered an error. Please try again.";
-      const assistantMsg = { id: genId(), role: 'assistant', content: errorMessage, parent: oldIndex, meta: { hideReactionButtons: true, hideDislike: true } };
-      messages.push(assistantMsg);
-      appendMessage(assistantMsg, messages.length - 1);
-      saveSession();
-      if (typeof reindexDom === 'function') reindexDom();
-    });
-  }, 700 + Math.min(1500, t.length * 18));
-
-  return; // نهاية فرع التعديل
-}
-// ====== END: edit branch replacement ======
- else {
-  if (pendingAttachment) {
-    sendAttachmentNow();
-  } else {
-    composer.value = '';
-    updateSendVisibility();
-    autoGrowTextarea();
-    sendMessage(t);
-  }
-}
-startRotatorIfNeeded();
-
+        startRotatorIfNeeded();
         }, 260);
       });
 
@@ -2240,7 +2211,6 @@ startRotatorIfNeeded();
           const prevBottom = messagesEl.scrollHeight - messagesEl.scrollTop;
 
           messages.splice(idx);
-
           [...messagesEl.querySelectorAll('.msg')].forEach(n => {
             const i = Number(n.dataset.index || -1);
             if (i >= idx) {
@@ -2250,19 +2220,19 @@ startRotatorIfNeeded();
               setTimeout(() => n.remove(), 120);
             }
           });
-
           reindexDom(); 
           saveSession();
 
           const typingEl = showTyping();
 
-          puter.ai.chat(userText, { model: 'gpt-5-chat-latest' }).then(response => {
+          try {
+            const response = await puter.ai.chat(userText, { model: 'gpt-5-chat-latest' });
             typingEl.remove();
             const assistantMsg = { id: genId(), role: 'assistant', content: response, parent: parentIdx, meta: {} };
             messages.push(assistantMsg);
             appendMessage(assistantMsg, messages.length - 1);
             saveSession();
-          }).catch(error => {
+          } catch(error) {
             console.error("Puter.js error:", error);
             typingEl.remove();
             const errorMessage = "Sorry, I encountered an error. Please try again.";
@@ -2270,7 +2240,7 @@ startRotatorIfNeeded();
             messages.push(assistantMessage);
             appendMessage(assistantMessage, messages.length - 1);
             saveSession();
-          });
+          }
           
           messagesEl.scrollTop = messagesEl.scrollHeight - prevBottom;
           return;
@@ -2470,33 +2440,30 @@ startRotatorIfNeeded();
 
       messageConfirmModal.addEventListener('click', (e)=>{ if(e.target === messageConfirmModal) messageConfirmModal.classList.remove('show'); });
       messageConfirmModal.querySelector('[data-msg-confirm="no"]').addEventListener('click', ()=>{ messageConfirmModal.classList.remove('show'); pendingMessageDeleteIndex = null; });
-     messageConfirmModal.querySelector('[data-msg-confirm="yes"]').addEventListener('click', ()=>{ 
-  if (typeof pendingMessageDeleteIndex === 'number') {
-    const start = pendingMessageDeleteIndex;
-
-    messages.splice(start);
-
-    const nodes = [...messagesEl.querySelectorAll('.msg')];
-    for (const el of nodes) {
-      const i = Number(el.dataset.index || -1);
-      if (i >= start) el.remove();
-    }
-
-    saveSession();
-    toast('Messages deleted');
-  }
-  pendingMessageDeleteIndex = null;
-  messageConfirmModal.classList.remove('show');
-});
+      messageConfirmModal.querySelector('[data-msg-confirm="yes"]').addEventListener('click', ()=>{ 
+        if (typeof pendingMessageDeleteIndex === 'number') {
+          const start = pendingMessageDeleteIndex;
+          messages.splice(start);
+          const nodes = [...messagesEl.querySelectorAll('.msg')];
+          for (const el of nodes) {
+            const i = Number(el.dataset.index || -1);
+            if (i >= start) el.remove();
+          }
+          saveSession();
+          toast('Messages deleted');
+        }
+        pendingMessageDeleteIndex = null;
+        messageConfirmModal.classList.remove('show');
+      });
 
       function findPrevUserIndex(i){
         for(let k=i-1; k>=0; k--){ if(messages[k].role==='user') return k; }
         return -1;
       }
       function reindexDom(){
-  const nodes = messagesEl.querySelectorAll('.msg');
-  nodes.forEach((el, i) => { el.dataset.index = i; });
-}
+        const nodes = messagesEl.querySelectorAll('.msg');
+        nodes.forEach((el, i) => { el.dataset.index = i; });
+      }
       function closeMenus(){ closeAttach(); chatMenu.classList.remove('show'); }
 
       chatMenuBtn.addEventListener('click', (e)=>{ e.stopPropagation(); chatMenu.classList.toggle('show'); });
@@ -3010,20 +2977,20 @@ startRotatorIfNeeded();
         }catch(e){ console.error(e); toast('Could not create new chat'); }
       });
          
-(function(){
-  const newChatBtnEl = document.getElementById('newChatBtn');
-  if (!newChatBtnEl) return;
+      (function(){
+        const newChatBtnEl = document.getElementById('newChatBtn');
+        if (!newChatBtnEl) return;
 
-  newChatBtnEl.addEventListener('touchstart', (e)=>{
-    newChatBtnEl.classList.add('touched');
-  }, {passive:true});
+        newChatBtnEl.addEventListener('touchstart', (e)=>{
+          newChatBtnEl.classList.add('touched');
+        }, {passive:true});
 
-  newChatBtnEl.addEventListener('touchend', ()=>{
-    setTimeout(()=> newChatBtnEl.classList.remove('touched'), 260);
-  });
+        newChatBtnEl.addEventListener('touchend', ()=>{
+          setTimeout(()=> newChatBtnEl.classList.remove('touched'), 260);
+        });
 
-  newChatBtnEl.addEventListener('mouseleave', ()=> newChatBtnEl.classList.remove('touched'));
-})();
+        newChatBtnEl.addEventListener('mouseleave', ()=> newChatBtnEl.classList.remove('touched'));
+      })();
 
       window.addEventListener('popstate', (event) => {
         try {
