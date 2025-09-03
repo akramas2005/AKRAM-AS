@@ -1876,11 +1876,6 @@
     botMessageEl.className = 'msg assistant';
     botMessageEl.dataset.index = messages.length;
     messagesEl.appendChild(botMessageEl);
-    
-    // Create the bubble and append it to the message element
-    const botBubbleEl = document.createElement('div');
-    botBubbleEl.className = 'bubble';
-    botMessageEl.appendChild(botBubbleEl);
 
     let botMessageText = '';
     
@@ -1895,7 +1890,8 @@
         for await (const part of response) {
             if (part && part.text) {
                 botMessageText += part.text;
-                botBubbleEl.innerHTML = escapeHtml(botMessageText).replace(/\n/g, '<br>');
+                // Update the innerHTML of the message element with a new bubble
+                botMessageEl.innerHTML = `<div class="bubble">${escapeHtml(botMessageText).replace(/\n/g, '<br>')}</div>`;
                 messagesEl.scrollTop = messagesEl.scrollHeight;
             }
         }
@@ -1914,7 +1910,7 @@
     } catch (error) {
         console.error("Puter.js Error:", error);
         messagesEl.removeChild(typingEl);
-        botBubbleEl.innerHTML = "حدث خطأ. يرجى المحاولة مرة أخرى.";
+        botMessageEl.innerHTML = `<div class="bubble">حدث خطأ. يرجى المحاولة مرة أخرى.</div>`;
     }
 }
       // OPEN/CLOSE CHAT (use history for back-button order)
@@ -3143,6 +3139,7 @@ else if (act === 'sendFeedback') {
 </body>
 
 </html>
+
 
 
 
