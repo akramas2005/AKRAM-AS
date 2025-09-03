@@ -2631,6 +2631,13 @@ else if (act === 'sendFeedback') {
   h1{ font-size:20px; color:#0078ff; margin:0 0 12px 0; }
   @media (max-width:600px){ body{padding:12px} .wrap{padding:12px} h1{font-size:18px} }
 </style>
+<style>
+/* Auto direction for message bubbles: Arabic will render RTL automatically */
+.msg.assistant .bubble, .msg.user .bubble {
+  direction: auto;
+  unicode-bidi: plaintext;
+}
+</style>
 </head>
 <body>
   <div class="wrap">
@@ -3202,6 +3209,132 @@ else if (act === 'sendFeedback') {
 
     });
   })();
+</script>
+
+<!-- Puter regen/edit integration: delegated handler to support regenerate & edit using sendMessage() -->
+<script>
+(function(){
+  if (window.__puter_regen_edit_installed) return;
+  window.__puter_regen_edit_installed = true;
+
+  document.addEventListener('click', async function(e){
+    const btn = e.target.closest && e.target.closest('.act-btn');
+    if (!btn) return;
+    const act = btn.dataset && btn.dataset.act;
+    if (!act) return;
+
+    try {
+      if (act === 'regen') {
+        e.preventDefault();
+        // find the assistant message element
+        const msgEl = btn.closest('.msg');
+        if (!msgEl) return;
+        // determine message index or id
+        const idx = msgEl.dataset && msgEl.dataset.index ? Number(msgEl.dataset.index) : null;
+        let parentIdx = null;
+        if (idx !== null && window.messages && window.messages[idx]) {
+          parentIdx = window.messages[idx].parent;
+        }
+        // fallback: find the nearest previous user message
+        if (parentIdx == null && Array.isArray(window.messages)) {
+          for (let i = (idx || window.messages.length-1); i >= 0; i--) {
+            if (window.messages[i] && window.messages[i].role === 'user') { parentIdx = i; break; }
+          }
+        }
+        if (parentIdx == null) return;
+        const userMsg = window.messages[parentIdx];
+        if (!userMsg) return;
+
+        // Remove assistant replies associated with this parent (so regenerate is clean)
+        if (Array.isArray(window.messages)) {
+          for (let i = window.messages.length - 1; i > parentIdx; i--) {
+            if (window.messages[i] && window.messages[i].role === 'assistant' && window.messages[i].parent === parentIdx) {
+              window.messages.splice(i, 1);
+            }
+          }
+        }
+
+        // re-render messages to remove old assistant bubbles if function available
+        if (typeof window.renderMessages === 'function') {
+          try { window.renderMessages(true); } catch(e) {}
+        } else {
+          // minimal DOM cleanup: remove assistant msg elements after parentIdx if present
+          try {
+            const nodes = document.querySelectorAll('.msg');
+            for (let i = nodes.length-1; i >=0; i--) {
+              const n = nodes[i];
+              const di = n.getAttribute('data-index');
+              if (di && Number(di) > parentIdx && n.classList.contains('assistant')) n.remove();
+            }
+          } catch(e) {}
+        }
+
+        // show typing and call sendMessage to regenerate
+        try {
+          // call sendMessage on the user's message content and pass parentIndex
+          if (typeof sendMessage === 'function') {
+            sendMessage(userMsg.content, parentIdx);
+          } else {
+            console.warn('sendMessage is not defined');
+          }
+        } catch(err) {
+          console.error('regen handler error', err);
+        }
+      } else if (act === 'edit') {
+        e.preventDefault();
+        const msgEl = btn.closest('.msg');
+        if (!msgEl) return;
+        const idx = msgEl.dataset && msgEl.dataset.index ? Number(msgEl.dataset.index) : null;
+        if (idx == null) return;
+        const target = (window.messages && window.messages[idx]) ? window.messages[idx] : null;
+        if (!target) return;
+
+        // If editing a user message, populate composer and set editIndex for your existing edit flow if present
+        if (target.role === 'user') {
+          if (typeof window.composer !== 'undefined') {
+            composer.value = target.content || '';
+            editIndex = idx;
+            if (typeof updateSendVisibility === 'function') try{ updateSendVisibility(); }catch(e) {}
+            if (typeof autoGrowTextarea === 'function') try{ autoGrowTextarea(); }catch(e) {}
+            // focus composer
+            try { composer.focus(); } catch(e) {}
+          } else {
+            // fallback: prompt for new content and resend
+            const newText = prompt('Edit message:', target.content || '');
+            if (newText !== null) {
+              window.messages[idx].content = String(newText);
+              // remove assistant replies after this user message
+              for (let i = window.messages.length - 1; i > idx; i--) {
+                if (window.messages[i] && window.messages[i].role === 'assistant' && window.messages[i].parent === idx) {
+                  window.messages.splice(i, 1);
+                }
+              }
+              if (typeof window.saveSession === 'function') try{ saveSession(); }catch(e) {}
+              if (typeof window.renderMessages === 'function') try{ renderMessages(true); }catch(e) {}
+              // resend using sendMessage
+              if (typeof sendMessage === 'function') sendMessage(newText, idx);
+            }
+          }
+        } else {
+          // If edit clicked on assistant message, find parent user and open composer for that parent
+          const parentIdx = target.parent != null ? target.parent : (function(){ for (let i=idx-1;i>=0;i--) if (window.messages[i] && window.messages[i].role==='user') return i; return null; })();
+          if (parentIdx != null) {
+            const parentMsg = window.messages[parentIdx];
+            if (parentMsg && typeof window.composer !== 'undefined') {
+              composer.value = parentMsg.content || '';
+              editIndex = parentIdx;
+              if (typeof updateSendVisibility === 'function') try{ updateSendVisibility(); }catch(e) {}
+              if (typeof autoGrowTextarea === 'function') try{ autoGrowTextarea(); }catch(e) {}
+              try { composer.focus(); } catch(e) {}
+            }
+          }
+        }
+      }
+    } catch(ex) {
+      console.error('regen/edit delegated handler error', ex);
+    }
+  }, true);
+})();
 </script>
 </body>
 
