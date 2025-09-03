@@ -919,6 +919,14 @@
 
 </style>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
+
+<style id="bubble-auto-dir">
+/* Auto direction for Arabic/English mix */
+.msg.assistant .bubble, .msg.user .bubble {
+  direction: auto;
+  unicode-bidi: plaintext;
+}
+</style>
 </head>
 <body>
   <div class="wrap">
@@ -1703,7 +1711,7 @@
         const bubble = document.createElement('div');
         bubble.className = 'bubble';
 
-        if (m.content && typeof m.content === 'string' && String(m.content||'').trim()) {
+        if (m.content && typeof m.content === 'string' && m.content.trim()) {
   const txt = document.createElement('div');
   txt.innerHTML = escapeHtml(m.content).replace(/\n/g,'<br>');
   bubble.appendChild(txt);
@@ -1853,8 +1861,7 @@
         return t; 
       }
 
-      
-async function sendMessage(text, parentIndex = null) {
+      async function sendMessage(text, parentIndex = null) {
     let textToUse = (text || '').trim();
     if (!textToUse && !pendingAttachment) return;
 
@@ -1863,7 +1870,7 @@ async function sendMessage(text, parentIndex = null) {
         return;
     }
 
-    // 1) add user message
+    // 1) أضف رسالة المستخدم
     const userMessage = { id: genId(), role: 'user', content: textToUse, parent: parentIndex };
     messages.push(userMessage);
     appendMessage(userMessage, messages.length - 1);
@@ -1871,115 +1878,70 @@ async function sendMessage(text, parentIndex = null) {
     localStorage.removeItem(DRAFT_KEY);
     updateWelcomeVisibility();
 
-    // 2) create assistant placeholder message (push to messages[] BUT DO NOT append DOM yet)
+    // 2) أضف رسالة البوت (مبدئية وفارغة)
     const assistantMessage = { id: genId(), role: 'assistant', content: '', parent: messages.length - 1, meta: {} };
     messages.push(assistantMessage);
-    const assistantIdx = messages.length - 1;
-    saveSession();
+    appendMessage(assistantMessage, messages.length - 1);
 
-    // 3) show typing indicator ONLY (no DOM bubble yet)
+    // 3) جيب عنصر الرسالة من DOM عشان نحدثه أثناء الستريم
+    const botMessageEl = messagesEl.querySelector(`.msg[data-index="${messages.length - 1}"]`);
+    const bubbleEl = botMessageEl.querySelector('.bubble');
+
+    // 4) أضف مؤشر الكتابة
     const typingEl = showTyping();
     messagesEl.scrollTop = messagesEl.scrollHeight;
 
-    // placeholders for DOM refs that we'll create upon first chunk
-    let botMessageEl = null;
-    let bubbleEl = null;
-    let domAppended = false;
-
     try {
+        // 5) اتصل بـ Puter (مع stream)
         const response = await puter.ai.chat(textToUse, { model: 'gpt-5-nano', stream: true });
 
-        let buffer = '';
+        // أزل مؤشر الكتابة أول ما يجي رد
+        if (typingEl && typingEl.parentNode) {
+            typingEl.parentNode.removeChild(typingEl);
+        }
 
+        let botMessageText = '';
+
+        // 6) حدث الفقاعة مع كل جزء من الرد
         for await (const part of response) {
-            if (!part) continue;
-            const piece = part.text || (part.message && part.message.content) || '';
-            if (!piece) continue;
-
-            // On first chunk: remove typing indicator and append canonical assistant DOM
-            if (!domAppended) {
-                if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl);
-
-                // Use canonical appendMessage so the created DOM matches your app's structure
-                appendMessage(assistantMessage, assistantIdx);
-
-                // locate the newly appended DOM element by data-id or index
-                botMessageEl = messagesEl.querySelector('.msg[data-id="'+assistantMessage.id+'"]')
-                            || messagesEl.querySelector('.msg[data-index="'+assistantIdx+'"]')
-                            || messagesEl.querySelector('.msg:last-child');
-
-                if (botMessageEl) {
-                    if (!botMessageEl.dataset.id) botMessageEl.dataset.id = assistantMessage.id;
-                    bubbleEl = botMessageEl.querySelector('.bubble');
-                    if (!bubbleEl) {
-                        bubbleEl = document.createElement('div');
-                        bubbleEl.className = 'bubble';
-                        botMessageEl.appendChild(bubbleEl);
-                    }
+            if (part && part.text) {
+                botMessageText += part.text;
+                assistantMessage.content = botMessageText; // تحديث المصفوفة
+                if (bubbleEl) {
+                    bubbleEl.innerHTML = escapeHtml(botMessageText).replace(/\n/g, '<br>');
                 }
-
-                domAppended = true;
+                messagesEl.scrollTop = messagesEl.scrollHeight;
             }
-
-            // Append stream text
-            buffer += String(piece);
-            assistantMessage.content = buffer;
-
-            if (bubbleEl) {
-                bubbleEl.innerHTML = escapeHtml(assistantMessage.content).replace(/\n/g, '<br>');
-            }
-
-            messagesEl.scrollTop = messagesEl.scrollHeight;
         }
 
-        // After stream completes: add actions and replace with canonical element for consistency
-        if (!domAppended) {
-            // no content arrived (edge case) — remove typing and append empty assistant bubble
-            if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl);
-            appendMessage(assistantMessage, assistantIdx);
-            botMessageEl = messagesEl.querySelector('.msg[data-id="'+assistantMessage.id+'"]') || messagesEl.querySelector('.msg:last-child');
-            bubbleEl = botMessageEl ? botMessageEl.querySelector('.bubble') : null;
-        }
-
-        // actions
+        // 7) بعد اكتمال الرد أضف أزرار الأكشن
         const messageActions = document.createElement('div');
         messageActions.className = 'msg-actions';
-        messageActions.innerHTML = `<button class="act-btn" data-act="regen" data-tip="Regenerate" title="Regenerate"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0b2633" stroke-width="2"><path d="M21 12a9 9 0 1 1-3-6.7"/><polyline points="21 3 21 9 15 9"/></svg></button><span class="divider"></span>`;
-        if (botMessageEl) botMessageEl.appendChild(messageActions);
-
-        // Replace with canonical render if possible (keeps DOM consistent)
-        try {
-            const newEl = createMessageElement(Object.assign({}, assistantMessage), assistantIdx);
-            if (botMessageEl && newEl) {
-                botMessageEl.replaceWith(newEl);
-                requestAnimationFrame(()=> setTimeout(()=> newEl.classList.add('show'), 20));
-            }
-        } catch (e) {
-            // fallback: we already updated bubbleEl
-            console.error('replace final message failed', e);
-        }
+        messageActions.innerHTML = `
+            <button class="act-btn" data-act="regen" data-tip="Regenerate" title="Regenerate">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0b2633" stroke-width="2">
+                    <path d="M21 12a9 9 0 1 1-3-6.7"/>
+                    <polyline points="21 3 21 9 15 9"/>
+                </svg>
+            </button>
+            <span class="divider"></span>
+        `;
+        botMessageEl.appendChild(messageActions);
 
         saveSession();
 
     } catch (error) {
         console.error("Puter.js Error:", error);
-        // remove typing if present
-        if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl);
 
-        // show error bubble (create DOM if needed)
-        if (!domAppended) {
-            appendMessage(assistantMessage, assistantIdx);
-            botMessageEl = messagesEl.querySelector('.msg[data-id="'+assistantMessage.id+'"]') || messagesEl.querySelector('.msg:last-child');
-            bubbleEl = botMessageEl ? botMessageEl.querySelector('.bubble') : null;
+        if (typingEl && typingEl.parentNode) {
+            typingEl.parentNode.removeChild(typingEl);
         }
+
         if (bubbleEl) {
             bubbleEl.innerHTML = `<div class="bubble">حدث خطأ. يرجى المحاولة مرة أخرى.</div>`;
         }
-        assistantMessage.content = 'حدث خطأ. يرجى المحاولة مرة أخرى.';
-        saveSession();
     }
 }
-
       // OPEN/CLOSE CHAT (use history for back-button order)
       function openChatSimple(){
         try {
@@ -2631,13 +2593,6 @@ else if (act === 'sendFeedback') {
   h1{ font-size:20px; color:#0078ff; margin:0 0 12px 0; }
   @media (max-width:600px){ body{padding:12px} .wrap{padding:12px} h1{font-size:18px} }
 </style>
-<style>
-/* Auto direction for message bubbles: Arabic will render RTL automatically */
-.msg.assistant .bubble, .msg.user .bubble {
-  direction: auto;
-  unicode-bidi: plaintext;
-}
-</style>
 </head>
 <body>
   <div class="wrap">
@@ -2652,7 +2607,7 @@ else if (act === 'sendFeedback') {
         try {
           const data = messages || [];
           if(!data || data.length === 0){ toast('Nothing to save'); return; }
-          const title = (data && data.length>0) ? (data.find(m=>m.role==='user' && m.content && String(m.content||'').trim()) ? data.find(m=>m.role==='user' && m.content && String(m.content||'').trim()).content.split(/\s+/).slice(0,4).join(' ') : 'Conversation') : 'Conversation';
+          const title = (data && data.length>0) ? (data.find(m=>m.role==='user' && m.content && m.content.trim()) ? data.find(m=>m.role==='user' && m.content && m.content.trim()).content.split(/\s+/).slice(0,4).join(' ') : 'Conversation') : 'Conversation';
           const html = buildConversationHTML(data, title);
           const blob = new Blob([html], { type: 'text/html' });
           const a = document.createElement('a');
@@ -2957,7 +2912,7 @@ else if (act === 'sendFeedback') {
       function generateConversationTitle(msgs){
         try{
           if(!Array.isArray(msgs) || msgs.length===0) return 'Conversation';
-          const user = msgs.find(m => m.role==='user' && m.content && String(m.content||'').trim());
+          const user = msgs.find(m => m.role==='user' && m.content && m.content.trim());
           if(user){
             const words = user.content.replace(/\s+/g,' ').trim().split(' ').filter(Boolean).slice(0,4);
             if(words.length) return words.join(' ');
@@ -3211,127 +3166,154 @@ else if (act === 'sendFeedback') {
   })();
 </script>
 
-<!-- Puter regen/edit integration: delegated handler to support regenerate & edit using sendMessage() -->
-<script>
-(function(){
-  if (window.__puter_regen_edit_installed) return;
-  window.__puter_regen_edit_installed = true;
+<script id="puter-helpers">
+/* Unified Puter helpers: silent init on Chat Now + regen/edit delegate (non-destructive) */
+
+// Silent initialization: load Puter.js if needed and perform a tiny ping in background (no UI)
+async function silentPuterInit() {
+  try {
+    // load script tag if missing
+    if (!window.puter || !window.puter.ai || typeof window.puter.ai.chat !== 'function') {
+      if (!document.querySelector('script[src*="js.puter.com/v2"]')) {
+        const s = document.createElement('script');
+        s.src = 'https://js.puter.com/v2/';
+        s.defer = true;
+        s.async = true;
+        s.onerror = function(){ /* ignore */ };
+        document.head.appendChild(s);
+      }
+      // wait briefly for init (non-blocking for UI)
+      const start = Date.now();
+      while (!(window.puter && window.puter.ai && typeof window.puter.ai.chat === 'function') && Date.now() - start < 4000) {
+        await new Promise(r => setTimeout(r, 150));
+      }
+    }
+    // ping in background (ignore errors; do not open any UI)
+    if (window.puter && window.puter.ai && typeof window.puter.ai.chat === 'function') {
+      try {
+        await window.puter.ai.chat("init", { model: "gpt-5-nano", max_tokens: 1 });
+      } catch(e){ /* ignore */ }
+    }
+  } catch(e) { console.warn('silentPuterInit error', e); }
+}
+
+// Attach a safe click handler to Chat Now that starts silent init but opens chat immediately
+(function attachChatNowSilentInit(){
+  try {
+    const btn = document.getElementById('openChatBtn');
+    if (!btn) return;
+    // avoid duplicate attachment
+    if (btn.__silent_init_attached) return;
+    btn.__silent_init_attached = true;
+    btn.addEventListener('click', async function(e){
+      e.preventDefault();
+      // start silent init but don't block UI
+      try { silentPuterInit(); } catch(_) {}
+      // optional small delay to give the loader a head start
+      // await new Promise(r=>setTimeout(r, 100));
+      try { openChatSimple(); } catch(e) { console.error('openChatSimple error', e); }
+    });
+  } catch(e){ console.warn('attachChatNowSilentInit failed', e); }
+})();
+
+// Delegated handler for regenerate and edit actions
+(function attachRegenEditDelegation(){
+  if (window.__puter_regeedit_attached) return;
+  window.__puter_regeedit_attached = true;
 
   document.addEventListener('click', async function(e){
-    const btn = e.target.closest && e.target.closest('.act-btn');
-    if (!btn) return;
-    const act = btn.dataset && btn.dataset.act;
+    const el = e.target.closest && e.target.closest('.act-btn');
+    if (!el) return;
+    const act = el.dataset && el.dataset.act;
     if (!act) return;
 
-    try {
-      if (act === 'regen') {
-        e.preventDefault();
-        // find the assistant message element
-        const msgEl = btn.closest('.msg');
-        if (!msgEl) return;
-        // determine message index or id
-        const idx = msgEl.dataset && msgEl.dataset.index ? Number(msgEl.dataset.index) : null;
+    // helper: find message element and its index/id
+    const msgEl = el.closest && el.closest('.msg');
+    const idx = msgEl && msgEl.dataset && msgEl.dataset.index ? Number(msgEl.dataset.index) : null;
+
+    if (act === 'regen') {
+      e.preventDefault();
+      try {
+        // find parent user message index
         let parentIdx = null;
-        if (idx !== null && window.messages && window.messages[idx]) {
-          parentIdx = window.messages[idx].parent;
-        }
-        // fallback: find the nearest previous user message
+        if (idx !== null && Array.isArray(window.messages) && window.messages[idx]) parentIdx = window.messages[idx].parent;
         if (parentIdx == null && Array.isArray(window.messages)) {
           for (let i = (idx || window.messages.length-1); i >= 0; i--) {
             if (window.messages[i] && window.messages[i].role === 'user') { parentIdx = i; break; }
           }
         }
         if (parentIdx == null) return;
+
         const userMsg = window.messages[parentIdx];
         if (!userMsg) return;
 
-        // Remove assistant replies associated with this parent (so regenerate is clean)
+        // remove assistant replies after parentIdx
         if (Array.isArray(window.messages)) {
           for (let i = window.messages.length - 1; i > parentIdx; i--) {
             if (window.messages[i] && window.messages[i].role === 'assistant' && window.messages[i].parent === parentIdx) {
-              window.messages.splice(i, 1);
+              window.messages.splice(i,1);
             }
           }
         }
-
-        // re-render messages to remove old assistant bubbles if function available
         if (typeof window.renderMessages === 'function') {
-          try { window.renderMessages(true); } catch(e) {}
+          try { window.renderMessages(true); } catch(_) {}
         } else {
-          // minimal DOM cleanup: remove assistant msg elements after parentIdx if present
-          try {
-            const nodes = document.querySelectorAll('.msg');
-            for (let i = nodes.length-1; i >=0; i--) {
-              const n = nodes[i];
-              const di = n.getAttribute('data-index');
-              if (di && Number(di) > parentIdx && n.classList.contains('assistant')) n.remove();
-            }
-          } catch(e) {}
-        }
-
-        // show typing and call sendMessage to regenerate
-        try {
-          // call sendMessage on the user's message content and pass parentIndex
-          if (typeof sendMessage === 'function') {
-            sendMessage(userMsg.content, parentIdx);
-          } else {
-            console.warn('sendMessage is not defined');
+          // minimal DOM cleanup: remove assistant nodes after parentIdx
+          const nodes = document.querySelectorAll('.msg');
+          for (let i = nodes.length-1; i >=0; i--) {
+            const n = nodes[i];
+            const di = n.getAttribute('data-index');
+            if (di && Number(di) > parentIdx && n.classList.contains('assistant')) n.remove();
           }
-        } catch(err) {
-          console.error('regen handler error', err);
         }
-      } else if (act === 'edit') {
-        e.preventDefault();
-        const msgEl = btn.closest('.msg');
-        if (!msgEl) return;
-        const idx = msgEl.dataset && msgEl.dataset.index ? Number(msgEl.dataset.index) : null;
-        if (idx == null) return;
-        const target = (window.messages && window.messages[idx]) ? window.messages[idx] : null;
-        if (!target) return;
 
-        // If editing a user message, populate composer and set editIndex for your existing edit flow if present
+        // call sendMessage to regenerate (will stream result)
+        if (typeof sendMessage === 'function') {
+          // ensure Puter is preloaded in background
+          try { silentPuterInit(); } catch(_) {}
+          sendMessage(userMsg.content, parentIdx);
+        }
+      } catch(err){ console.error('regen handler err', err); }
+    } else if (act === 'edit') {
+      e.preventDefault();
+      try {
+        if (idx == null || !Array.isArray(window.messages) || !window.messages[idx]) return;
+        const target = window.messages[idx];
         if (target.role === 'user') {
           if (typeof window.composer !== 'undefined') {
             composer.value = target.content || '';
             editIndex = idx;
-            if (typeof updateSendVisibility === 'function') try{ updateSendVisibility(); }catch(e) {}
-            if (typeof autoGrowTextarea === 'function') try{ autoGrowTextarea(); }catch(e) {}
-            // focus composer
-            try { composer.focus(); } catch(e) {}
+            if (typeof updateSendVisibility === 'function') try{ updateSendVisibility(); }catch(e){}
+            if (typeof autoGrowTextarea === 'function') try{ autoGrowTextarea(); }catch(e){}
+            try{ composer.focus(); }catch(e){}
           } else {
-            // fallback: prompt for new content and resend
             const newText = prompt('Edit message:', target.content || '');
             if (newText !== null) {
               window.messages[idx].content = String(newText);
               // remove assistant replies after this user message
               for (let i = window.messages.length - 1; i > idx; i--) {
-                if (window.messages[i] && window.messages[i].role === 'assistant' && window.messages[i].parent === idx) {
-                  window.messages.splice(i, 1);
-                }
+                if (window.messages[i] && window.messages[i].role === 'assistant' && window.messages[i].parent === idx) window.messages.splice(i,1);
               }
-              if (typeof window.saveSession === 'function') try{ saveSession(); }catch(e) {}
-              if (typeof window.renderMessages === 'function') try{ renderMessages(true); }catch(e) {}
-              // resend using sendMessage
-              if (typeof sendMessage === 'function') sendMessage(newText, idx);
+              if (typeof window.saveSession === 'function') try{ saveSession(); }catch(e){}
+              if (typeof window.renderMessages === 'function') try{ renderMessages(true); }catch(e){}
+              if (typeof sendMessage === 'function') {
+                try { silentPuterInit(); } catch(_) {}
+                sendMessage(newText, idx);
+              }
             }
           }
         } else {
-          // If edit clicked on assistant message, find parent user and open composer for that parent
+          // editing assistant: focus parent user
           const parentIdx = target.parent != null ? target.parent : (function(){ for (let i=idx-1;i>=0;i--) if (window.messages[i] && window.messages[i].role==='user') return i; return null; })();
-          if (parentIdx != null) {
-            const parentMsg = window.messages[parentIdx];
-            if (parentMsg && typeof window.composer !== 'undefined') {
-              composer.value = parentMsg.content || '';
-              editIndex = parentIdx;
-              if (typeof updateSendVisibility === 'function') try{ updateSendVisibility(); }catch(e) {}
-              if (typeof autoGrowTextarea === 'function') try{ autoGrowTextarea(); }catch(e) {}
-              try { composer.focus(); } catch(e) {}
-            }
+          if (parentIdx != null && typeof window.composer !== 'undefined') {
+            composer.value = window.messages[parentIdx].content || '';
+            editIndex = parentIdx;
+            if (typeof updateSendVisibility === 'function') try{ updateSendVisibility(); }catch(e){}
+            if (typeof autoGrowTextarea === 'function') try{ autoGrowTextarea(); }catch(e){}
+            try{ composer.focus(); }catch(e){}
           }
         }
-      }
-    } catch(ex) {
-      console.error('regen/edit delegated handler error', ex);
+      } catch(err){ console.error('edit handler err', err); }
     }
   }, true);
 })();
