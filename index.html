@@ -1871,83 +1871,113 @@
     updateWelcomeVisibility();
 
     // 2) create assistant placeholder message and append via canonical function
+        // 2) create assistant placeholder message (push to messages[] BUT DO NOT append DOM yet)
     const assistantMessage = { id: genId(), role: 'assistant', content: '', parent: messages.length - 1, meta: {} };
     messages.push(assistantMessage);
     const assistantIdx = messages.length - 1;
-    appendMessage(assistantMessage, assistantIdx);
     saveSession();
 
-    // 3) locate DOM element for the assistant message using data-id (fallback to index)
-    let botMessageEl = messagesEl.querySelector('.msg[data-id="'+assistantMessage.id+'"]') 
-                     || messagesEl.querySelector('.msg[data-index="'+assistantIdx+'"]') 
-                     || messagesEl.querySelector('.msg:last-child');
-
-    if (!botMessageEl) {
-        // fallback: create element with bubble
-        botMessageEl = document.createElement('div');
-        botMessageEl.className = 'msg assistant';
-        botMessageEl.dataset.index = assistantIdx;
-        botMessageEl.dataset.id = assistantMessage.id;
-        const b = document.createElement('div'); b.className = 'bubble'; botMessageEl.appendChild(b);
-        messagesEl.appendChild(botMessageEl);
-    } else {
-        // ensure data-id present
-        if(!botMessageEl.dataset.id) botMessageEl.dataset.id = assistantMessage.id;
-    }
-
-    let bubbleEl = botMessageEl.querySelector('.bubble');
-    if(!bubbleEl){
-        bubbleEl = document.createElement('div'); bubbleEl.className = 'bubble'; botMessageEl.appendChild(bubbleEl);
-    }
-
-    // 4) show typing indicator
+    // 3) show typing indicator ONLY (no DOM bubble yet)
     const typingEl = showTyping();
     messagesEl.scrollTop = messagesEl.scrollHeight;
+
+    // placeholders for DOM refs that we'll create upon first chunk
+    let botMessageEl = null;
+    let bubbleEl = null;
+    let domAppended = false;
 
     try {
         const response = await puter.ai.chat(textToUse, { model: 'gpt-5-nano', stream: true });
 
-        // remove typing indicator when response starts
-        if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl);
-
         let buffer = '';
+
         for await (const part of response) {
             if (!part) continue;
             const piece = part.text || (part.message && part.message.content) || '';
             if (!piece) continue;
+
+            // On first chunk: remove typing indicator and append canonical assistant DOM
+            if (!domAppended) {
+                if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl);
+
+                // Use canonical appendMessage so the created DOM matches your app's structure
+                appendMessage(assistantMessage, assistantIdx);
+
+                // locate the newly appended DOM element by data-id or index
+                botMessageEl = messagesEl.querySelector('.msg[data-id="'+assistantMessage.id+'"]')
+                            || messagesEl.querySelector('.msg[data-index="'+assistantIdx+'"]')
+                            || messagesEl.querySelector('.msg:last-child');
+
+                if (botMessageEl) {
+                    if (!botMessageEl.dataset.id) botMessageEl.dataset.id = assistantMessage.id;
+                    bubbleEl = botMessageEl.querySelector('.bubble');
+                    if (!bubbleEl) {
+                        bubbleEl = document.createElement('div');
+                        bubbleEl.className = 'bubble';
+                        botMessageEl.appendChild(bubbleEl);
+                    }
+                }
+
+                domAppended = true;
+            }
+
+            // Append stream text
             buffer += String(piece);
             assistantMessage.content = buffer;
-            bubbleEl.innerHTML = escapeHtml(assistantMessage.content).replace(/\\n/g, '<br>');
+
+            if (bubbleEl) {
+                bubbleEl.innerHTML = escapeHtml(assistantMessage.content).replace(/\n/g, '<br>');
+            }
+
             messagesEl.scrollTop = messagesEl.scrollHeight;
         }
 
-        // add actions
+        // After stream completes: add actions and replace with canonical element for consistency
+        if (!domAppended) {
+            // no content arrived (edge case) — remove typing and append empty assistant bubble
+            if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl);
+            appendMessage(assistantMessage, assistantIdx);
+            botMessageEl = messagesEl.querySelector('.msg[data-id="'+assistantMessage.id+'"]') || messagesEl.querySelector('.msg:last-child');
+            bubbleEl = botMessageEl ? botMessageEl.querySelector('.bubble') : null;
+        }
+
+        // actions
         const messageActions = document.createElement('div');
         messageActions.className = 'msg-actions';
         messageActions.innerHTML = `<button class="act-btn" data-act="regen" data-tip="Regenerate" title="Regenerate"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0b2633" stroke-width="2"><path d="M21 12a9 9 0 1 1-3-6.7"/><polyline points="21 3 21 9 15 9"/></svg></button><span class="divider"></span>`;
-        botMessageEl.appendChild(messageActions);
+        if (botMessageEl) botMessageEl.appendChild(messageActions);
 
-        // replace with canonical element to ensure consistency
+        // Replace with canonical render if possible (keeps DOM consistent)
         try {
             const newEl = createMessageElement(Object.assign({}, assistantMessage), assistantIdx);
-            botMessageEl.replaceWith(newEl);
-            requestAnimationFrame(()=> setTimeout(()=> newEl.classList.add('show'), 20));
-        } catch(e){
-            // fallback: keep bubble updated already
+            if (botMessageEl && newEl) {
+                botMessageEl.replaceWith(newEl);
+                requestAnimationFrame(()=> setTimeout(()=> newEl.classList.add('show'), 20));
+            }
+        } catch (e) {
+            // fallback: we already updated bubbleEl
             console.error('replace final message failed', e);
         }
 
         saveSession();
+
     } catch (error) {
         console.error("Puter.js Error:", error);
+        // remove typing if present
         if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl);
+
+        // show error bubble (create DOM if needed)
+        if (!domAppended) {
+            appendMessage(assistantMessage, assistantIdx);
+            botMessageEl = messagesEl.querySelector('.msg[data-id="'+assistantMessage.id+'"]') || messagesEl.querySelector('.msg:last-child');
+            bubbleEl = botMessageEl ? botMessageEl.querySelector('.bubble') : null;
+        }
         if (bubbleEl) {
-            bubbleEl.innerHTML = escapeHtml('حدث خطأ. يرجى المحاولة مرة أخرى.');
+            bubbleEl.innerHTML = `<div class="bubble">حدث خطأ. يرجى المحاولة مرة أخرى.</div>`;
         }
         assistantMessage.content = 'حدث خطأ. يرجى المحاولة مرة أخرى.';
         saveSession();
     }
-}
       // OPEN/CLOSE CHAT (use history for back-button order)
       function openChatSimple(){
         try {
