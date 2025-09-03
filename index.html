@@ -1092,9 +1092,8 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
-<script src="https://js.puter.com/v2/"></script>  
-<script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>  
+<script src="https://js.puter.com/v2/"></script> <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-firestore.js"></script>  
 <script>
   (function(){
@@ -1840,17 +1839,6 @@
         messagesEl.scrollTop = messagesEl.scrollHeight;
       }
 
-      function simulatedAssistantReply(prompt){
-        prompt = (prompt||'').trim();
-        if(!prompt) return "Could you provide a little more detail on what you want?";
-        const low = prompt.toLowerCase();
-        if(low.includes('summarize')) return "Here's a concise summary: ...";
-        if(low.includes('quiz')) return "Short quiz:\n1) ...\n2) ...\n3) ...";
-        if(low.includes('explain')) return "I'll explain step-by-step: ...";
-        if(low.includes('plan')) return "Two-week study plan: Week 1 ... Week 2 ...";
-        return "Focused answer:\n• Key idea: " + prompt.split('.').slice(0,1).join('');
-      }
-
       // Typing indicator — do not force scroll if user is scrolled up (autoScrollEnabled will control)
       function showTyping(){ 
         const t = document.createElement('div'); 
@@ -1865,36 +1853,50 @@
         return t; 
       }
 
-      function sendMessage(text){
-        text = (text||'').trim();
-        if(!text && !pendingAttachment) return;
+      async function sendMessage(text, parentIndex = null){
+        let textToUse = (text||'').trim();
+        if(!textToUse && !pendingAttachment) return;
 
         if(pendingAttachment){
           sendAttachmentNow();
           return;
         }
 
-        const userMessage = {id:genId(), role:'user', content:text};
+        const userMessage = {id:genId(), role:'user', content:textToUse, parent: parentIndex};
         messages.push(userMessage);
         appendMessage(userMessage, messages.length - 1);
         saveSession();
         localStorage.removeItem(DRAFT_KEY);
-
         updateWelcomeVisibility();
 
         const typingEl = showTyping();
-        setTimeout(()=>{
-          typingEl.remove();
-          const reply = simulatedAssistantReply(text);
-          const userIndex = messages.length - 1;
-          
-          const assistantMessage = {id:genId(), role:'assistant', content:reply, parent:userIndex, meta:{}};
-          messages.push(assistantMessage);
-          appendMessage(assistantMessage, messages.length - 1);
-          saveSession();
-        }, 700 + Math.min(1500, text.length*18));
-      }
 
+        let botMessageText = '';
+        const botMessageEl = document.createElement('div');
+        botMessageEl.classList.add('message');
+        botMessageEl.classList.add('bot-message');
+        messagesEl.appendChild(botMessageEl);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+
+        try {
+          // Puter.js chat call
+          const response = await puter.ai.chat(textToUse, { model: 'gpt-5-nano', stream: true });
+
+          messagesEl.removeChild(typingEl);
+
+          for await (const part of response) {
+            if (part && part.text) {
+              botMessageText += part.text;
+              botMessageEl.textContent = botMessageText;
+              messagesEl.scrollTop = messagesEl.scrollHeight;
+            }
+          }
+        } catch (error) {
+          console.error("Puter.js Error:", error);
+          messagesEl.removeChild(typingEl);
+          botMessageEl.textContent = "حدث خطأ. يرجى المحاولة مرة أخرى.";
+        }
+      }
       // OPEN/CLOSE CHAT (use history for back-button order)
       function openChatSimple(){
         try {
@@ -3121,5 +3123,6 @@ else if (act === 'sendFeedback') {
 </body>
 
 </html>
+
 
 
