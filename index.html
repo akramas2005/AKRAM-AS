@@ -1878,10 +1878,15 @@
         // Remove the typing indicator when the full response is ready
         messagesEl.removeChild(typingEl);
 
+        // Update the main messages array with the final content
+        const assistantMessage = { id: genId(), role: 'assistant', content: response, parent: messages.length - 1, meta: {} };
+        messages.push(assistantMessage);
+        saveSession();
+
         // Create the message element and its content
         const botMessageEl = document.createElement('div');
         botMessageEl.className = 'msg assistant';
-        botMessageEl.dataset.index = messages.length;
+        botMessageEl.dataset.index = messages.length - 1;
         
         const botBubbleEl = document.createElement('div');
         botBubbleEl.className = 'bubble';
@@ -1897,10 +1902,6 @@
         messagesEl.appendChild(botMessageEl);
         messagesEl.scrollTop = messagesEl.scrollHeight;
 
-        // Update the main messages array with the final content
-        const assistantMessage = { id: genId(), role: 'assistant', content: response, parent: messages.length - 1, meta: {} };
-        messages.push(assistantMessage);
-        saveSession();
 
     } catch (error) {
         console.error("Puter.js Error:", error);
@@ -3134,6 +3135,7 @@ else if (act === 'sendFeedback') {
 </body>
 
 </html>
+
 
 
 
