@@ -1871,7 +1871,6 @@
     updateWelcomeVisibility();
 
     // 2) create assistant placeholder message and append via canonical function
-        // 2) create assistant placeholder message (push to messages[] BUT DO NOT append DOM yet)
     const assistantMessage = { id: genId(), role: 'assistant', content: '', parent: messages.length - 1, meta: {} };
     messages.push(assistantMessage);
     const assistantIdx = messages.length - 1;
