@@ -1853,62 +1853,7 @@
         return t; 
       }
 
-      async function sendMessage(text, parentIndex = null) {
-    let textToUse = (text || '').trim();
-    if (!textToUse && !pendingAttachment) return;
-
-    if (pendingAttachment) {
-        sendAttachmentNow();
-        return;
-    }
-
-    const userMessage = { id: genId(), role: 'user', content: textToUse, parent: parentIndex };
-    messages.push(userMessage);
-    appendMessage(userMessage, messages.length - 1);
-    saveSession();
-    localStorage.removeItem(DRAFT_KEY);
-    updateWelcomeVisibility();
-
-    const typingEl = showTyping();
-    
-    try {
-        // Wait for the full response from Puter.js without streaming
-        const response = await puter.ai.chat(textToUse, { model: 'gpt-5-nano' });
-
-        // Remove the typing indicator when the full response is ready
-        messagesEl.removeChild(typingEl);
-
-        // Update the main messages array with the final content
-        const assistantMessage = { id: genId(), role: 'assistant', content: response, parent: messages.length - 1, meta: {} };
-        messages.push(assistantMessage);
-        saveSession();
-
-        // Create the message element and its content
-        const botMessageEl = document.createElement('div');
-        botMessageEl.className = 'msg assistant';
-        botMessageEl.dataset.index = messages.length - 1;
-        
-        const botBubbleEl = document.createElement('div');
-        botBubbleEl.className = 'bubble';
-        botBubbleEl.innerHTML = escapeHtml(response).replace(/\n/g, '<br>');
-        botMessageEl.appendChild(botBubbleEl);
-        
-        // Add message actions
-        const messageActions = document.createElement('div');
-        messageActions.className = 'msg-actions';
-        messageActions.innerHTML = `<button class="act-btn" data-act="regen" data-tip="Regenerate" title="Regenerate"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0b2633" stroke-width="2"><path d="M21 12a9 9 0 1 1-3-6.7"/><polyline points="21 3 21 9 15 9"/></svg></button><span class="divider"></span>`;
-        botMessageEl.appendChild(messageActions);
-        
-        messagesEl.appendChild(botMessageEl);
-        messagesEl.scrollTop = messagesEl.scrollHeight;
-
-
-    } catch (error) {
-        console.error("Puter.js Error:", error);
-        messagesEl.removeChild(typingEl);
-        appendMessage('bot', "حدث خطأ. يرجى المحاولة مرة أخرى.");
-    }
-}
+      async function
       // OPEN/CLOSE CHAT (use history for back-button order)
       function openChatSimple(){
         try {
@@ -3135,6 +3080,7 @@ else if (act === 'sendFeedback') {
 </body>
 
 </html>
+
 
 
 
