@@ -1853,7 +1853,8 @@
         return t; 
       }
 
-      async function sendMessage(text, parentIndex = null) {
+      
+async function sendMessage(text, parentIndex = null) {
     let textToUse = (text || '').trim();
     if (!textToUse && !pendingAttachment) return;
 
@@ -1870,7 +1871,7 @@
     localStorage.removeItem(DRAFT_KEY);
     updateWelcomeVisibility();
 
-    // 2) create assistant placeholder message and append via canonical function
+    // 2) create assistant placeholder message (push to messages[] BUT DO NOT append DOM yet)
     const assistantMessage = { id: genId(), role: 'assistant', content: '', parent: messages.length - 1, meta: {} };
     messages.push(assistantMessage);
     const assistantIdx = messages.length - 1;
@@ -1977,6 +1978,8 @@
         assistantMessage.content = 'حدث خطأ. يرجى المحاولة مرة أخرى.';
         saveSession();
     }
+}
+
       // OPEN/CLOSE CHAT (use history for back-button order)
       function openChatSimple(){
         try {
