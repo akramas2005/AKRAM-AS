@@ -1637,23 +1637,10 @@
 
           clearPreview();
 
-          const typingEl = showTyping();
-          setTimeout(()=>{
-            typingEl.remove();
-            const reply = simulatedAssistantReply(text || ('Sent ' + (userMessage.attachment.name || userMessage.attachment.type)));
-            const assistantMessage = {id:genId(), role:'assistant', content:reply, parent: messages.length - 1, meta:{}};
-            messages.push(assistantMessage);
-            appendMessage(assistantMessage, messages.length - 1);
-            saveSession();
-          }, 700 + Math.min(1500, (text || '').length*18));
-
-        } catch(e){
-          console.error(e);
-          toast('Send failed');
-        } finally {
-          try { if(pendingAttachment) pendingAttachment._sending = false; } catch(e){}
-        }
-      }
+          // 👇 بدلنا الجزء القديم كله بالنداء للوظيفة الجديدة
+regenerateAssistantForParent(oldIndex);
+if (typeof reindexDom === 'function') reindexDom();
+return;
 
       document.addEventListener('click', (e)=>{ if(attachPanel.classList.contains('open') && !attachPanel.contains(e.target) && !attachBtn.contains(e.target)) closeAttach(); }, true);
 
@@ -1979,6 +1966,77 @@ async function sendMessage(text, parentIndex = null) {
         assistantMessage.content = 'حدث خطأ. يرجى المحاولة مرة أخرى.';
         saveSession();
     }
+}
+          async function regenerateAssistantForParent(parentIdx){
+  try{
+    if (typeof parentIdx !== 'number' || parentIdx < 0 || !messages[parentIdx]) return;
+    const userText = String(messages[parentIdx].content || '').trim();
+    if (!userText) return;
+
+    const assistantMessage = { id: genId(), role: 'assistant', content: '', parent: parentIdx, meta: {} };
+    messages.push(assistantMessage);
+    const assistantIdx = messages.length - 1;
+    saveSession();
+
+    const typingEl = showTyping();
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+
+    if (typeof puter === 'undefined' || !puter.ai || typeof puter.ai.chat !== 'function') {
+      setTimeout(()=>{
+        if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl);
+        const reply = (typeof simulatedAssistantReply === 'function') ? simulatedAssistantReply(userText) : ('Reply: ' + userText.slice(0,200));
+        assistantMessage.content = reply;
+        appendMessage(assistantMessage, assistantIdx);
+        saveSession();
+      }, 700 + Math.min(1500, userText.length * 18));
+      return;
+    }
+
+    let botMessageEl = null;
+    let bubbleEl = null;
+    let domAppended = false;
+    try {
+      const response = await puter.ai.chat(userText, { model: 'gpt-5-nano', stream: true });
+      let buffer = '';
+
+      for await (const part of response) {
+        if (!part) continue;
+        const piece = part.text || (part.message && part.message.content) || '';
+        if (!piece) continue;
+
+        if (!domAppended) {
+          if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl);
+          appendMessage(assistantMessage, assistantIdx);
+          botMessageEl = messagesEl.querySelector('.msg[data-id="'+assistantMessage.id+'"]')
+                    || messagesEl.querySelector('.msg[data-index="'+assistantIdx+'"]')
+                    || messagesEl.querySelector('.msg:last-child');
+          bubbleEl = botMessageEl ? botMessageEl.querySelector('.bubble') : null;
+          domAppended = true;
+        }
+
+        buffer += String(piece);
+        assistantMessage.content = buffer;
+        if (bubbleEl) bubbleEl.innerHTML = escapeHtml(assistantMessage.content).replace(/\n/g,'<br>');
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+
+      if (!domAppended) {
+        if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl);
+        appendMessage(assistantMessage, assistantIdx);
+      }
+
+      saveSession();
+
+    } catch (error) {
+      console.error("regenerateAssistantForParent Error:", error);
+      if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl);
+      appendMessage(assistantMessage, assistantIdx);
+      assistantMessage.content = 'حدث خطأ. يرجى المحاولة مرة أخرى.';
+      saveSession();
+    }
+  }catch(e){
+    console.error('regenerateAssistantForParent wrapper error', e);
+  }
 }
 
       // OPEN/CLOSE CHAT (use history for back-button order)
@@ -2320,18 +2378,13 @@ startRotatorIfNeeded();
           else { try{ const ok = await copyTextToClipboard(text); if(ok) toast('Copied for sharing'); else toast('Share not available'); }catch(_e){ toast('Share not available'); } }
         }
         else if (act === 'regen') {
-  // لا نعيد رسم الكل: نحذف هذه الفقاعة وما بعدها ثم نُظهر النقاط
   const parentIdx = typeof msg.parent === 'number' ? msg.parent : findPrevUserIndex(idx);
   if (parentIdx === -1) { toast('No related user message'); return; }
-  const userText = messages[parentIdx].content;
 
-  // نحافظ على موضع التمرير النسبي
   const prevBottom = messagesEl.scrollHeight - messagesEl.scrollTop;
 
-  // 1) نحذف من البيانات
   messages.splice(idx);
 
-  // 2) نحذف من الـ DOM كل العناصر من هذا الـ index فما بعده
   [...messagesEl.querySelectorAll('.msg')].forEach(n => {
     const i = Number(n.dataset.index || -1);
     if (i >= idx) {
@@ -2342,23 +2395,12 @@ startRotatorIfNeeded();
     }
   });
 
-  reindexDom(); // مهم: إعادة ترقيم data-index بعد الحذف
+  reindexDom();
   saveSession();
 
-  // 3) نقاط الكتابة
-  const typingEl = showTyping();
+  // 👇 بدلنا simulatedAssistantReply بالوظيفة الجديدة
+  regenerateAssistantForParent(parentIdx);
 
-  setTimeout(() => {
-    typingEl.remove();
-    const reply = simulatedAssistantReply(userText);
-    const assistantMsg = { id: genId(), role: 'assistant', content: reply, parent: parentIdx, meta: {} };
-    messages.push(assistantMsg);
-    // نفترض أن appendMessage موجودة لدينا من التعديل السابق
-    appendMessage(assistantMsg, messages.length - 1);
-    saveSession();
-  }, 700 + Math.min(1500, userText.length * 18));
-
-  // 4) استعادة وضع التمرير النسبي
   messagesEl.scrollTop = messagesEl.scrollHeight - prevBottom;
   return;
 }
