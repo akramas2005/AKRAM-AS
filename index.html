@@ -1093,8 +1093,7 @@
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>  
-<script src="https://js.puter.com/v2/"></script>
-<script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
+<script src="https://js.puter.com/v2/"></script> <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-firestore.js"></script>  
 <script>
   (function(){
@@ -1637,10 +1636,23 @@
 
           clearPreview();
 
-          // 👇 بدلنا الجزء القديم كله بالنداء للوظيفة الجديدة
-regenerateAssistantForParent(oldIndex);
-if (typeof reindexDom === 'function') reindexDom();
-return;
+          const typingEl = showTyping();
+          setTimeout(()=>{
+            typingEl.remove();
+            const reply = simulatedAssistantReply(text || ('Sent ' + (userMessage.attachment.name || userMessage.attachment.type)));
+            const assistantMessage = {id:genId(), role:'assistant', content:reply, parent: messages.length - 1, meta:{}};
+            messages.push(assistantMessage);
+            appendMessage(assistantMessage, messages.length - 1);
+            saveSession();
+          }, 700 + Math.min(1500, (text || '').length*18));
+
+        } catch(e){
+          console.error(e);
+          toast('Send failed');
+        } finally {
+          try { if(pendingAttachment) pendingAttachment._sending = false; } catch(e){}
+        }
+      }
 
       document.addEventListener('click', (e)=>{ if(attachPanel.classList.contains('open') && !attachPanel.contains(e.target) && !attachBtn.contains(e.target)) closeAttach(); }, true);
 
@@ -1842,6 +1854,17 @@ return;
       }
 
       
+
+// Safe fallback for simulatedAssistantReply if not defined elsewhere
+function simulatedAssistantReply(text){
+  try {
+    text = String(text || '').trim();
+    if(!text) return '...';
+    return 'Assistant (offline): ' + (text.length > 240 ? text.slice(0,240) + '…' : text);
+  } catch(e) {
+    return 'Assistant (offline)';
+  }
+}
 async function sendMessage(text, parentIndex = null) {
     let textToUse = (text || '').trim();
     if (!textToUse && !pendingAttachment) return;
@@ -1967,7 +1990,11 @@ async function sendMessage(text, parentIndex = null) {
         saveSession();
     }
 }
-          async function regenerateAssistantForParent(parentIdx){
+
+      
+
+// Regenerate assistant reply for a given parent message index
+async function regenerateAssistantForParent(parentIdx){
   try{
     if (typeof parentIdx !== 'number' || parentIdx < 0 || !messages[parentIdx]) return;
     const userText = String(messages[parentIdx].content || '').trim();
@@ -1979,14 +2006,15 @@ async function sendMessage(text, parentIndex = null) {
     saveSession();
 
     const typingEl = showTyping();
-    messagesEl.scrollTop = messagesEl.scrollHeight;
+    if (typeof messagesEl !== 'undefined' && messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
 
     if (typeof puter === 'undefined' || !puter.ai || typeof puter.ai.chat !== 'function') {
+      // fallback: simple simulated reply after small delay
       setTimeout(()=>{
-        if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl);
+        try{ if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl); }catch(e){}
         const reply = (typeof simulatedAssistantReply === 'function') ? simulatedAssistantReply(userText) : ('Reply: ' + userText.slice(0,200));
         assistantMessage.content = reply;
-        appendMessage(assistantMessage, assistantIdx);
+        if (typeof appendMessage === 'function') appendMessage(assistantMessage, assistantIdx);
         saveSession();
       }, 700 + Math.min(1500, userText.length * 18));
       return;
@@ -2005,11 +2033,9 @@ async function sendMessage(text, parentIndex = null) {
         if (!piece) continue;
 
         if (!domAppended) {
-          if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl);
-          appendMessage(assistantMessage, assistantIdx);
-          botMessageEl = messagesEl.querySelector('.msg[data-id="'+assistantMessage.id+'"]')
-                    || messagesEl.querySelector('.msg[data-index="'+assistantIdx+'"]')
-                    || messagesEl.querySelector('.msg:last-child');
+          try{ if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl); }catch(e){}
+          if (typeof appendMessage === 'function') appendMessage(assistantMessage, assistantIdx);
+          botMessageEl = (typeof messagesEl !== 'undefined' && messagesEl) ? (messagesEl.querySelector('.msg[data-id="'+assistantMessage.id+'"]') || messagesEl.querySelector('.msg[data-index="'+assistantIdx+'"]') || messagesEl.querySelector('.msg:last-child')) : null;
           bubbleEl = botMessageEl ? botMessageEl.querySelector('.bubble') : null;
           domAppended = true;
         }
@@ -2017,20 +2043,20 @@ async function sendMessage(text, parentIndex = null) {
         buffer += String(piece);
         assistantMessage.content = buffer;
         if (bubbleEl) bubbleEl.innerHTML = escapeHtml(assistantMessage.content).replace(/\n/g,'<br>');
-        messagesEl.scrollTop = messagesEl.scrollHeight;
+        if (typeof messagesEl !== 'undefined' && messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
       }
 
       if (!domAppended) {
-        if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl);
-        appendMessage(assistantMessage, assistantIdx);
+        try{ if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl); }catch(e){}
+        if (typeof appendMessage === 'function') appendMessage(assistantMessage, assistantIdx);
       }
 
       saveSession();
 
     } catch (error) {
       console.error("regenerateAssistantForParent Error:", error);
-      if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl);
-      appendMessage(assistantMessage, assistantIdx);
+      try{ if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl); }catch(e){}
+      if (typeof appendMessage === 'function') appendMessage(assistantMessage, assistantIdx);
       assistantMessage.content = 'حدث خطأ. يرجى المحاولة مرة أخرى.';
       saveSession();
     }
@@ -2038,8 +2064,7 @@ async function sendMessage(text, parentIndex = null) {
     console.error('regenerateAssistantForParent wrapper error', e);
   }
 }
-
-      // OPEN/CLOSE CHAT (use history for back-button order)
+// OPEN/CLOSE CHAT (use history for back-button order)
       function openChatSimple(){
         try {
           if(!(history.state && history.state.ui === 'chat')){
@@ -2220,25 +2245,10 @@ if (editIndex !== null && editIndex >= 0) {
   autoGrowTextarea();
 
   // 7) إظهار نقاط الكتابة ثم إضافة رد المساعد الجديد بسلاسة (appendMessage إن وُجد)
-  const typingEl = showTyping();
-  setTimeout(() => {
-    typingEl.remove();
-    const replyText = simulatedAssistantReply(t);
-    const assistantMsg = { id: genId(), role: 'assistant', content: replyText, parent: oldIndex, meta: {} };
-    messages.push(assistantMsg);
-
-    if (typeof appendMessage === 'function') {
-      appendMessage(assistantMsg, messages.length - 1);
-    } else {
-      // fallback: ريندر جزئي/كامل إذا لم توجد appendMessage
-      renderMessages();
-    }
-
-    saveSession();
-    if (typeof reindexDom === 'function') reindexDom();
-  }, 700 + Math.min(1500, t.length * 18));
-
-  return; // نهاية فرع التعديل
+    // regenerate reply for edited message
+  regenerateAssistantForParent(oldIndex);
+  if (typeof reindexDom === 'function') reindexDom();
+  return;
 }
 // ====== END: edit branch replacement ======
  else {
@@ -2378,13 +2388,18 @@ startRotatorIfNeeded();
           else { try{ const ok = await copyTextToClipboard(text); if(ok) toast('Copied for sharing'); else toast('Share not available'); }catch(_e){ toast('Share not available'); } }
         }
         else if (act === 'regen') {
+  // لا نعيد رسم الكل: نحذف هذه الفقاعة وما بعدها ثم نُظهر النقاط
   const parentIdx = typeof msg.parent === 'number' ? msg.parent : findPrevUserIndex(idx);
   if (parentIdx === -1) { toast('No related user message'); return; }
+  const userText = messages[parentIdx].content;
 
+  // نحافظ على موضع التمرير النسبي
   const prevBottom = messagesEl.scrollHeight - messagesEl.scrollTop;
 
+  // 1) نحذف من البيانات
   messages.splice(idx);
 
+  // 2) نحذف من الـ DOM كل العناصر من هذا الـ index فما بعده
   [...messagesEl.querySelectorAll('.msg')].forEach(n => {
     const i = Number(n.dataset.index || -1);
     if (i >= idx) {
@@ -2395,12 +2410,16 @@ startRotatorIfNeeded();
     }
   });
 
-  reindexDom();
+  reindexDom(); // مهم: إعادة ترقيم data-index بعد الحذف
   saveSession();
 
-  // 👇 بدلنا simulatedAssistantReply بالوظيفة الجديدة
+  // 3) نقاط الكتابة
+  const typingEl = showTyping();
+
   regenerateAssistantForParent(parentIdx);
 
+
+  // 4) استعادة وضع التمرير النسبي
   messagesEl.scrollTop = messagesEl.scrollHeight - prevBottom;
   return;
 }
@@ -3254,6 +3273,7 @@ else if (act === 'sendFeedback') {
   })();
 </script>
 
+<!-- Puter regen/edit integration: delegated handler to support regenerate & edit using sendMessage() -->
 <script>
 (function(){
   if (window.__puter_regen_edit_installed) return;
@@ -3379,4 +3399,6 @@ else if (act === 'sendFeedback') {
 })();
 </script>
 </body>
+
 </html>
+
