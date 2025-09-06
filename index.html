@@ -1840,20 +1840,26 @@
       }
 
       // Typing indicator — do not force scroll if user is scrolled up (autoScrollEnabled will control)
-      function showTyping(){ 
-        const t = document.createElement('div'); 
-        t.className = 'typing msg assistant show'; 
-        t.innerHTML = `<div class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>`; 
-        messagesEl.appendChild(t);
-        try {
-          if (typeof autoScrollEnabled === 'undefined' || autoScrollEnabled) {
-            messagesEl.scrollTop = messagesEl.scrollHeight;
-          }
-        } catch(e){}
-        return t; 
-      }
+      function showTyping(){
+  // 🔹 احذف أي مؤشر كتابة قديم
+  const oldTyping = messagesEl.querySelector('.typing');
+  if (oldTyping && oldTyping.parentNode) {
+    oldTyping.parentNode.removeChild(oldTyping);
+  }
 
-      
+  const typing = document.createElement('div');
+  typing.className = 'typing msg assistant show';
+  typing.innerHTML = `<div class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>`;
+  messagesEl.appendChild(typing);
+
+  try {
+    if (typeof autoScrollEnabled === 'undefined' || autoScrollEnabled) {
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+  } catch(e){}
+
+  return typing;
+}      
 
 // Safe fallback for simulatedAssistantReply if not defined elsewhere
 function simulatedAssistantReply(text){
@@ -1889,8 +1895,13 @@ async function sendMessage(text, parentIndex = null) {
     saveSession();
 
     // 3) show typing indicator ONLY (no DOM bubble yet)
-    const typingEl = showTyping();
-    messagesEl.scrollTop = messagesEl.scrollHeight;
+    const oldTyping = messagesEl.querySelector('.typing');
+if (oldTyping && oldTyping.parentNode) {
+  oldTyping.parentNode.removeChild(oldTyping);
+}
+
+const typingEl = showTyping();
+messagesEl.scrollTop = messagesEl.scrollHeight;
 
     // placeholders for DOM refs that we'll create upon first chunk
     let botMessageEl = null;
@@ -1995,27 +2006,49 @@ async function sendMessage(text, parentIndex = null) {
 
 // Regenerate assistant reply for a given parent message index
 async function regenerateAssistantForParent(parentIdx){
-  try{
-    if (typeof parentIdx !== 'number' || parentIdx < 0 || !messages[parentIdx]) return;
+  try {
+    // 🔹 حماية ضد الضغط المتكرر
+    if (window._regenLock) {
+      console.warn("Regenerate in progress, ignoring extra click");
+      return;
+    }
+    window._regenLock = true;
+
+    if (typeof parentIdx !== 'number' || parentIdx < 0 || !messages[parentIdx]) {
+      window._regenLock = false;
+      return;
+    }
     const userText = String(messages[parentIdx].content || '').trim();
-    if (!userText) return;
+    if (!userText) {
+      window._regenLock = false;
+      return;
+    }
 
     const assistantMessage = { id: genId(), role: 'assistant', content: '', parent: parentIdx, meta: {} };
     messages.push(assistantMessage);
     const assistantIdx = messages.length - 1;
     saveSession();
 
+    // 🔹 إزالة أي typing قديم قبل إنشاء الجديد
+    const oldTyping = messagesEl.querySelector('.typing');
+    if (oldTyping && oldTyping.parentNode) {
+      oldTyping.parentNode.removeChild(oldTyping);
+    }
+
     const typingEl = showTyping();
-    if (typeof messagesEl !== 'undefined' && messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
+    if (typeof messagesEl !== 'undefined' && messagesEl) {
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
 
     if (typeof puter === 'undefined' || !puter.ai || typeof puter.ai.chat !== 'function') {
-      // fallback: simple simulated reply after small delay
+      // fallback: simulated reply
       setTimeout(()=>{
-        try{ if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl); }catch(e){}
+        try { if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl); } catch(e){}
         const reply = (typeof simulatedAssistantReply === 'function') ? simulatedAssistantReply(userText) : ('Reply: ' + userText.slice(0,200));
         assistantMessage.content = reply;
         if (typeof appendMessage === 'function') appendMessage(assistantMessage, assistantIdx);
         saveSession();
+        window._regenLock = false;
       }, 700 + Math.min(1500, userText.length * 18));
       return;
     }
@@ -2033,9 +2066,12 @@ async function regenerateAssistantForParent(parentIdx){
         if (!piece) continue;
 
         if (!domAppended) {
-          try{ if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl); }catch(e){}
+          try { if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl); } catch(e){}
           if (typeof appendMessage === 'function') appendMessage(assistantMessage, assistantIdx);
-          botMessageEl = (typeof messagesEl !== 'undefined' && messagesEl) ? (messagesEl.querySelector('.msg[data-id="'+assistantMessage.id+'"]') || messagesEl.querySelector('.msg[data-index="'+assistantIdx+'"]') || messagesEl.querySelector('.msg:last-child')) : null;
+          botMessageEl = (typeof messagesEl !== 'undefined' && messagesEl) ? 
+            (messagesEl.querySelector('.msg[data-id="'+assistantMessage.id+'"]') 
+            || messagesEl.querySelector('.msg[data-index="'+assistantIdx+'"]') 
+            || messagesEl.querySelector('.msg:last-child')) : null;
           bubbleEl = botMessageEl ? botMessageEl.querySelector('.bubble') : null;
           domAppended = true;
         }
@@ -2047,21 +2083,24 @@ async function regenerateAssistantForParent(parentIdx){
       }
 
       if (!domAppended) {
-        try{ if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl); }catch(e){}
+        try { if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl); } catch(e){}
         if (typeof appendMessage === 'function') appendMessage(assistantMessage, assistantIdx);
       }
 
       saveSession();
+      window._regenLock = false;
 
     } catch (error) {
       console.error("regenerateAssistantForParent Error:", error);
-      try{ if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl); }catch(e){}
+      try { if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl); } catch(e){}
       if (typeof appendMessage === 'function') appendMessage(assistantMessage, assistantIdx);
       assistantMessage.content = 'حدث خطأ. يرجى المحاولة مرة أخرى.';
       saveSession();
+      window._regenLock = false;
     }
-  }catch(e){
+  } catch(e) {
     console.error('regenerateAssistantForParent wrapper error', e);
+    window._regenLock = false;
   }
 }
 // OPEN/CLOSE CHAT (use history for back-button order)
