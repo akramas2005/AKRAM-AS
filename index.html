@@ -1589,7 +1589,7 @@
       }
 
       // sendAttachmentNow
-      function sendAttachmentNow(){
+      async function sendAttachmentNow(){
         try{
           if(!pendingAttachment){
             return;
@@ -1608,9 +1608,29 @@
             return;
           }
 
+          if(pendingAttachment._sending) return;
           pendingAttachment._sending = true;
 
-          const attCopy = {
+          let uploadResult = null;
+          // upload real file if we have a File object
+          if (pendingAttachment.file) {
+            try {
+              toast('Uploading file...');
+              uploadResult = await uploadFileToServer(pendingAttachment.file);
+              toast('Upload complete');
+            } catch (err) {
+              console.warn('uploadFileToServer failed', err);
+              toast('Upload failed — message will be queued locally and retried');
+            }
+          }
+
+          // build attachment object to insert in message
+          const attCopy = uploadResult ? {
+            id: uploadResult.id,
+            url: uploadResult.url,
+            filename: uploadResult.filename,
+            mime_type: uploadResult.mime_type
+          } : {
             type: pendingAttachment.type,
             name: pendingAttachment.name,
             size: pendingAttachment.size,
@@ -1622,29 +1642,31 @@
             id: genId(),
             role: 'user',
             content: text || '',
-            attachment: attCopy
+            attachment: attCopy,
+            meta: {}
           };
 
+          // append locally
           messages.push(userMessage);
           appendMessage(userMessage, messages.length - 1);
           saveSession();
           updateWelcomeVisibility();
 
+          // clear composer
           composer.value = '';
           updateSendVisibility();
           autoGrowTextarea();
 
+          // try to persist user message immediately (if file was uploaded we include file id/url)
+          postMessageToServer(userMessage).catch((err) => {
+            console.warn('postMessageToServer failed for attachment message', err);
+            scheduleSync();
+          });
+
           clearPreview();
 
-          const typingEl = showTyping();
-          setTimeout(()=>{
-            typingEl.remove();
-            const reply = simulatedAssistantReply(text || ('Sent ' + (userMessage.attachment.name || userMessage.attachment.type)));
-            const assistantMessage = {id:genId(), role:'assistant', content:reply, parent: messages.length - 1, meta:{}};
-            messages.push(assistantMessage);
-            appendMessage(assistantMessage, messages.length - 1);
-            saveSession();
-          }, 700 + Math.min(1500, (text || '').length*18));
+          // trigger assistant reply for this new message (parent = index of the user message)
+          regenerateAssistantForParent(messages.length - 1);
 
         } catch(e){
           console.error(e);
@@ -1659,7 +1681,7 @@
       const STORAGE_KEY = 'chat_study';
       const DRAFT_KEY = 'chat_study_draft';
       const REPORTS_KEY = 'chat_study_reports';
-      const API_BASE = "https://backend-as-space.onrender.com";
+      const API_BASE = "https://backend-as-space-1.onrender.com";
       let messages = [];
       let editIndex = null;
       function genId(){ return 'm-'+Math.random().toString(36).slice(2,9); }
@@ -1688,6 +1710,88 @@
           // persist into savedConvos (autosave)
           persistCurrentToHistory();
         } catch(e) { console.error('saveSession error', e); }
+      }
+
+      // ----------------------
+      // Background sync + file upload helpers
+      // ----------------------
+      const SYNC_DEBOUNCE = 800; // ms
+      let _syncTimer = null;
+      let _syncRunning = false;
+
+      function scheduleSync(delay = SYNC_DEBOUNCE){
+        if(_syncTimer) clearTimeout(_syncTimer);
+        _syncTimer = setTimeout(()=> { syncMessagesToServer(); }, delay);
+      }
+
+      async function syncMessagesToServer(){
+        if(_syncRunning) return;
+        _syncRunning = true;
+        try {
+          for (let i = 0; i < messages.length; i++){
+            const m = messages[i];
+            // already persisted remotely?
+            if (m.meta && m.meta.remoteId) continue;
+
+            try {
+              await postMessageToServer(m, i);
+              // small throttle so we don't hammer the API
+              await new Promise(r => setTimeout(r, 120));
+            } catch (err) {
+              console.warn('syncMessagesToServer: stop on error, will retry later', err);
+              break; // stop and retry later
+            }
+          }
+        } finally {
+          _syncRunning = false;
+        }
+      }
+
+      // Persist a single message to backend /api/messages
+      async function postMessageToServer(msg, index){
+        if (!msg || !API_BASE) throw new Error('postMessageToServer: missing message or API_BASE');
+
+        const payload = {
+          role: msg.role || 'user',
+          content: msg.content || '',
+          parent_id: null,
+          attachmentId: (msg.attachment && msg.attachment.id) ? msg.attachment.id : null,
+          attachmentUrl: (msg.attachment && (msg.attachment.url || msg.attachment.src)) ? (msg.attachment.url || msg.attachment.src) : null,
+          attachmentName: (msg.attachment && (msg.attachment.name || msg.attachment.filename)) ? (msg.attachment.name || msg.attachment.filename) : null,
+          attachmentType: (msg.attachment && (msg.attachment.type || msg.attachment.mime_type)) ? (msg.attachment.type || msg.attachment.mime_type) : null
+        };
+
+        try {
+          const resp = await fetch(API_BASE + '/api/messages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+
+          if (!resp.ok) throw new Error('post message failed: ' + resp.status);
+          const data = await resp.json();
+          // mark message as synced
+          msg.meta = msg.meta || {};
+          msg.meta.remoteId = data.id;
+          msg.meta.synced = true;
+          saveSession(); // persist meta locally
+          return data;
+        } catch (err) {
+          throw err;
+        }
+      }
+
+      // Upload a file to /api/files (returns { id, url, filename, mime_type } expected from backend)
+      async function uploadFileToServer(file){
+        if (!file) throw new Error('uploadFileToServer: missing file');
+        const fd = new FormData();
+        fd.append('file', file);
+        const resp = await fetch(API_BASE + '/api/files', { method: 'POST', body: fd });
+        if(!resp.ok) {
+          const txt = await resp.text().catch(()=> '');
+          throw new Error('file upload failed: ' + resp.status + ' ' + txt);
+        }
+        return await resp.json();
       }
       function saveDraft(){ localStorage.setItem(DRAFT_KEY, composer.value || ''); }
       function loadDraft(){
@@ -1880,13 +1984,19 @@ async function sendMessage(text, parentIndex = null) {
         return;
     }
 
-    // 1) add user message
-    const userMessage = { id: genId(), role: 'user', content: textToUse, parent: parentIndex };
+    // 1) add user message locally
+    const userMessage = { id: genId(), role: 'user', content: textToUse, parent: parentIndex, meta: {} };
     messages.push(userMessage);
     appendMessage(userMessage, messages.length - 1);
     saveSession();
     localStorage.removeItem(DRAFT_KEY);
     updateWelcomeVisibility();
+
+    // Try to post the user message to backend (fire & forget; on failure schedule sync)
+    postMessageToServer(userMessage).catch((err) => {
+      console.warn('postMessageToServer failed (will retry):', err);
+      scheduleSync();
+    });
 
     // 2) create assistant placeholder message (push to messages[] BUT DO NOT append DOM yet)
     const assistantMessage = { id: genId(), role: 'assistant', content: '', parent: messages.length - 1, meta: {} };
@@ -1896,12 +2006,11 @@ async function sendMessage(text, parentIndex = null) {
 
     // 3) show typing indicator ONLY (no DOM bubble yet)
     const oldTyping = messagesEl.querySelector('.typing');
-if (oldTyping && oldTyping.parentNode) {
-  oldTyping.parentNode.removeChild(oldTyping);
-}
-
-const typingEl = showTyping();
-messagesEl.scrollTop = messagesEl.scrollHeight;
+    if (oldTyping && oldTyping.parentNode) {
+      oldTyping.parentNode.removeChild(oldTyping);
+    }
+    const typingEl = showTyping();
+    if (typeof messagesEl !== 'undefined' && messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
 
     // placeholders for DOM refs that we'll create upon first chunk
     let botMessageEl = null;
