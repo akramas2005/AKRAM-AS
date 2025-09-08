@@ -1319,55 +1319,93 @@
         updateComposerSpacing();
       }
 
-      // ===== upload simulation (keeps previous behavior) =====
-      const UPLOAD_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
-
       function startUploadSimulation(pending, outerEl, rectEl, onComplete, onFail){
-        if(pending._uploadInterval) { clearInterval(pending._uploadInterval); pending._uploadInterval = null; }
-        if(pending._timeoutTimer) { clearTimeout(pending._timeoutTimer); pending._timeoutTimer = null; }
+  // cleanup existing timers/intervals
+  if(pending._uploadInterval) { clearInterval(pending._uploadInterval); pending._uploadInterval = null; }
+  if(pending._timeoutTimer) { clearTimeout(pending._timeoutTimer); pending._timeoutTimer = null; }
 
-        pending.uploadState = 'uploading';
-        pending.progress = pending.progress || 0;
-        pending.sendOnComplete = !!pending.sendOnComplete;
+  pending.uploadState = 'uploading';
+  pending.progress = pending.progress || 0;
+  pending.sendOnComplete = !!pending.sendOnComplete;
 
-        const startTime = Date.now();
-        let len = 0;
-        try { len = rectEl.getTotalLength(); rectEl.style.strokeDasharray = len; }catch(e){ len = 240; }
+  let len = 0;
+  try { len = rectEl.getTotalLength(); rectEl.style.strokeDasharray = len; } catch(e){ len = 240; }
 
-        rectEl.style.strokeDashoffset = Math.round(len * (1 - (pending.progress||0)/100));
-        rectEl.style.opacity = '1';
-        outerEl.classList.remove('upload-failed','upload-complete','clean-ring');
+  rectEl.style.strokeDashoffset = Math.round(len * (1 - (pending.progress||0)/100));
+  rectEl.style.opacity = '1';
+  outerEl.classList.remove('upload-failed','upload-complete','clean-ring');
 
-        pending._uploadInterval = setInterval(()=>{
-          const step = Math.random()*10 + 6;
-          pending.progress = Math.min(100, (pending.progress||0) + step);
-          const draw = Math.max(0, Math.round(len * (1 - pending.progress/100)));
-          rectEl.style.strokeDashoffset = draw;
-
-          if(pending.progress >= 100){
-            clearInterval(pending._uploadInterval);
-            pending._uploadInterval = null;
-            pending.uploadState = 'complete';
-            outerEl.classList.add('upload-complete');
-            setTimeout(()=> { outerEl.classList.add('clean-ring'); rectEl.style.opacity = '0'; updateComposerSpacing(); }, 520);
-            if(typeof onComplete === 'function'){
-              setTimeout(()=> { try { onComplete(); } catch(e){ console.error('onComplete error', e); } }, 10);
-            }
-          }
-        }, Math.max(80, Math.min(350, Math.round(2200 / Math.log((pending.size||1)+100)))));
-
-        pending._timeoutTimer = setTimeout(()=>{
-          if(pending.uploadState !== 'complete'){
-            pending.uploadState = 'failed';
-            outerEl.classList.add('upload-failed');
-            if(pending._uploadInterval){ clearInterval(pending._uploadInterval); pending._uploadInterval = null; }
-            if(typeof onFail === 'function'){ setTimeout(()=> { try { onFail(); } catch(e){ console.error('onFail error', e); } }, 10); }
-            updateSendVisibility();
-            toast('Upload timed out — retry available');
-          }
-        }, UPLOAD_TIMEOUT_MS);
+  // If we have a real File object and API_BASE configured -> do real upload with progress
+  if (pending.file && typeof uploadFileToServer === 'function' && API_BASE) {
+    // perform real upload and update progress in callback
+    pending._realUpload = true;
+    uploadFileToServer(pending.file, (pct) => {
+      pending.progress = pct;
+      try {
+        const draw = Math.max(0, Math.round(len * (1 - pending.progress/100)));
+        rectEl.style.strokeDashoffset = draw;
+      } catch(e){}
+    }).then((res) => {
+      pending.uploadState = 'complete';
+      pending.progress = 100;
+      pending._uploadResult = res; // store result for sendAttachmentNow
+      outerEl.classList.add('upload-complete');
+      setTimeout(()=> { outerEl.classList.add('clean-ring'); rectEl.style.opacity = '0'; updateComposerSpacing(); }, 520);
+      if(typeof onComplete === 'function'){
+        setTimeout(()=> { try { onComplete(); } catch(e){} }, 10);
       }
+    }).catch((err) => {
+      pending.uploadState = 'failed';
+      outerEl.classList.add('upload-failed');
+      if(typeof onFail === 'function'){ setTimeout(()=> { try { onFail(); } catch(e){} }, 10); }
+      updateSendVisibility();
+    });
 
+    // safety timeout (still keep)
+    pending._timeoutTimer = setTimeout(()=>{
+      if(pending.uploadState !== 'complete'){
+        pending.uploadState = 'failed';
+        outerEl.classList.add('upload-failed');
+        if(pending._uploadInterval){ clearInterval(pending._uploadInterval); pending._uploadInterval = null; }
+        if(typeof onFail === 'function'){ setTimeout(()=> { try { onFail(); } catch(e){} }, 10); }
+        updateSendVisibility();
+        toast('Upload timed out — retry available');
+      }
+    }, UPLOAD_TIMEOUT_MS);
+
+    return;
+  }
+
+  // fallback: keep the original simulation behaviour (for disks / offline preview)
+  pending._uploadInterval = setInterval(()=>{
+    const step = Math.random()*10 + 6;
+    pending.progress = Math.min(100, (pending.progress||0) + step);
+    const draw = Math.max(0, Math.round(len * (1 - pending.progress/100)));
+    rectEl.style.strokeDashoffset = draw;
+
+    if(pending.progress >= 100){
+      clearInterval(pending._uploadInterval);
+      pending._uploadInterval = null;
+      pending.uploadState = 'complete';
+      outerEl.classList.add('upload-complete');
+      setTimeout(()=> { outerEl.classList.add('clean-ring'); rectEl.style.opacity = '0'; updateComposerSpacing(); }, 520);
+      if(typeof onComplete === 'function'){
+        setTimeout(()=> { try { onComplete(); } catch(e){} }, 10);
+      }
+    }
+  }, Math.max(80, Math.min(350, Math.round(2200 / Math.log((pending.size||1)+100)))));
+
+  pending._timeoutTimer = setTimeout(()=>{
+    if(pending.uploadState !== 'complete'){
+      pending.uploadState = 'failed';
+      outerEl.classList.add('upload-failed');
+      if(pending._uploadInterval){ clearInterval(pending._uploadInterval); pending._uploadInterval = null; }
+      if(typeof onFail === 'function'){ setTimeout(()=> { try { onFail(); } catch(e){} }, 10); }
+      updateSendVisibility();
+      toast('Upload timed out — retry available');
+    }
+  }, UPLOAD_TIMEOUT_MS);
+}
       // show image preview
       function showImagePreview(file){
         try {
@@ -1612,17 +1650,32 @@
           pendingAttachment._sending = true;
 
           let uploadResult = null;
-          // upload real file if we have a File object
           if (pendingAttachment.file) {
-            try {
-              toast('Uploading file...');
-              uploadResult = await uploadFileToServer(pendingAttachment.file);
-              toast('Upload complete');
-            } catch (err) {
-              console.warn('uploadFileToServer failed', err);
-              toast('Upload failed — message will be queued locally and retried');
-            }
-          }
+  try {
+    // إذا كانت نتيجة الرفع تمّت بالفعل أثناء المعاينة، استخدمها مباشرة
+    if (pendingAttachment._uploadResult) {
+      uploadResult = pendingAttachment._uploadResult;
+    } else {
+      toast('Uploading file...');
+      uploadResult = await uploadFileToServer(pendingAttachment.file, (pct) => {
+        // تحديث سريع للتقدم أثناء هذا الطلب (إن لم تكن المعاينة قد فعلت ذلك)
+        pendingAttachment.progress = pct;
+        // محاولة تحديث الدوم الخاص بالـ rect إذا كان موجوداً
+        const preview = document.querySelector('.thumb-outer');
+        const rect = preview ? preview.querySelector('rect') : null;
+        if (rect && typeof rect.getTotalLength === 'function') {
+          const len = rect.getTotalLength();
+          rect.style.strokeDashoffset = Math.round(len * (1 - (pct||0)/100));
+        }
+      });
+      toast('Upload complete');
+      pendingAttachment._uploadResult = uploadResult;
+    }
+  } catch (err) {
+    console.warn('uploadFileToServer failed', err);
+    toast('Upload failed — message will be queued locally and retried');
+  }
+}
 
           // build attachment object to insert in message
           const attCopy = uploadResult ? {
@@ -1781,18 +1834,47 @@
         }
       }
 
-      // Upload a file to /api/files (returns { id, url, filename, mime_type } expected from backend)
-      async function uploadFileToServer(file){
-        if (!file) throw new Error('uploadFileToServer: missing file');
-        const fd = new FormData();
-        fd.append('file', file);
-        const resp = await fetch(API_BASE + '/api/files', { method: 'POST', body: fd });
-        if(!resp.ok) {
-          const txt = await resp.text().catch(()=> '');
-          throw new Error('file upload failed: ' + resp.status + ' ' + txt);
+      // Upload a file to /api/files with real progress callback.
+// resolves { id, url, filename, mime_type } (same as backend expected)
+// onProgress(pct) is optional callback (0..100)
+async function uploadFileToServer(file, onProgress){
+  if (!file) throw new Error('uploadFileToServer: missing file');
+  return new Promise((resolve, reject) => {
+    try {
+      const xhr = new XMLHttpRequest();
+      const fd = new FormData();
+      fd.append('file', file);
+
+      xhr.open('POST', API_BASE + '/api/files', true);
+      xhr.withCredentials = false;
+      // progress event
+      xhr.upload.onprogress = function(e){
+        if (e.lengthComputable && typeof onProgress === 'function'){
+          const pct = Math.round((e.loaded / e.total) * 100);
+          try { onProgress(pct); } catch(err) { /* ignore */ }
         }
-        return await resp.json();
-      }
+      };
+      xhr.onload = function(){
+        if (xhr.status >= 200 && xhr.status < 300){
+          try {
+            const json = JSON.parse(xhr.responseText || '{}');
+            resolve(json);
+          } catch(err) {
+            resolve({ raw: xhr.responseText });
+          }
+        } else {
+          reject(new Error('file upload failed: ' + xhr.status + ' ' + (xhr.responseText || '')));
+        }
+      };
+      xhr.onerror = function(){
+        reject(new Error('file upload error'));
+      };
+      xhr.send(fd);
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
       function saveDraft(){ localStorage.setItem(DRAFT_KEY, composer.value || ''); }
       function loadDraft(){
         const d = localStorage.getItem(DRAFT_KEY);
