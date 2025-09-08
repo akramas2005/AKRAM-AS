@@ -1895,42 +1895,47 @@ async function uploadFileToServer(file, onProgress){
   bubble.appendChild(txt);
 }
 
-        if(m.attachment){
-          if(m.attachment.type === 'image'){
-            const img = document.createElement('img');
-            img.className = 'att-image';
-            img.alt = m.attachment.name || 'image';
-            img.src = m.attachment.src || '';
-            bubble.appendChild(img);
-          } else {
-            const fc = document.createElement('div');
-            fc.className = 'file-card';
-            const icon = document.createElement('div');
-            icon.className = 'file-icon';
-            icon.innerText = 'F';
-            const meta = document.createElement('div');
-            meta.className = 'file-meta';
-            const name = document.createElement('div');
-            name.className = 'file-name';
-            name.textContent = m.attachment.name || 'file';
-            const size = document.createElement('div');
-            size.className = 'file-size';
-            size.textContent = (m.attachment.size ? Math.round(m.attachment.size/1024) + ' KB' : '');
-            meta.appendChild(name);
-            meta.appendChild(size);
-            fc.appendChild(icon);
-            fc.appendChild(meta);
-            if(m.attachment.src){
-              const a = document.createElement('a');
-              a.href = m.attachment.src;
-              a.download = m.attachment.name || '';
-              a.appendChild(fc);
-              bubble.appendChild(a);
-            } else {
-              bubble.appendChild(fc);
-            }
-          }
-        }
+        if (m.attachment) {
+  // determine if attachment is an image
+  const mime = m.attachment.mime_type || m.attachment.attachment_type || '';
+  const src = m.attachment.url || m.attachment.src || '';
+  const isImage = (m.attachment.type === 'image')
+                   || (typeof mime === 'string' && mime.startsWith && mime.startsWith('image/'))
+                   || (typeof src === 'string' && src.startsWith && src.startsWith('data:image/'))
+                   || (typeof src === 'string' && /\.(png|jpe?g|gif|webp|svg)(\?.*)?$/.test(src.toLowerCase()));
+
+  if (isImage) {
+    const img = document.createElement('img');
+    img.className = 'att-image';
+    img.alt = m.attachment.name || 'image';
+    img.src = src || (m.attachment.dataUri || '');
+    bubble.appendChild(img);
+  } else {
+    const fc = document.createElement('div');
+    fc.className = 'file-card';
+    const icon = document.createElement('div');
+    icon.className = 'file-icon';
+    icon.innerText = 'F';
+    const meta = document.createElement('div');
+    meta.className = 'file-meta';
+    const title = document.createElement('div');
+    title.className = 'file-title';
+    title.textContent = m.attachment.name || m.attachment.filename || 'file';
+    const sub = document.createElement('div');
+    sub.className = 'file-sub';
+    sub.textContent = (m.attachment.mime_type || m.attachment.attachment_type || '') + (m.attachment.size ? ' • ' + Math.round((m.attachment.size||0)/1024) + ' KB' : '');
+    meta.appendChild(title);
+    meta.appendChild(sub);
+    fc.appendChild(icon);
+    fc.appendChild(meta);
+    // clickable download/open
+    if (src) {
+      fc.style.cursor = 'pointer';
+      fc.addEventListener('click', ()=> { window.open(src, '_blank'); });
+    }
+    bubble.appendChild(fc);
+  }
+}
 
         if(!m.attachment && m.content){
           // already added above
