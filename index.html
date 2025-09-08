@@ -1319,93 +1319,49 @@
         updateComposerSpacing();
       }
 
+      // ===== upload simulation (keeps previous behavior) =====
+      const UPLOAD_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
+
+      
       function startUploadSimulation(pending, outerEl, rectEl, onComplete, onFail){
-  // cleanup existing timers/intervals
-  if(pending._uploadInterval) { clearInterval(pending._uploadInterval); pending._uploadInterval = null; }
-  if(pending._timeoutTimer) { clearTimeout(pending._timeoutTimer); pending._timeoutTimer = null; }
-
-  pending.uploadState = 'uploading';
-  pending.progress = pending.progress || 0;
-  pending.sendOnComplete = !!pending.sendOnComplete;
-
-  let len = 0;
-  try { len = rectEl.getTotalLength(); rectEl.style.strokeDasharray = len; } catch(e){ len = 240; }
-
-  rectEl.style.strokeDashoffset = Math.round(len * (1 - (pending.progress||0)/100));
-  rectEl.style.opacity = '1';
-  outerEl.classList.remove('upload-failed','upload-complete','clean-ring');
-
-  // If we have a real File object and API_BASE configured -> do real upload with progress
-  if (pending.file && typeof uploadFileToServer === 'function' && API_BASE) {
-    // perform real upload and update progress in callback
-    pending._realUpload = true;
-    uploadFileToServer(pending.file, (pct) => {
-      pending.progress = pct;
-      try {
-        const draw = Math.max(0, Math.round(len * (1 - pending.progress/100)));
-        rectEl.style.strokeDashoffset = draw;
-      } catch(e){}
-    }).then((res) => {
-      pending.uploadState = 'complete';
-      pending.progress = 100;
-      pending._uploadResult = res; // store result for sendAttachmentNow
-      outerEl.classList.add('upload-complete');
-      setTimeout(()=> { outerEl.classList.add('clean-ring'); rectEl.style.opacity = '0'; updateComposerSpacing(); }, 520);
-      if(typeof onComplete === 'function'){
-        setTimeout(()=> { try { onComplete(); } catch(e){} }, 10);
+        try{
+          if(!pending) return;
+          // clear existing interval if any
+          if(pending._uploadInterval){ clearInterval(pending._uploadInterval); pending._uploadInterval = null; }
+          // reset classes
+          if(outerEl && outerEl.classList){
+            outerEl.classList.remove('upload-failed','upload-complete','clean-ring');
+            outerEl.classList.add('uploading');
+          }
+          pending.progress = pending.progress || 0;
+          pending.uploadState = pending.uploadState || 'pending';
+          // ensure rect stroke setup
+          let len = null;
+          try { if(rectEl && typeof rectEl.getTotalLength === 'function'){ len = rectEl.getTotalLength(); rectEl.style.strokeDasharray = len; rectEl.style.strokeDashoffset = len * (1 - (pending.progress/100)); } } catch(e){}
+          // If a real upload is in-progress, don't start simulation
+          if(pending._useRealUpload){
+            return;
+          }
+          // simulation interval to provide lively progress before real XHR progress kicks in
+          pending._uploadInterval = setInterval(()=>{
+            try{
+              if(pending.uploadState === 'failed' || pending.uploadState === 'complete'){
+                clearInterval(pending._uploadInterval); pending._uploadInterval = null;
+                return;
+              }
+              // gentle random progress increment (never reach 100%)
+              const inc = 2 + Math.floor(Math.random()*5);
+              pending.progress = Math.min(98, (pending.progress || 0) + inc);
+              if(rectEl && len){
+                const draw = Math.max(0, Math.round(len * (1 - pending.progress/100)));
+                rectEl.style.strokeDashoffset = draw;
+              }
+            }catch(e){}
+          }, 300);
+        }catch(e){ console.error('startUploadSimulation error', e); }
       }
-    }).catch((err) => {
-      pending.uploadState = 'failed';
-      outerEl.classList.add('upload-failed');
-      if(typeof onFail === 'function'){ setTimeout(()=> { try { onFail(); } catch(e){} }, 10); }
-      updateSendVisibility();
-    });
 
-    // safety timeout (still keep)
-    pending._timeoutTimer = setTimeout(()=>{
-      if(pending.uploadState !== 'complete'){
-        pending.uploadState = 'failed';
-        outerEl.classList.add('upload-failed');
-        if(pending._uploadInterval){ clearInterval(pending._uploadInterval); pending._uploadInterval = null; }
-        if(typeof onFail === 'function'){ setTimeout(()=> { try { onFail(); } catch(e){} }, 10); }
-        updateSendVisibility();
-        toast('Upload timed out — retry available');
-      }
-    }, UPLOAD_TIMEOUT_MS);
 
-    return;
-  }
-
-  // fallback: keep the original simulation behaviour (for disks / offline preview)
-  pending._uploadInterval = setInterval(()=>{
-    const step = Math.random()*10 + 6;
-    pending.progress = Math.min(100, (pending.progress||0) + step);
-    const draw = Math.max(0, Math.round(len * (1 - pending.progress/100)));
-    rectEl.style.strokeDashoffset = draw;
-
-    if(pending.progress >= 100){
-      clearInterval(pending._uploadInterval);
-      pending._uploadInterval = null;
-      pending.uploadState = 'complete';
-      outerEl.classList.add('upload-complete');
-      setTimeout(()=> { outerEl.classList.add('clean-ring'); rectEl.style.opacity = '0'; updateComposerSpacing(); }, 520);
-      if(typeof onComplete === 'function'){
-        setTimeout(()=> { try { onComplete(); } catch(e){} }, 10);
-      }
-    }
-  }, Math.max(80, Math.min(350, Math.round(2200 / Math.log((pending.size||1)+100)))));
-
-  pending._timeoutTimer = setTimeout(()=>{
-    if(pending.uploadState !== 'complete'){
-      pending.uploadState = 'failed';
-      outerEl.classList.add('upload-failed');
-      if(pending._uploadInterval){ clearInterval(pending._uploadInterval); pending._uploadInterval = null; }
-      if(typeof onFail === 'function'){ setTimeout(()=> { try { onFail(); } catch(e){} }, 10); }
-      updateSendVisibility();
-      toast('Upload timed out — retry available');
-    }
-  }, UPLOAD_TIMEOUT_MS);
-}
       // show image preview
       function showImagePreview(file){
         try {
@@ -1475,7 +1431,10 @@
               _sending: false
             };
             updateSendVisibility();
-            startUploadSimulation(pendingAttachment, outer, rect, () => {
+            
+            pendingAttachment._outer = outer;
+            pendingAttachment._rect = rect;
+startUploadSimulation(pendingAttachment, outer, rect, () => {
               updateSendVisibility();
               if(pendingAttachment && pendingAttachment.sendOnComplete){
                 pendingAttachment.sendOnComplete = false;
@@ -1588,7 +1547,10 @@
           updateSendVisibility();
 
           setTimeout(()=> {
-            startUploadSimulation(pendingAttachment, outer, rect, () => {
+            
+            pendingAttachment._outer = outer;
+            pendingAttachment._rect = rect;
+startUploadSimulation(pendingAttachment, outer, rect, () => {
               updateSendVisibility();
               if(pendingAttachment && pendingAttachment.sendOnComplete){
                 pendingAttachment.sendOnComplete = false;
@@ -1649,36 +1611,44 @@
           if(pendingAttachment._sending) return;
           pendingAttachment._sending = true;
 
-          let uploadResult = null;
-          if (pendingAttachment.file) {
-  try {
-    // إذا كانت نتيجة الرفع تمّت بالفعل أثناء المعاينة، استخدمها مباشرة
-    if (pendingAttachment._uploadResult) {
-      uploadResult = pendingAttachment._uploadResult;
-    } else {
-      toast('Uploading file...');
-      uploadResult = await uploadFileToServer(pendingAttachment.file, (pct) => {
-        // تحديث سريع للتقدم أثناء هذا الطلب (إن لم تكن المعاينة قد فعلت ذلك)
-        pendingAttachment.progress = pct;
-        // محاولة تحديث الدوم الخاص بالـ rect إذا كان موجوداً
-        const preview = document.querySelector('.thumb-outer');
-        const rect = preview ? preview.querySelector('rect') : null;
-        if (rect && typeof rect.getTotalLength === 'function') {
-          const len = rect.getTotalLength();
-          rect.style.strokeDashoffset = Math.round(len * (1 - (pct||0)/100));
-        }
-      });
-      toast('Upload complete');
-      pendingAttachment._uploadResult = uploadResult;
-    }
-  } catch (err) {
-    console.warn('uploadFileToServer failed', err);
-    toast('Upload failed — message will be queued locally and retried');
-  }
-}
-
-          // build attachment object to insert in message
-          const attCopy = uploadResult ? {
+          
+      let uploadResult = null;
+          // upload real file if we have a File object
+          if (pendingAttachment && pendingAttachment.file) {
+            try {
+              toast('Uploading file...');
+              // mark that real upload will be used so simulation stops
+              pendingAttachment._useRealUpload = true;
+              // clear any simulation
+              if (pendingAttachment._uploadInterval){ clearInterval(pendingAttachment._uploadInterval); pendingAttachment._uploadInterval = null; }
+              // get rect element if available to update progress
+              const rectEl = pendingAttachment._rect || null;
+              // perform upload with progress callback
+              uploadResult = await uploadFileToServer(pendingAttachment.file, (pct, loaded, total) => {
+                try {
+                  pendingAttachment.progress = pct;
+                  pendingAttachment.uploadState = 'uploading';
+                  // update visual ring if present
+                  if (rectEl && typeof rectEl.getTotalLength === 'function') {
+                    const len = rectEl.getTotalLength();
+                    const draw = Math.max(0, Math.round(len * (1 - (pct/100))));
+                    rectEl.style.strokeDashoffset = draw;
+                  }
+                } catch(e){}
+              });
+              // mark completion
+              pendingAttachment.uploadState = 'complete';
+              pendingAttachment.progress = 100;
+              pendingAttachment._uploadResult = uploadResult;
+              toast('Upload complete');
+            } catch (err) {
+              console.warn('uploadFileToServer failed', err);
+              pendingAttachment.uploadState = 'failed';
+              pendingAttachment.progress = 0;
+              toast('Upload failed — message will be queued locally and retried');
+            }
+          }
+const attCopy = uploadResult ? {
             id: uploadResult.id,
             url: uploadResult.url,
             filename: uploadResult.filename,
@@ -1739,6 +1709,33 @@
       let editIndex = null;
       function genId(){ return 'm-'+Math.random().toString(36).slice(2,9); }
       function escapeHtml(str){ return String(str).replace(/[&<>"]/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s])); }
+      // build a plain-text prompt from last N messages (for context)
+      function buildChatPrompt(msgs, upToIndex = null, windowSize = 15){
+        try{
+          const arr = Array.isArray(msgs) ? msgs : (typeof messages !== 'undefined' ? messages : []);
+          if(!arr || arr.length === 0) return '';
+          // determine slice end
+          let end = (typeof upToIndex === 'number' && upToIndex >= 0) ? Math.min(upToIndex, arr.length - 1) : (arr.length - 1);
+          let start = Math.max(0, end - windowSize + 1);
+          const parts = [];
+          for(let i = start; i <= end; i++){
+            const m = arr[i];
+            if(!m || !m.role) continue;
+            const role = (m.role === 'assistant') ? 'Assistant' : ((m.role === 'user') ? 'User' : m.role);
+            const text = (m.content || '').trim();
+            if(text) parts.push(role + ': ' + text);
+            // include attachment reference as short note
+            if(m.attachment){
+              const a = m.attachment;
+              const aname = a.filename || a.name || a.attachment_name || a.attachmentName || '';
+              const atype = a.mime_type || a.attachment_type || a.type || '';
+              parts.push(role + ' attachment: ' + (aname || atype || (a.url ? 'file' : 'attachment')));
+            }
+          }
+          return parts.join('\n');
+        }catch(e){ console.error('buildChatPrompt error', e); return ''; }
+      }
+
 
       // Load session
       function loadSession(){
@@ -1834,47 +1831,50 @@
         }
       }
 
-      // Upload a file to /api/files with real progress callback.
-// resolves { id, url, filename, mime_type } (same as backend expected)
-// onProgress(pct) is optional callback (0..100)
-async function uploadFileToServer(file, onProgress){
-  if (!file) throw new Error('uploadFileToServer: missing file');
-  return new Promise((resolve, reject) => {
-    try {
-      const xhr = new XMLHttpRequest();
-      const fd = new FormData();
-      fd.append('file', file);
-
-      xhr.open('POST', API_BASE + '/api/files', true);
-      xhr.withCredentials = false;
-      // progress event
-      xhr.upload.onprogress = function(e){
-        if (e.lengthComputable && typeof onProgress === 'function'){
-          const pct = Math.round((e.loaded / e.total) * 100);
-          try { onProgress(pct); } catch(err) { /* ignore */ }
-        }
-      };
-      xhr.onload = function(){
-        if (xhr.status >= 200 && xhr.status < 300){
+      // Upload a file to /api/files (returns { id, url, filename, mime_type } expected from backend)
+      
+      // upload with progress (uses XMLHttpRequest to get progress events)
+      async function uploadFileToServer(file, onProgress){
+        if (!file) throw new Error('uploadFileToServer: missing file');
+        // if onProgress is not a function, ignore progress
+        return await new Promise((resolve, reject) => {
           try {
-            const json = JSON.parse(xhr.responseText || '{}');
-            resolve(json);
-          } catch(err) {
-            resolve({ raw: xhr.responseText });
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', API_BASE + '/api/files', true);
+            xhr.responseType = 'text';
+            xhr.onreadystatechange = function(){
+              if (xhr.readyState === 4) {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                  try {
+                    const txt = xhr.responseText || '';
+                    const json = txt.length ? JSON.parse(txt) : {};
+                    resolve(json);
+                  } catch(e){ resolve({}); }
+                } else {
+                  let txt = '';
+                  try { txt = xhr.responseText || ''; }catch(e){}
+                  reject(new Error('file upload failed: ' + xhr.status + ' ' + txt));
+                }
+              }
+            };
+            xhr.onerror = function(){ reject(new Error('file upload error')); };
+            if (xhr.upload && typeof onProgress === 'function') {
+              xhr.upload.onprogress = function(e){
+                if(e.lengthComputable){
+                  const pct = Math.round((e.loaded / e.total) * 100);
+                  try{ onProgress(pct, e.loaded, e.total); }catch(_){}
+                }
+              };
+            }
+            const fd = new FormData();
+            fd.append('file', file, file.name);
+            xhr.send(fd);
+          } catch (e) {
+            reject(e);
           }
-        } else {
-          reject(new Error('file upload failed: ' + xhr.status + ' ' + (xhr.responseText || '')));
-        }
-      };
-      xhr.onerror = function(){
-        reject(new Error('file upload error'));
-      };
-      xhr.send(fd);
-    } catch (err) {
-      reject(err);
-    }
-  });
-}
+        });
+      }
+
       function saveDraft(){ localStorage.setItem(DRAFT_KEY, composer.value || ''); }
       function loadDraft(){
         const d = localStorage.getItem(DRAFT_KEY);
@@ -1895,47 +1895,55 @@ async function uploadFileToServer(file, onProgress){
   bubble.appendChild(txt);
 }
 
-        if (m.attachment) {
-  // determine if attachment is an image
-  const mime = m.attachment.mime_type || m.attachment.attachment_type || '';
-  const src = m.attachment.url || m.attachment.src || '';
-  const isImage = (m.attachment.type === 'image')
-                   || (typeof mime === 'string' && mime.startsWith && mime.startsWith('image/'))
-                   || (typeof src === 'string' && src.startsWith && src.startsWith('data:image/'))
-                   || (typeof src === 'string' && /\.(png|jpe?g|gif|webp|svg)(\?.*)?$/.test(src.toLowerCase()));
+        
+          if (m.attachment) {
+            const att = m.attachment;
+            // normalize mime/type fields
+            const mime = att.mime_type || att.attachment_type || att.type || '';
+            const name = att.filename || att.name || att.filename || att.attachment_name || att.attachmentName || 'file';
+            const url = att.url || att.src || att.attachment_url || att.attachmentUrl || null;
+            const isImage = typeof mime === 'string' && mime.startsWith && mime.startsWith('image/');
+            const elWrap = document.createElement('div');
+            elWrap.className = 'file-card';
+            if (isImage && url) {
+              const thumb = document.createElement('div');
+              thumb.className = 'file-thumb-img';
+              const img = document.createElement('img');
+              img.alt = name;
+              img.src = url;
+              thumb.appendChild(img);
+              elWrap.appendChild(thumb);
+            } else {
+              const icon = document.createElement('div');
+              icon.className = 'file-icon';
+              icon.innerHTML = '&nbsp;'; // keep layout
+              elWrap.appendChild(icon);
+            }
+            const info = document.createElement('div');
+            info.className = 'file-info';
+            const title = document.createElement('div');
+            title.className = 'file-name';
+            title.textContent = name;
+            info.appendChild(title);
+            if (mime) {
+              const mt = document.createElement('div');
+              mt.className = 'file-type';
+              mt.textContent = mime;
+              info.appendChild(mt);
+            }
+            elWrap.appendChild(info);
+            if (url) {
+              const a = document.createElement('a');
+              a.href = url;
+              a.target = '_blank';
+              a.rel = 'noopener noreferrer';
+              a.className = 'file-link';
+              a.textContent = 'Open';
+              elWrap.appendChild(a);
+            }
+            bubble.appendChild(elWrap);
+          }
 
-  if (isImage) {
-    const img = document.createElement('img');
-    img.className = 'att-image';
-    img.alt = m.attachment.name || 'image';
-    img.src = src || (m.attachment.dataUri || '');
-    bubble.appendChild(img);
-  } else {
-    const fc = document.createElement('div');
-    fc.className = 'file-card';
-    const icon = document.createElement('div');
-    icon.className = 'file-icon';
-    icon.innerText = 'F';
-    const meta = document.createElement('div');
-    meta.className = 'file-meta';
-    const title = document.createElement('div');
-    title.className = 'file-title';
-    title.textContent = m.attachment.name || m.attachment.filename || 'file';
-    const sub = document.createElement('div');
-    sub.className = 'file-sub';
-    sub.textContent = (m.attachment.mime_type || m.attachment.attachment_type || '') + (m.attachment.size ? ' • ' + Math.round((m.attachment.size||0)/1024) + ' KB' : '');
-    meta.appendChild(title);
-    meta.appendChild(sub);
-    fc.appendChild(icon);
-    fc.appendChild(meta);
-    // clickable download/open
-    if (src) {
-      fc.style.cursor = 'pointer';
-      fc.addEventListener('click', ()=> { window.open(src, '_blank'); });
-    }
-    bubble.appendChild(fc);
-  }
-}
 
         if(!m.attachment && m.content){
           // already added above
@@ -2105,7 +2113,7 @@ async function sendMessage(text, parentIndex = null) {
     let domAppended = false;
 
     try {
-        const response = await puter.ai.chat(textToUse, { model: 'gpt-5-nano', stream: true });
+        const response = await puter.ai.chat(buildChatPrompt(messages), { model: 'gpt-5-nano', stream: true });
 
         let buffer = '';
 
@@ -2253,7 +2261,7 @@ async function regenerateAssistantForParent(parentIdx){
     let bubbleEl = null;
     let domAppended = false;
     try {
-      const response = await puter.ai.chat(userText, { model: 'gpt-5-nano', stream: true });
+      const response = await puter.ai.chat(buildChatPrompt(messages, parentIdx), { model: 'gpt-5-nano', stream: true });
       let buffer = '';
 
       for await (const part of response) {
