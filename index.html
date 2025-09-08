@@ -1901,7 +1901,10 @@ const attCopy = uploadResult ? {
             // normalize mime/type fields
             const mime = att.mime_type || att.attachment_type || att.type || '';
             const name = att.filename || att.name || att.filename || att.attachment_name || att.attachmentName || 'file';
-            const url = att.url || att.src || att.attachment_url || att.attachmentUrl || null;
+            let url = att.url || att.src || att.attachment_url || att.attachmentUrl || null;
+if (url && url.startsWith('http://')) {
+  url = url.replace('http://', 'https://');
+}
             const isImage = typeof mime === 'string' && mime.startsWith && mime.startsWith('image/');
             const elWrap = document.createElement('div');
             elWrap.className = 'file-card';
