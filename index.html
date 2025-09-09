@@ -1609,100 +1609,78 @@ startUploadSimulation(pendingAttachment, outer, rect, () => {
         }
       }
 
-      // sendAttachmentNow
-      async function sendAttachmentNow(){
-        try{
-          if(!pendingAttachment){
-            return;
-          }
-          if(pendingAttachment._sending){
-            return;
-          }
-
-          if(pendingAttachment.uploadState === 'uploading' || pendingAttachment.uploadState === 'pending'){
-            pendingAttachment.sendOnComplete = true;
-            toast('Waiting for upload to complete...');
-            return;
-          }
-          if(pendingAttachment.uploadState === 'failed'){
-            toast('Upload failed — please retry or remove the attachment');
-            return;
-          }
-
-          if(pendingAttachment._sending) return;
-          pendingAttachment._sending = true;
-
-          
       let uploadResult = null;
-          // upload real file if we have a File object
-          if (pendingAttachment && pendingAttachment.file) {
-            try {
-              toast('Uploading file...');
-              // mark that real upload will be used so simulation stops
-              pendingAttachment._useRealUpload = true;
-              // clear any simulation
-              if (pendingAttachment._uploadInterval){ clearInterval(pendingAttachment._uploadInterval); pendingAttachment._uploadInterval = null; }
-              // get rect element if available to update progress
-              const rectEl = pendingAttachment._rect || null;
-              // perform upload with progress callback
-              uploadResult = await uploadFileToServer(pendingAttachment.file, (pct, loaded, total) => {
-                try {
-                  pendingAttachment.progress = pct;
-                  pendingAttachment.uploadState = 'uploading';
-                  // update visual ring if present
-                  if (rectEl && typeof rectEl.getTotalLength === 'function') {
-                    const len = rectEl.getTotalLength();
-                    const draw = Math.max(0, Math.round(len * (1 - (pct/100))));
-                    rectEl.style.strokeDashoffset = draw;
-                  }
-                } catch(e){}
-              });
-              if (uploadResult) {
-  // ✅ علّم أن الرفع انتهى
-  pendingAttachment.uploadState = 'done';
-  pendingAttachment.progress = 100;
 
-  // ✅ خزّن تفاصيل الملف من السيرفر
-  pendingAttachment.id = uploadResult.id;
-  pendingAttachment.url = uploadResult.url;
-  pendingAttachment.filename = uploadResult.filename;
-  pendingAttachment.mime_type = uploadResult.mime_type;
+// رفع الملف فعليًا إذا عندنا File object
+if (pendingAttachment && pendingAttachment.file) {
+  try {
+    toast('Uploading file...');
+    pendingAttachment._useRealUpload = true;
 
-  toast('Upload complete!');
+    // أوقف أي محاكاة قديمة
+    if (pendingAttachment._uploadInterval) {
+      clearInterval(pendingAttachment._uploadInterval);
+      pendingAttachment._uploadInterval = null;
+    }
+
+    const rectEl = pendingAttachment._rect || null;
+
+    // رفع الملف مع التقدم
+    uploadResult = await uploadFileToServer(pendingAttachment.file, (pct, loaded, total) => {
+      try {
+        pendingAttachment.progress = pct;
+        pendingAttachment.uploadState = 'uploading';
+        if (rectEl && typeof rectEl.getTotalLength === 'function') {
+          const len = rectEl.getTotalLength();
+          const draw = Math.max(0, Math.round(len * (1 - (pct/100))));
+          rectEl.style.strokeDashoffset = draw;
+        }
+      } catch (e) {}
+    });
+
+    // 🟢 إذا نجح الرفع
+    if (uploadResult) {
+      pendingAttachment.uploadState = 'done';
+      pendingAttachment.progress = 100;
+      pendingAttachment.id = uploadResult.id;
+      pendingAttachment.url = uploadResult.url;
+      pendingAttachment.filename = uploadResult.filename;
+      pendingAttachment.mime_type = uploadResult.mime_type;
+      pendingAttachment._uploadResult = uploadResult;
+
+      toast('Upload complete!');
+    }
+
+  } catch (err) {
+    console.warn('uploadFileToServer failed', err);
+    pendingAttachment.uploadState = 'failed';
+    pendingAttachment.progress = 0;
+    toast('Upload failed — message will be queued locally and retried');
+  }
 }
-              // mark completion
-              pendingAttachment.uploadState = 'complete';
-              pendingAttachment.progress = 100;
-              pendingAttachment._uploadResult = uploadResult;
-              toast('Upload complete');
-            } catch (err) {
-              console.warn('uploadFileToServer failed', err);
-              pendingAttachment.uploadState = 'failed';
-              pendingAttachment.progress = 0;
-              toast('Upload failed — message will be queued locally and retried');
-            }
-          }
+
+// نسخة attachment نضيفها للرسالة
 const attCopy = uploadResult ? {
-            id: uploadResult.id,
-            url: uploadResult.url,
-            filename: uploadResult.filename,
-            mime_type: uploadResult.mime_type
-          } : {
-            type: pendingAttachment.type,
-            name: pendingAttachment.name,
-            size: pendingAttachment.size,
-            src: pendingAttachment.src
-          };
+  id: uploadResult.id,
+  url: uploadResult.url,
+  filename: uploadResult.filename,
+  mime_type: uploadResult.mime_type
+} : {
+  type: pendingAttachment.type,
+  name: pendingAttachment.name,
+  size: pendingAttachment.size,
+  src: pendingAttachment.src
+};
 
-          const text = (composer.value || '').trim();
-          const userMessage = {
-            id: genId(),
-            role: 'user',
-            content: text || '',
-            attachment: attCopy,
-            meta: {}
-          };
-
+// الرسالة نفسها
+const text = (composer.value || '').trim();
+const userMessage = {
+  id: genId(),
+  role: 'user',
+  content: text || '',
+  attachment: attCopy,
+  meta: {}
+};
           // append locally
           messages.push(userMessage);
           appendMessage(userMessage, messages.length - 1);
