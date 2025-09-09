@@ -1657,6 +1657,19 @@ startUploadSimulation(pendingAttachment, outer, rect, () => {
                   }
                 } catch(e){}
               });
+              if (uploadResult) {
+  // ✅ علّم أن الرفع انتهى
+  pendingAttachment.uploadState = 'done';
+  pendingAttachment.progress = 100;
+
+  // ✅ خزّن تفاصيل الملف من السيرفر
+  pendingAttachment.id = uploadResult.id;
+  pendingAttachment.url = uploadResult.url;
+  pendingAttachment.filename = uploadResult.filename;
+  pendingAttachment.mime_type = uploadResult.mime_type;
+
+  toast('Upload complete!');
+}
               // mark completion
               pendingAttachment.uploadState = 'complete';
               pendingAttachment.progress = 100;
