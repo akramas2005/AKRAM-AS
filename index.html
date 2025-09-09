@@ -1324,42 +1324,63 @@
 
       
       function startUploadSimulation(pending, outerEl, rectEl, onComplete, onFail){
-        try{
-          if(!pending) return;
-          // clear existing interval if any
-          if(pending._uploadInterval){ clearInterval(pending._uploadInterval); pending._uploadInterval = null; }
-          // reset classes
-          if(outerEl && outerEl.classList){
-            outerEl.classList.remove('upload-failed','upload-complete','clean-ring');
-            outerEl.classList.add('uploading');
-          }
-          pending.progress = pending.progress || 0;
-          pending.uploadState = pending.uploadState || 'pending';
-          // ensure rect stroke setup
-          let len = null;
-          try { if(rectEl && typeof rectEl.getTotalLength === 'function'){ len = rectEl.getTotalLength(); rectEl.style.strokeDasharray = len; rectEl.style.strokeDashoffset = len * (1 - (pending.progress/100)); } } catch(e){}
-          // If a real upload is in-progress, don't start simulation
-          if(pending._useRealUpload){
-            return;
-          }
-          // simulation interval to provide lively progress before real XHR progress kicks in
-          pending._uploadInterval = setInterval(()=>{
-            try{
-              if(pending.uploadState === 'failed' || pending.uploadState === 'complete'){
-                clearInterval(pending._uploadInterval); pending._uploadInterval = null;
-                return;
-              }
-              // gentle random progress increment (never reach 100%)
-              const inc = 2 + Math.floor(Math.random()*5);
-              pending.progress = Math.min(98, (pending.progress || 0) + inc);
-              if(rectEl && len){
-                const draw = Math.max(0, Math.round(len * (1 - pending.progress/100)));
-                rectEl.style.strokeDashoffset = draw;
-              }
-            }catch(e){}
-          }, 300);
-        }catch(e){ console.error('startUploadSimulation error', e); }
+  try{
+    if(!pending) return;
+    // clear existing interval if any
+    if(pending._uploadInterval){ clearInterval(pending._uploadInterval); pending._uploadInterval = null; }
+    // reset classes
+    if(outerEl && outerEl.classList){
+      outerEl.classList.remove('upload-failed','upload-complete','clean-ring');
+      outerEl.classList.add('uploading');
+    }
+    pending.progress = pending.progress || 0;
+    pending.uploadState = pending.uploadState || 'pending';
+    // ensure rect stroke setup
+    let len = null;
+    try {
+      if(rectEl && typeof rectEl.getTotalLength === 'function'){
+        len = rectEl.getTotalLength();
+        rectEl.style.strokeDasharray = len;
+        rectEl.style.strokeDashoffset = len * (1 - (pending.progress/100));
       }
+    } catch(e){}
+
+    // If a real upload already flagged, don't start (but ensure state visual updated)
+    if(pending._useRealUpload){
+      // ensure uploading class is set and rect updated from current progress
+      if(rectEl && len){
+        const draw = Math.max(0, Math.round(len * (1 - (pending.progress/100))));
+        rectEl.style.strokeDashoffset = draw;
+      }
+      return;
+    }
+
+    // simulation interval to provide lively progress before real XHR progress kicks in
+    pending._uploadInterval = setInterval(()=>{
+      try{
+        // if real upload started, stop simulation
+        if (pending._useRealUpload) {
+          clearInterval(pending._uploadInterval); pending._uploadInterval = null;
+          return;
+        }
+
+        if(pending.uploadState === 'failed' || pending.uploadState === 'complete'){
+          clearInterval(pending._uploadInterval); pending._uploadInterval = null;
+          return;
+        }
+
+        // gentle random progress increment but allow reaching 99 (leave room for finalization)
+        const inc = 2 + Math.floor(Math.random()*5);
+        pending.progress = Math.min(99, (pending.progress || 0) + inc);
+
+        if(rectEl && len){
+          const draw = Math.max(0, Math.round(len * (1 - pending.progress/100)));
+          rectEl.style.strokeDashoffset = draw;
+        }
+      }catch(e){}
+    }, 250);
+  }catch(e){ console.error('startUploadSimulation error', e); }
+}
 
 
       // show image preview
@@ -1834,46 +1855,80 @@ const attCopy = uploadResult ? {
       // Upload a file to /api/files (returns { id, url, filename, mime_type } expected from backend)
       
       // upload with progress (uses XMLHttpRequest to get progress events)
-      async function uploadFileToServer(file, onProgress){
-        if (!file) throw new Error('uploadFileToServer: missing file');
-        // if onProgress is not a function, ignore progress
-        return await new Promise((resolve, reject) => {
+// Improved: ensures final 100% progress and handles cleanup
+async function uploadFileToServer(file, onProgress){
+  if (!file) throw new Error('uploadFileToServer: missing file');
+  return await new Promise((resolve, reject) => {
+    try {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', API_BASE + '/api/files', true);
+      xhr.responseType = 'text';
+
+      // ensure caller knows real upload started (so simulation stops)
+      try { if (typeof pendingAttachment !== 'undefined' && pendingAttachment) pendingAttachment._useRealUpload = true; } catch(e){}
+
+      xhr.onreadystatechange = function(){
+        if (xhr.readyState === 4) {
+          // try to notify final progress (if length known)
           try {
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', API_BASE + '/api/files', true);
-            xhr.responseType = 'text';
-            xhr.onreadystatechange = function(){
-              if (xhr.readyState === 4) {
-                if (xhr.status >= 200 && xhr.status < 300) {
-                  try {
-                    const txt = xhr.responseText || '';
-                    const json = txt.length ? JSON.parse(txt) : {};
-                    resolve(json);
-                  } catch(e){ resolve({}); }
-                } else {
-                  let txt = '';
-                  try { txt = xhr.responseText || ''; }catch(e){}
-                  reject(new Error('file upload failed: ' + xhr.status + ' ' + txt));
-                }
-              }
-            };
-            xhr.onerror = function(){ reject(new Error('file upload error')); };
-            if (xhr.upload && typeof onProgress === 'function') {
-              xhr.upload.onprogress = function(e){
-                if(e.lengthComputable){
-                  const pct = Math.round((e.loaded / e.total) * 100);
-                  try{ onProgress(pct, e.loaded, e.total); }catch(_){}
-                }
-              };
+            if (xhr._totalSize && typeof onProgress === 'function') {
+              onProgress(100, xhr._totalSize, xhr._totalSize);
+            } else if (typeof onProgress === 'function') {
+              onProgress(100, 0, 0);
             }
-            const fd = new FormData();
-            fd.append('file', file, file.name);
-            xhr.send(fd);
-          } catch (e) {
-            reject(e);
+          } catch(e){}
+
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const txt = xhr.responseText || '';
+              const json = txt.length ? JSON.parse(txt) : {};
+              resolve(json);
+            } catch(e){
+              resolve({});
+            }
+          } else {
+            let txt = '';
+            try { txt = xhr.responseText || ''; }catch(e){}
+            reject(new Error('file upload failed: ' + xhr.status + ' ' + txt));
           }
-        });
+        }
+      };
+
+      xhr.onerror = function(){ reject(new Error('file upload error')); };
+
+      if (xhr.upload && typeof onProgress === 'function') {
+        xhr.upload.onprogress = function(e){
+          if(e.lengthComputable){
+            const pct = Math.round((e.loaded / e.total) * 100);
+            // store total so readyState handler can use it if needed
+            try { xhr._totalSize = e.total; } catch(e){}
+            try{ onProgress(pct, e.loaded, e.total); }catch(_){}
+          } else {
+            // unknown total: call some progress pulse
+            try{ onProgress(50, 0, 0); }catch(_){}
+          }
+        };
       }
+
+      // Also add onload to ensure final call if readyState doesn't deliver
+      xhr.onload = function(e){
+        try {
+          if (typeof onProgress === 'function') {
+            // if we had total stored, use it
+            const total = xhr._totalSize || 0;
+            onProgress(100, total, total);
+          }
+        } catch(e){}
+      };
+
+      const fd = new FormData();
+      fd.append('file', file, file.name);
+      xhr.send(fd);
+    } catch (e) {
+      reject(e);
+    }
+  });
+}
 
       function saveDraft(){ localStorage.setItem(DRAFT_KEY, composer.value || ''); }
       function loadDraft(){
