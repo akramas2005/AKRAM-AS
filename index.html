@@ -1609,107 +1609,124 @@ startUploadSimulation(pendingAttachment, outer, rect, () => {
         }
       }
 
-      let uploadResult = null;
-
-// رفع الملف فعليًا إذا عندنا File object
-if (pendingAttachment && pendingAttachment.file) {
+      // إرسال المرفق فعليًا (صورة أو ملف)
+async function sendAttachmentNow(){
   try {
-    toast('Uploading file...');
-    pendingAttachment._useRealUpload = true;
+    if(!pendingAttachment) return;
+    if(pendingAttachment._sending) return;
 
-    // أوقف أي محاكاة قديمة
-    if (pendingAttachment._uploadInterval) {
-      clearInterval(pendingAttachment._uploadInterval);
-      pendingAttachment._uploadInterval = null;
+    if(pendingAttachment.uploadState === 'uploading' || pendingAttachment.uploadState === 'pending'){
+      pendingAttachment.sendOnComplete = true;
+      toast('Waiting for upload to complete...');
+      return;
+    }
+    if(pendingAttachment.uploadState === 'failed'){
+      toast('Upload failed — please retry or remove the attachment');
+      return;
     }
 
-    const rectEl = pendingAttachment._rect || null;
+    pendingAttachment._sending = true;
 
-    // رفع الملف مع التقدم
-    uploadResult = await uploadFileToServer(pendingAttachment.file, (pct, loaded, total) => {
+    // 🟢 متغير لحفظ نتيجة الرفع
+    let uploadResult = null;
+
+    // رفع الملف فعليًا إذا عندنا File object
+    if (pendingAttachment && pendingAttachment.file) {
       try {
-        pendingAttachment.progress = pct;
-        pendingAttachment.uploadState = 'uploading';
-        if (rectEl && typeof rectEl.getTotalLength === 'function') {
-          const len = rectEl.getTotalLength();
-          const draw = Math.max(0, Math.round(len * (1 - (pct/100))));
-          rectEl.style.strokeDashoffset = draw;
+        toast('Uploading file...');
+        pendingAttachment._useRealUpload = true;
+
+        if (pendingAttachment._uploadInterval) {
+          clearInterval(pendingAttachment._uploadInterval);
+          pendingAttachment._uploadInterval = null;
         }
-      } catch (e) {}
+
+        const rectEl = pendingAttachment._rect || null;
+
+        uploadResult = await uploadFileToServer(pendingAttachment.file, (pct, loaded, total) => {
+          try {
+            pendingAttachment.progress = pct;
+            pendingAttachment.uploadState = 'uploading';
+            if (rectEl && typeof rectEl.getTotalLength === 'function') {
+              const len = rectEl.getTotalLength();
+              const draw = Math.max(0, Math.round(len * (1 - (pct/100))));
+              rectEl.style.strokeDashoffset = draw;
+            }
+          } catch (e) {}
+        });
+
+        // 🟢 إذا نجح الرفع
+        if (uploadResult) {
+          pendingAttachment.uploadState = 'done';
+          pendingAttachment.progress = 100;
+          pendingAttachment.id = uploadResult.id;
+          pendingAttachment.url = uploadResult.url;
+          pendingAttachment.filename = uploadResult.filename;
+          pendingAttachment.mime_type = uploadResult.mime_type;
+          pendingAttachment._uploadResult = uploadResult;
+          toast('Upload complete!');
+        }
+
+      } catch (err) {
+        console.warn('uploadFileToServer failed', err);
+        pendingAttachment.uploadState = 'failed';
+        pendingAttachment.progress = 0;
+        toast('Upload failed — message will be queued locally and retried');
+      }
+    }
+
+    // نسخة attachment نضيفها للرسالة
+    const attCopy = uploadResult ? {
+      id: uploadResult.id,
+      url: uploadResult.url,
+      filename: uploadResult.filename,
+      mime_type: uploadResult.mime_type
+    } : {
+      type: pendingAttachment.type,
+      name: pendingAttachment.name,
+      size: pendingAttachment.size,
+      src: pendingAttachment.src
+    };
+
+    // الرسالة نفسها
+    const text = (composer.value || '').trim();
+    const userMessage = {
+      id: genId(),
+      role: 'user',
+      content: text || '',
+      attachment: attCopy,
+      meta: {}
+    };
+
+    // append locally
+    messages.push(userMessage);
+    appendMessage(userMessage, messages.length - 1);
+    saveSession();
+    updateWelcomeVisibility();
+
+    // clear composer
+    composer.value = '';
+    updateSendVisibility();
+    autoGrowTextarea();
+
+    // try to persist user message immediately
+    postMessageToServer(userMessage).catch((err) => {
+      console.warn('postMessageToServer failed for attachment message', err);
+      scheduleSync();
     });
 
-    // 🟢 إذا نجح الرفع
-    if (uploadResult) {
-      pendingAttachment.uploadState = 'done';
-      pendingAttachment.progress = 100;
-      pendingAttachment.id = uploadResult.id;
-      pendingAttachment.url = uploadResult.url;
-      pendingAttachment.filename = uploadResult.filename;
-      pendingAttachment.mime_type = uploadResult.mime_type;
-      pendingAttachment._uploadResult = uploadResult;
+    clearPreview();
 
-      toast('Upload complete!');
-    }
+    // trigger assistant reply for this new message
+    regenerateAssistantForParent(messages.length - 1);
 
-  } catch (err) {
-    console.warn('uploadFileToServer failed', err);
-    pendingAttachment.uploadState = 'failed';
-    pendingAttachment.progress = 0;
-    toast('Upload failed — message will be queued locally and retried');
+  } catch(e){
+    console.error(e);
+    toast('Send failed');
+  } finally {
+    try { if(pendingAttachment) pendingAttachment._sending = false; } catch(e){}
   }
 }
-
-// نسخة attachment نضيفها للرسالة
-const attCopy = uploadResult ? {
-  id: uploadResult.id,
-  url: uploadResult.url,
-  filename: uploadResult.filename,
-  mime_type: uploadResult.mime_type
-} : {
-  type: pendingAttachment.type,
-  name: pendingAttachment.name,
-  size: pendingAttachment.size,
-  src: pendingAttachment.src
-};
-
-// الرسالة نفسها
-const text = (composer.value || '').trim();
-const userMessage = {
-  id: genId(),
-  role: 'user',
-  content: text || '',
-  attachment: attCopy,
-  meta: {}
-};
-          // append locally
-          messages.push(userMessage);
-          appendMessage(userMessage, messages.length - 1);
-          saveSession();
-          updateWelcomeVisibility();
-
-          // clear composer
-          composer.value = '';
-          updateSendVisibility();
-          autoGrowTextarea();
-
-          // try to persist user message immediately (if file was uploaded we include file id/url)
-          postMessageToServer(userMessage).catch((err) => {
-            console.warn('postMessageToServer failed for attachment message', err);
-            scheduleSync();
-          });
-
-          clearPreview();
-
-          // trigger assistant reply for this new message (parent = index of the user message)
-          regenerateAssistantForParent(messages.length - 1);
-
-        } catch(e){
-          console.error(e);
-          toast('Send failed');
-        } finally {
-          try { if(pendingAttachment) pendingAttachment._sending = false; } catch(e){}
-        }
-      }
 
       document.addEventListener('click', (e)=>{ if(attachPanel.classList.contains('open') && !attachPanel.contains(e.target) && !attachBtn.contains(e.target)) closeAttach(); }, true);
 
