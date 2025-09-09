@@ -1442,16 +1442,16 @@ function startUploadSimulation(pending, outer, rect, onComplete, onTick){
         }
 
         // gentle random progress increment but allow reaching 99 (leave room for finalization)
-        const inc = 2 + Math.floor(Math.random()*5);
-        pending.progress = Math.min(99, (pending.progress || 0) + inc);
+const inc = 2 + Math.floor(Math.random() * 5);
+pending.progress = Math.min(99, (pending.progress || 0) + inc);
 
-        if (rectEl && len) {
-  const draw = Math.max(0, Math.round(len * (1 - pending.progress/100)));
+if (rectEl && len) {
+  const draw = Math.max(0, Math.round(len * (1 - pending.progress / 100)));
   rectEl.style.strokeDashoffset = draw;
 }
-} catch(e) {}
+
 }, 250);
-} catch(e) {
+} catch (e) {
   console.error('startUploadSimulation error', e);
 }
 
