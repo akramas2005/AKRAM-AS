@@ -1323,27 +1323,99 @@
       const UPLOAD_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
 
       
-      function startUploadSimulation(pending, outerEl, rectEl, onComplete, onFail){
-  try{
+      // === (NEW) startUploadSimulation ===
+// Simulated progress for preview ring. Calls onComplete() when simulation finishes
+// or when a real upload starts (pending._useRealUpload === true).
+function startUploadSimulation(pending, outer, rect, onComplete, onTick){
+  try {
     if(!pending) return;
-    // clear existing interval if any
-    if(pending._uploadInterval){ clearInterval(pending._uploadInterval); pending._uploadInterval = null; }
-    // reset classes
-    if(outerEl && outerEl.classList){
-      outerEl.classList.remove('upload-failed','upload-complete','clean-ring');
-      outerEl.classList.add('uploading');
+    // clear existing interval
+    if (pending._uploadInterval) {
+      clearInterval(pending._uploadInterval);
+      pending._uploadInterval = null;
     }
+
+    // if real upload already requested -> immediately complete simulation and call onComplete
+    if (pending._useRealUpload) {
+      pending.uploadState = pending.uploadState || 'pending';
+      if (typeof onComplete === 'function') onComplete();
+      return;
+    }
+
+    // ensure state
+    pending.uploadState = pending.uploadState || 'uploading';
     pending.progress = pending.progress || 0;
-    pending.uploadState = pending.uploadState || 'pending';
-    // ensure rect stroke setup
-    let len = null;
+
+    // prepare SVG stroke if provided
     try {
-      if(rectEl && typeof rectEl.getTotalLength === 'function'){
-        len = rectEl.getTotalLength();
-        rectEl.style.strokeDasharray = len;
-        rectEl.style.strokeDashoffset = len * (1 - (pending.progress/100));
+      if (rect && typeof rect.getTotalLength === 'function') {
+        const totalLen = rect.getTotalLength();
+        rect.style.strokeDasharray = String(totalLen);
+        rect.style.strokeDashoffset = String(totalLen);
+        rect.style.transition = 'stroke-dashoffset 120ms linear, opacity .6s ease';
       }
     } catch(e){}
+
+    let lastTime = Date.now();
+
+    pending._uploadInterval = setInterval(()=>{
+      try {
+        if (!pending) {
+          clearInterval(pending._uploadInterval);
+          pending._uploadInterval = null;
+          return;
+        }
+
+        // If a real upload was triggered elsewhere, stop simulation and notify
+        if (pending._useRealUpload) {
+          clearInterval(pending._uploadInterval);
+          pending._uploadInterval = null;
+          pending.uploadState = pending.uploadState || 'pending';
+          if (typeof onComplete === 'function') onComplete();
+          return;
+        }
+
+        // Stop if failed or already completed
+        if (pending.uploadState === 'failed' || pending.uploadState === 'complete') {
+          clearInterval(pending._uploadInterval);
+          pending._uploadInterval = null;
+          if (pending.uploadState === 'complete' && typeof onComplete === 'function') onComplete();
+          return;
+        }
+
+        // advance progress slowly but keep room for real upload
+        const now = Date.now();
+        const dt = Math.max(80, Math.min(1200, now - lastTime));
+        lastTime = now;
+        const bump = Math.max(1, Math.round(Math.random() * 6));
+        pending.progress = Math.min(98, (pending.progress || 0) + bump);
+
+        // update ring
+        if (rect && typeof rect.getTotalLength === 'function') {
+          const len = rect.getTotalLength();
+          const draw = Math.max(0, Math.round(len * (1 - (pending.progress/100))));
+          rect.style.strokeDashoffset = draw;
+        }
+
+        // tick callback to update UI
+        if (typeof onTick === 'function') onTick();
+
+        // If we reached simulation threshold -> stop and call onComplete so preview flow can continue
+        if ((pending.progress || 0) >= 98) {
+          clearInterval(pending._uploadInterval);
+          pending._uploadInterval = null;
+          // mark ready (not actually uploaded yet)
+          pending.uploadState = 'pending';
+          if (typeof onComplete === 'function') onComplete();
+        }
+      } catch (e) {
+        console.error('startUploadSimulation tick error', e);
+      }
+    }, 120 + Math.round(Math.random()*180));
+  } catch (e) {
+    console.error('startUploadSimulation error', e);
+  }
+}
 
     // If a real upload already flagged, don't start (but ensure state visual updated)
     if(pending._useRealUpload){
@@ -1609,40 +1681,43 @@ startUploadSimulation(pendingAttachment, outer, rect, () => {
         }
       }
 
-      // إرسال المرفق فعليًا (صورة أو ملف)
+      // === (NEW) sendAttachmentNow ===
 async function sendAttachmentNow(){
-  try {
+  try{
     if(!pendingAttachment) return;
     if(pendingAttachment._sending) return;
 
-    if(pendingAttachment.uploadState === 'uploading' || pendingAttachment.uploadState === 'pending'){
+    // if still in simulated upload -> ask to wait and mark sendOnComplete
+    if (pendingAttachment.uploadState === 'uploading' || pendingAttachment.uploadState === 'pending') {
       pendingAttachment.sendOnComplete = true;
       toast('Waiting for upload to complete...');
       return;
     }
-    if(pendingAttachment.uploadState === 'failed'){
+    if (pendingAttachment.uploadState === 'failed') {
       toast('Upload failed — please retry or remove the attachment');
       return;
     }
 
     pendingAttachment._sending = true;
 
-    // 🟢 متغير لحفظ نتيجة الرفع
     let uploadResult = null;
 
-    // رفع الملف فعليًا إذا عندنا File object
+    // If we have a File object, perform real upload now
     if (pendingAttachment && pendingAttachment.file) {
       try {
         toast('Uploading file...');
         pendingAttachment._useRealUpload = true;
 
-        if (pendingAttachment._uploadInterval) {
-          clearInterval(pendingAttachment._uploadInterval);
-          pendingAttachment._uploadInterval = null;
-        }
+        // stop any simulation
+        try { if (pendingAttachment._uploadInterval) { clearInterval(pendingAttachment._uploadInterval); pendingAttachment._uploadInterval = null; } } catch(e){}
 
         const rectEl = pendingAttachment._rect || null;
+        const outerEl = pendingAttachment._outer || null;
 
+        // ensure ring shows uploading state
+        try { if (outerEl) { outerEl.classList.remove('upload-failed','upload-complete'); outerEl.classList.add('uploading'); } } catch(e){}
+
+        // real upload with progress callback
         uploadResult = await uploadFileToServer(pendingAttachment.file, (pct, loaded, total) => {
           try {
             pendingAttachment.progress = pct;
@@ -1652,18 +1727,34 @@ async function sendAttachmentNow(){
               const draw = Math.max(0, Math.round(len * (1 - (pct/100))));
               rectEl.style.strokeDashoffset = draw;
             }
-          } catch (e) {}
+            // ensure UI updates
+            updateSendVisibility && updateSendVisibility();
+          } catch(e){}
         });
 
-        // 🟢 إذا نجح الرفع
+        // success path
         if (uploadResult) {
-          pendingAttachment.uploadState = 'done';
+          pendingAttachment.uploadState = 'complete';
           pendingAttachment.progress = 100;
           pendingAttachment.id = uploadResult.id;
           pendingAttachment.url = uploadResult.url;
           pendingAttachment.filename = uploadResult.filename;
           pendingAttachment.mime_type = uploadResult.mime_type;
           pendingAttachment._uploadResult = uploadResult;
+
+          // update outer/visuals
+          try {
+            if (rectEl && typeof rectEl.getTotalLength === 'function') {
+              rectEl.style.strokeDashoffset = 0;
+            }
+            if (outerEl) {
+              outerEl.classList.remove('uploading','upload-failed');
+              outerEl.classList.add('upload-complete');
+              // small cleanup animation
+              setTimeout(()=>{ try{ outerEl.classList.add('clean-ring'); }catch(e){} }, 600);
+            }
+          } catch(e){}
+
           toast('Upload complete!');
         }
 
@@ -1671,11 +1762,15 @@ async function sendAttachmentNow(){
         console.warn('uploadFileToServer failed', err);
         pendingAttachment.uploadState = 'failed';
         pendingAttachment.progress = 0;
+        // update visuals
+        try {
+          if (pendingAttachment._outer) { pendingAttachment._outer.classList.remove('uploading'); pendingAttachment._outer.classList.add('upload-failed'); }
+        } catch(e){}
         toast('Upload failed — message will be queued locally and retried');
       }
     }
 
-    // نسخة attachment نضيفها للرسالة
+    // Build attachment object to attach to message
     const attCopy = uploadResult ? {
       id: uploadResult.id,
       url: uploadResult.url,
@@ -1688,7 +1783,7 @@ async function sendAttachmentNow(){
       src: pendingAttachment.src
     };
 
-    // الرسالة نفسها
+    // Compose user message
     const text = (composer.value || '').trim();
     const userMessage = {
       id: genId(),
@@ -1698,7 +1793,7 @@ async function sendAttachmentNow(){
       meta: {}
     };
 
-    // append locally
+    // append locally and persist
     messages.push(userMessage);
     appendMessage(userMessage, messages.length - 1);
     saveSession();
@@ -1709,19 +1804,22 @@ async function sendAttachmentNow(){
     updateSendVisibility();
     autoGrowTextarea();
 
-    // try to persist user message immediately
+    // send to backend (if uploaded we have id/url)
     postMessageToServer(userMessage).catch((err) => {
       console.warn('postMessageToServer failed for attachment message', err);
       scheduleSync();
     });
 
+    // clear preview area
     clearPreview();
 
-    // trigger assistant reply for this new message
+    // trigger assistant reply
     regenerateAssistantForParent(messages.length - 1);
 
-  } catch(e){
-    console.error(e);
+    return;
+
+  } catch (e){
+    console.error('sendAttachmentNow error', e);
     toast('Send failed');
   } finally {
     try { if(pendingAttachment) pendingAttachment._sending = false; } catch(e){}
@@ -1862,37 +1960,59 @@ async function sendAttachmentNow(){
 
       // Upload a file to /api/files (returns { id, url, filename, mime_type } expected from backend)
       
-  // upload with progress (XMLHttpRequest)
-async function uploadFileToServer(file, onProgress){
-  if (!file) throw new Error('uploadFileToServer: missing file');
-
-  return await new Promise((resolve, reject) => {
+  // === (NEW) uploadFileToServer ===
+// returns Promise resolving to parsed JSON { id, url, filename, mime_type } from backend
+function uploadFileToServer(file, onProgress){
+  if (!file) return Promise.reject(new Error('uploadFileToServer: missing file'));
+  return new Promise((resolve, reject) => {
     try {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', API_BASE + '/api/files', true);
-      xhr.responseType = 'json'; // 🟢 نخلي السيرفر يرجع JSON مباشرة
+      // use text so we parse robustly (some environments return text)
+      xhr.responseType = 'text';
 
+      // track total size if available
       xhr.upload.onprogress = function(e){
-        if (e.lengthComputable) {
-          const pct = Math.round((e.loaded / e.total) * 100);
-          if (typeof onProgress === 'function') onProgress(pct, e.loaded, e.total);
-        } else {
-          if (typeof onProgress === 'function') onProgress(50, 0, 0);
-        }
+        try {
+          if (e.lengthComputable) {
+            xhr._totalSize = e.total;
+            const pct = Math.round((e.loaded / e.total) * 100);
+            if (typeof onProgress === 'function') onProgress(pct, e.loaded, e.total);
+          } else {
+            if (typeof onProgress === 'function') onProgress(50, 0, 0);
+          }
+        } catch(e){}
       };
 
       xhr.onload = function(){
-        if (xhr.status >= 200 && xhr.status < 300) {
-          if (typeof onProgress === 'function') onProgress(100, file.size, file.size);
-          resolve(xhr.response); // 🟢 يرجع {id, url, filename, mime_type}
-        } else {
-          reject(new Error('file upload failed: ' + xhr.status));
+        try {
+          // ensure final progress callback
+          try {
+            const total = xhr._totalSize || file.size || 0;
+            if (typeof onProgress === 'function') onProgress(100, total, total);
+          } catch(e){}
+
+          if (xhr.status >= 200 && xhr.status < 300) {
+            const txt = xhr.responseText || xhr.response || '';
+            try {
+              const json = txt && typeof txt === 'string' ? JSON.parse(txt) : (typeof txt === 'object' ? txt : {});
+              resolve(json);
+            } catch(e) {
+              // parse failure -> still resolve with empty object
+              resolve({});
+            }
+          } else {
+            const txt = xhr.responseText || '';
+            reject(new Error('file upload failed: ' + xhr.status + ' ' + txt));
+          }
+        } catch(e){
+          reject(e);
         }
       };
 
-      xhr.onerror = function(){
-        reject(new Error('file upload error'));
-      };
+      xhr.onerror = function(){ reject(new Error('file upload error')); };
+      xhr.onabort = function(){ reject(new Error('file upload aborted')); };
+      xhr.ontimeout = function(){ reject(new Error('file upload timeout')); };
 
       const fd = new FormData();
       fd.append('file', file, file.name);
