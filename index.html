@@ -1845,78 +1845,43 @@ const userMessage = {
 
       // Upload a file to /api/files (returns { id, url, filename, mime_type } expected from backend)
       
-      // upload with progress (uses XMLHttpRequest to get progress events)
-// Improved: ensures final 100% progress and handles cleanup
+  // upload with progress (XMLHttpRequest)
 async function uploadFileToServer(file, onProgress){
   if (!file) throw new Error('uploadFileToServer: missing file');
+
   return await new Promise((resolve, reject) => {
     try {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', API_BASE + '/api/files', true);
-      xhr.responseType = 'text';
+      xhr.responseType = 'json'; // 🟢 نخلي السيرفر يرجع JSON مباشرة
 
-      // ensure caller knows real upload started (so simulation stops)
-      try { if (typeof pendingAttachment !== 'undefined' && pendingAttachment) pendingAttachment._useRealUpload = true; } catch(e){}
-
-      xhr.onreadystatechange = function(){
-        if (xhr.readyState === 4) {
-          // try to notify final progress (if length known)
-          try {
-            if (xhr._totalSize && typeof onProgress === 'function') {
-              onProgress(100, xhr._totalSize, xhr._totalSize);
-            } else if (typeof onProgress === 'function') {
-              onProgress(100, 0, 0);
-            }
-          } catch(e){}
-
-          if (xhr.status >= 200 && xhr.status < 300) {
-            try {
-              const txt = xhr.responseText || '';
-              const json = txt.length ? JSON.parse(txt) : {};
-              resolve(json);
-            } catch(e){
-              resolve({});
-            }
-          } else {
-            let txt = '';
-            try { txt = xhr.responseText || ''; }catch(e){}
-            reject(new Error('file upload failed: ' + xhr.status + ' ' + txt));
-          }
+      xhr.upload.onprogress = function(e){
+        if (e.lengthComputable) {
+          const pct = Math.round((e.loaded / e.total) * 100);
+          if (typeof onProgress === 'function') onProgress(pct, e.loaded, e.total);
+        } else {
+          if (typeof onProgress === 'function') onProgress(50, 0, 0);
         }
       };
 
-      xhr.onerror = function(){ reject(new Error('file upload error')); };
+      xhr.onload = function(){
+        if (xhr.status >= 200 && xhr.status < 300) {
+          if (typeof onProgress === 'function') onProgress(100, file.size, file.size);
+          resolve(xhr.response); // 🟢 يرجع {id, url, filename, mime_type}
+        } else {
+          reject(new Error('file upload failed: ' + xhr.status));
+        }
+      };
 
-      if (xhr.upload && typeof onProgress === 'function') {
-        xhr.upload.onprogress = function(e){
-          if(e.lengthComputable){
-            const pct = Math.round((e.loaded / e.total) * 100);
-            // store total so readyState handler can use it if needed
-            try { xhr._totalSize = e.total; } catch(e){}
-            try{ onProgress(pct, e.loaded, e.total); }catch(_){}
-          } else {
-            // unknown total: call some progress pulse
-            try{ onProgress(50, 0, 0); }catch(_){}
-          }
-        };
-      }
-
-      // Also add onload to ensure final call if readyState doesn't deliver
-      xhr.onload = function(e){
-        try {
-          if (typeof onProgress === 'function') {
-            // if we had total stored, use it
-            const total = xhr._totalSize || 0;
-            onProgress(100, total, total);
-          }
-        } catch(e){}
+      xhr.onerror = function(){
+        reject(new Error('file upload error'));
       };
 
       const fd = new FormData();
       fd.append('file', file, file.name);
       xhr.send(fd);
-    } catch (e) {
-      reject(e);
+    } catch (err) {
+      reject(err);
     }
   });
 }
