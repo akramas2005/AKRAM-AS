@@ -1794,7 +1794,18 @@ async function sendAttachmentNow() {
 
       appendMessage(msg);        // يظهر في الواجهة
       clearPreview();            // يمسح من المعاينة
-      socketSend(msg);           // يرسله للسيرفر (أو fetch، حسب اللي عندك)
+
+      // 🟢 أرسل للسيرفر عبر REST API
+      try {
+        await fetch(API_BASE + "/api/messages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(msg)
+        });
+      } catch(e) {
+        console.warn("Failed to send message to server", e);
+      }
+
       pendingAttachment = null;  // نرجع للحالة الطبيعية
       return;
     }
