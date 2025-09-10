@@ -1530,14 +1530,7 @@ function showImagePreview(file){
       pendingAttachment._rect = rect;
       updateSendVisibility();
 
-      // 🔹 تهيئة شريط التقدم من البداية
-      if (rect && typeof rect.getTotalLength === 'function') {
-        const len = rect.getTotalLength();
-        rect.style.strokeDasharray = String(len);
-        rect.style.strokeDashoffset = len; // يبدأ فارغ (0%)
-      }
-
-      // 🔹 ابدأ الرفع الفعلي مع التقدم
+      // ابدأ الرفع الفعلي فوراً (لكن لا ترسل الرسالة تلقائياً)
       uploadFileToServer(file, (pct, loaded, total) => {
         try {
           pendingAttachment.progress = pct;
@@ -1558,14 +1551,6 @@ function showImagePreview(file){
         pendingAttachment.filename = result.filename;
         pendingAttachment.mime_type = result.mime_type;
         pendingAttachment._uploadResult = result;
-
-        if (outer) {
-  outer.classList.add('upload-complete');
-  // 🟢 بدلاً من clearPreview، خلينا فقط ننظف حلقة التقدم ونترك الصورة
-  setTimeout(()=> { 
-    try { outer.classList.add('clean-ring'); } catch(e){}
-  }, 600);
-}
 
         // تحديث الشكل النهائي للحلقة
         try {
@@ -1589,7 +1574,7 @@ function showImagePreview(file){
     };
     reader.readAsDataURL(file);
 
-    // زر الإغلاق
+    // زر الإغلاق: إذا كان الملف قد رُفع بالفعل (id موجود) نحاول حذفه من السيرفر ثم نغلق المعاينة
     closeBtn.addEventListener('click', async (ev)=>{
       ev.preventDefault();
       if (pendingAttachment && pendingAttachment.id) {
@@ -1602,7 +1587,7 @@ function showImagePreview(file){
       clearPreview();
     });
 
-    // زر الإعادة
+    // زر الإعادة: نعيد تعيين الحالة ونشغل محاكاة أو رفع جديد
     retry.addEventListener('click', (ev)=>{
       ev.preventDefault();
       if(!pendingAttachment) return;
@@ -1610,7 +1595,11 @@ function showImagePreview(file){
       pendingAttachment.uploadState = 'pending';
       outer.classList.remove('upload-failed','upload-complete','clean-ring');
 
+      // يمكنك هنا إما تشغيل startUploadSimulation (مع محاكاة) أو مباشرة إعادة رفع الملف الحقيقي:
+      // startUploadSimulation(pendingAttachment, outer, rect, () => { updateSendVisibility(); }, () => { updateSendVisibility(); });
+      // أو لإعادة رفع حقيقي فوراً:
       if (pendingAttachment.file) {
+        // نعيد تشغيل نفس دالة الرفع الحقيقية (نستعمل uploadFileToServer مباشرة)
         uploadFileToServer(pendingAttachment.file, (pct)=> {
           try {
             pendingAttachment.progress = pct;
@@ -2140,50 +2129,42 @@ function uploadFileToServer(file, onProgress){
 }
 
         
-         if (m.attachment) {
+          if (m.attachment) {
   const att = m.attachment;
-  const mime = att.mime_type || att.attachment_type || att.type || '';
+  const mime = att.mime_type || att.type || '';
   const name = att.filename || att.name || 'file';
   let url = att.url || att.src || null;
 
-  const isImage = mime && mime.startsWith('image/');
+  const elWrap = document.createElement('div');
+  elWrap.className = 'file-card';
 
-  if (isImage && url) {
-    // 🟢 للصور: اعرضها مباشرة بشكل أوضح
-    const img = document.createElement('img');
-    img.className = 'att-image';
-    img.alt = name;
-    img.src = url;
-    bubble.appendChild(img);
+  // 🔹 أيقونة فيها الامتداد
+  const icon = document.createElement('div');
+  icon.className = 'file-icon';
+  // خذ الامتداد من اسم الملف (مثلاً pdf, html, png)
+  const ext = name.split('.').pop().toUpperCase();
+  icon.textContent = ext;
+  elWrap.appendChild(icon);
+
+  // 🔹 اسم الملف فقط (دون زر Open أو نوع mime)
+  const info = document.createElement('div');
+  info.className = 'file-info';
+  const title = document.createElement('div');
+  title.className = 'file-name';
+  title.textContent = name;
+  info.appendChild(title);
+  elWrap.appendChild(info);
+
+  // 🔹 إذا فيه رابط نخلي البطاقة كلها قابلة للضغط
+  if (url) {
+    const a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.className = 'file-download';
+    a.appendChild(elWrap);
+    bubble.appendChild(a);
   } else {
-    // 🟢 للملفات الأخرى: عرض البطاقة مع الأيقونة + الاسم + النوع
-    const elWrap = document.createElement('div');
-    elWrap.className = 'file-card';
-
-    const icon = document.createElement('div');
-    icon.className = 'file-icon';
-    // ضع نوع الملف داخل الأيقونة (مثلاً PDF أو HTML)
-    icon.textContent = (mime.split('/')[1] || mime || 'FILE').toUpperCase();
-    elWrap.appendChild(icon);
-
-    const info = document.createElement('div');
-    info.className = 'file-info';
-    const title = document.createElement('div');
-    title.className = 'file-name';
-    title.textContent = name;
-    info.appendChild(title);
-    elWrap.appendChild(info);
-
-    if (url) {
-      const a = document.createElement('a');
-      a.href = url;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      a.className = 'file-link';
-      a.textContent = 'Open';
-      elWrap.appendChild(a);
-    }
-
     bubble.appendChild(elWrap);
   }
 }
