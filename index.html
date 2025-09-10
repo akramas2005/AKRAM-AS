@@ -1323,42 +1323,36 @@
       const UPLOAD_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
 
       
-      // === (NEW) startUploadSimulation ===
+      // === startUploadSimulation ===
 // Simulated progress for preview ring. Calls onComplete() when simulation finishes
 // or when a real upload starts (pending._useRealUpload === true).
-function startUploadSimulation(pending, outer, rect, onComplete, onTick){
+function startUploadSimulation(pending, outerEl, rectEl, onComplete, onTick) {
   try {
-    if(!pending) return;
+    if (!pending) return;
+
     // clear existing interval
     if (pending._uploadInterval) {
       clearInterval(pending._uploadInterval);
       pending._uploadInterval = null;
     }
 
-    // if real upload already requested -> immediately complete simulation and call onComplete
-    if (pending._useRealUpload) {
-      pending.uploadState = pending.uploadState || 'pending';
-      if (typeof onComplete === 'function') onComplete();
-      return;
-    }
-
-    // ensure state
+    // reset state
     pending.uploadState = pending.uploadState || 'uploading';
     pending.progress = pending.progress || 0;
 
-    // prepare SVG stroke if provided
+    // prepare SVG stroke
+    let len = null;
     try {
-      if (rect && typeof rect.getTotalLength === 'function') {
-        const totalLen = rect.getTotalLength();
-        rect.style.strokeDasharray = String(totalLen);
-        rect.style.strokeDashoffset = String(totalLen);
-        rect.style.transition = 'stroke-dashoffset 120ms linear, opacity .6s ease';
+      if (rectEl && typeof rectEl.getTotalLength === 'function') {
+        len = rectEl.getTotalLength();
+        rectEl.style.strokeDasharray = String(len);
+        rectEl.style.strokeDashoffset = String(len);
+        rectEl.style.transition = 'stroke-dashoffset 120ms linear, opacity .6s ease';
       }
-    } catch(e){}
+    } catch (e) {}
 
-    let lastTime = Date.now();
-
-    pending._uploadInterval = setInterval(()=>{
+    // start simulation interval
+    pending._uploadInterval = setInterval(() => {
       try {
         if (!pending) {
           clearInterval(pending._uploadInterval);
@@ -1366,93 +1360,36 @@ function startUploadSimulation(pending, outer, rect, onComplete, onTick){
           return;
         }
 
-        // If a real upload was triggered elsewhere, stop simulation and notify
-        if (pending._useRealUpload) {
-          clearInterval(pending._uploadInterval);
-          pending._uploadInterval = null;
-          pending.uploadState = pending.uploadState || 'pending';
-          if (typeof onComplete === 'function') onComplete();
-          return;
-        }
-
-        // Stop if failed or already completed
+        // stop if marked complete or failed
         if (pending.uploadState === 'failed' || pending.uploadState === 'complete') {
           clearInterval(pending._uploadInterval);
           pending._uploadInterval = null;
-          if (pending.uploadState === 'complete' && typeof onComplete === 'function') onComplete();
+          if (pending.uploadState === 'complete' && typeof onComplete === 'function') {
+            onComplete();
+          }
           return;
         }
 
-        // advance progress slowly but keep room for real upload
-        const now = Date.now();
-        const dt = Math.max(80, Math.min(1200, now - lastTime));
-        lastTime = now;
-        const bump = Math.max(1, Math.round(Math.random() * 6));
-        pending.progress = Math.min(98, (pending.progress || 0) + bump);
+        // gentle random progress increment but allow reaching 99
+        const inc = 2 + Math.floor(Math.random() * 5);
+        pending.progress = Math.min(99, (pending.progress || 0) + inc);
 
-        // update ring
-        if (rect && typeof rect.getTotalLength === 'function') {
-          const len = rect.getTotalLength();
-          const draw = Math.max(0, Math.round(len * (1 - (pending.progress/100))));
-          rect.style.strokeDashoffset = draw;
+        if (rectEl && len) {
+          const draw = Math.max(0, Math.round(len * (1 - pending.progress / 100)));
+          rectEl.style.strokeDashoffset = draw;
         }
 
-        // tick callback to update UI
+        // tick callback
         if (typeof onTick === 'function') onTick();
 
-        // If we reached simulation threshold -> stop and call onComplete so preview flow can continue
-        if ((pending.progress || 0) >= 98) {
-          clearInterval(pending._uploadInterval);
-          pending._uploadInterval = null;
-          // mark ready (not actually uploaded yet)
-          pending.uploadState = 'pending';
-          if (typeof onComplete === 'function') onComplete();
-        }
       } catch (e) {
         console.error('startUploadSimulation tick error', e);
       }
-    }, 120 + Math.round(Math.random()*180));
+    }, 250);
+
   } catch (e) {
     console.error('startUploadSimulation error', e);
   }
-}
-
-    // If a real upload already flagged, don't start (but ensure state visual updated)
-    if(pending._useRealUpload){
-      // ensure uploading class is set and rect updated from current progress
-      if(rectEl && len){
-        const draw = Math.max(0, Math.round(len * (1 - (pending.progress/100))));
-        rectEl.style.strokeDashoffset = draw;
-      }
-      return;
-    }
-
-    // simulation interval to provide lively progress before real XHR progress kicks in
-    pending._uploadInterval = setInterval(()=>{
-      try{
-        // if real upload started, stop simulation
-        if (pending._useRealUpload) {
-          clearInterval(pending._uploadInterval); pending._uploadInterval = null;
-          return;
-        }
-
-        if(pending.uploadState === 'failed' || pending.uploadState === 'complete'){
-          clearInterval(pending._uploadInterval); pending._uploadInterval = null;
-          return;
-        }
-
-        // gentle random progress increment but allow reaching 99 (leave room for finalization)
-const inc = 2 + Math.floor(Math.random() * 5);
-pending.progress = Math.min(99, (pending.progress || 0) + inc);
-
-if (rectEl && len) {
-  const draw = Math.max(0, Math.round(len * (1 - pending.progress / 100)));
-  rectEl.style.strokeDashoffset = draw;
-}
-
-}, 250);
-} catch (e) {
-  console.error('startUploadSimulation error', e);
 }
 
       // show image preview
