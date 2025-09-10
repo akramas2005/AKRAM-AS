@@ -1547,8 +1547,10 @@ function showImagePreview(file){
       // 🔹 ابدأ الرفع الفعلي مع التقدم
       uploadFileToServer(file, (pct, loaded, total) => {
         try {
-          pendingAttachment.progress = pct;
-          pendingAttachment.uploadState = 'uploading';
+          if (pendingAttachment) {
+  pendingAttachment.progress = pct;
+  pendingAttachment.uploadState = 'uploading';
+}
           if (rect && typeof rect.getTotalLength === 'function') {
             const len = rect.getTotalLength();
             const draw = Math.max(0, Math.round(len * (1 - (pct/100))));
@@ -1558,8 +1560,10 @@ function showImagePreview(file){
         } catch(_){}
       }).then(result => {
         // نجاح الرفع — خزّن بيانات الملف من السيرفر
-        pendingAttachment.uploadState = 'done';
-        pendingAttachment.progress = 100;
+        if (pendingAttachment) {
+  pendingAttachment.uploadState = 'done';
+  pendingAttachment.progress = 100;
+}
         pendingAttachment.id = result.id;
         pendingAttachment.url = result.url;
         pendingAttachment.filename = result.filename;
@@ -1587,8 +1591,10 @@ function showImagePreview(file){
         updateSendVisibility();
       }).catch(err => {
         console.error('upload failed', err);
-        pendingAttachment.uploadState = 'failed';
-        pendingAttachment.progress = 0;
+        if (pendingAttachment) {
+  pendingAttachment.uploadState = 'failed';
+  pendingAttachment.progress = 0;
+}
         try { if (outer) { outer.classList.remove('uploading'); outer.classList.add('upload-failed'); } } catch(e){}
         toast('Upload failed, try again.');
         updateSendVisibility();
@@ -1858,7 +1864,7 @@ async function sendAttachmentNow() {
 
         // success path
         if (uploadResult) {
-          pendingAttachment.uploadState = 'complete';
+          pendingAttachment.uploadState = 'done';
           pendingAttachment.progress = 100;
           pendingAttachment.id = uploadResult.id;
           pendingAttachment.url = uploadResult.url;
