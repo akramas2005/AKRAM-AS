@@ -1560,9 +1560,12 @@ function showImagePreview(file){
         pendingAttachment._uploadResult = result;
 
         if (outer) {
-          outer.classList.add('upload-complete');
-          setTimeout(()=> { clearPreview(); }, 800); // يخفي الشريط بعد ثانية تقريباً
-        }
+  outer.classList.add('upload-complete');
+  // 🟢 بدلاً من clearPreview، خلينا فقط ننظف حلقة التقدم ونترك الصورة
+  setTimeout(()=> { 
+    try { outer.classList.add('clean-ring'); } catch(e){}
+  }, 600);
+}
 
         // تحديث الشكل النهائي للحلقة
         try {
