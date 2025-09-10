@@ -1520,36 +1520,30 @@ function startUploadSimulation(pending, outer, rect, onComplete, onTick) {
               _sending: false
             };
             updateSendVisibility();
-            
-            pendingAttachment._outer = outer;
-            pendingAttachment._rect = rect;
-            // بمجرد اختيار الملف، ابدأ رفعه مباشرة
+
+pendingAttachment._outer = outer;
+pendingAttachment._rect = rect;
+
+// بمجرد اختيار الملف، ابدأ رفعه مباشرة
 sendAttachmentNow();
-          reader.readAsDataURL(file);
 
-          closeBtn.addEventListener('click', (ev)=>{
-            ev.preventDefault();
-            clearPreview();
-          });
+reader.readAsDataURL(file);
 
-          retry.addEventListener('click', (ev)=>{
-            ev.preventDefault();
-            if(!pendingAttachment) return;
-            pendingAttachment.progress = 0;
-            pendingAttachment.uploadState = 'pending';
-            outer.classList.remove('upload-failed','upload-complete','clean-ring');
-            startUploadSimulation(pendingAttachment, outer, rect, () => {
-              updateSendVisibility();
-              if(pendingAttachment && pendingAttachment.sendOnComplete){
-                pendingAttachment.sendOnComplete = false;
-                setTimeout(()=> { try { sendAttachmentNow(); } catch(e){ console.error(e); } }, 10);
-              }
-            }, () => {
-              updateSendVisibility();
+closeBtn.addEventListener('click', (ev)=>{
+  ev.preventDefault();
+  clearPreview();
+});
 
-// ✂️ هنا كان فيه startUploadSimulation(...) مع }) زايدة
-// استبدلناه بـ:
-sendAttachmentNow();
+retry.addEventListener('click', (ev)=>{
+  ev.preventDefault();
+  if(!pendingAttachment) return;
+  pendingAttachment.progress = 0;
+  pendingAttachment.uploadState = 'pending';
+  outer.classList.remove('upload-failed','upload-complete','clean-ring');
+
+  // بمجرد الضغط على إعادة المحاولة، نعيد رفع الملف مباشرة
+  sendAttachmentNow();
+});
 
 } catch(e){
   console.error('preview image error', e);
