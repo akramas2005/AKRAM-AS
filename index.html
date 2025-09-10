@@ -1170,13 +1170,6 @@
     window.addEventListener('DOMContentLoaded', () => {
       // set a base history state so the phone back button behaves sensibly on the main card screen
       try { history.replaceState({ui:'root'}, ''); } catch(e){}
-      // 🟢 استرجاع الرسائل من localStorage
-  try {
-    const saved = JSON.parse(localStorage.getItem('chatMessages') || '[]');
-    saved.forEach((m, i) => appendMessage(m, i));
-  } catch(e) {
-    console.warn('localStorage load failed', e);
-  }
 
       const rotator = document.getElementById('rotator');
       const rotatorText = document.getElementById('rotatorText');
@@ -1547,10 +1540,8 @@ function showImagePreview(file){
       // 🔹 ابدأ الرفع الفعلي مع التقدم
       uploadFileToServer(file, (pct, loaded, total) => {
         try {
-          if (pendingAttachment) {
-  pendingAttachment.progress = pct;
-  pendingAttachment.uploadState = 'uploading';
-}
+          pendingAttachment.progress = pct;
+          pendingAttachment.uploadState = 'uploading';
           if (rect && typeof rect.getTotalLength === 'function') {
             const len = rect.getTotalLength();
             const draw = Math.max(0, Math.round(len * (1 - (pct/100))));
@@ -1560,10 +1551,8 @@ function showImagePreview(file){
         } catch(_){}
       }).then(result => {
         // نجاح الرفع — خزّن بيانات الملف من السيرفر
-        if (pendingAttachment) {
-  pendingAttachment.uploadState = 'done';
-  pendingAttachment.progress = 100;
-}
+        pendingAttachment.uploadState = 'done';
+        pendingAttachment.progress = 100;
         pendingAttachment.id = result.id;
         pendingAttachment.url = result.url;
         pendingAttachment.filename = result.filename;
@@ -1591,10 +1580,8 @@ function showImagePreview(file){
         updateSendVisibility();
       }).catch(err => {
         console.error('upload failed', err);
-        if (pendingAttachment) {
-  pendingAttachment.uploadState = 'failed';
-  pendingAttachment.progress = 0;
-}
+        pendingAttachment.uploadState = 'failed';
+        pendingAttachment.progress = 0;
         try { if (outer) { outer.classList.remove('uploading'); outer.classList.add('upload-failed'); } } catch(e){}
         toast('Upload failed, try again.');
         updateSendVisibility();
@@ -1772,51 +1759,17 @@ startUploadSimulation(pendingAttachment, outer, rect, () => {
       }
 
       // === sendAttachmentNow (fixed) ===
-async function sendAttachmentNow() {
-  try {
-    if (!pendingAttachment) return;
-    if (pendingAttachment._sending) return;
+async function sendAttachmentNow(){
+  try{
+    if(!pendingAttachment) return;
+    if(pendingAttachment._sending) return;
 
-    // ✅ إذا الملف مرفوع بالكامل بالفعل
-    if (pendingAttachment.uploadState === 'done' && pendingAttachment.url) {
-      const msg = {
-        id: 'local-' + Date.now(),
-        type: 'outgoing',
-        text: '',
-        attachment: {
-          type: pendingAttachment.type,
-          src: pendingAttachment.url,
-          name: pendingAttachment.filename || pendingAttachment.name,
-          mime: pendingAttachment.mime_type || '',
-        },
-        created_at: new Date().toISOString()
-      };
-
-      appendMessage(msg);        // يظهر في الواجهة
-      clearPreview();            // يمسح من المعاينة
-
-      // 🟢 أرسل للسيرفر عبر REST API
-      try {
-        await fetch(API_BASE + "/api/messages", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(msg)
-        });
-      } catch(e) {
-        console.warn("Failed to send message to server", e);
-      }
-
-      pendingAttachment = null;  // نرجع للحالة الطبيعية
-      return;
-    }
-
-    // لو لسه بيرفع → نمنع الإرسال وننتظر
+    // only block if a real upload is already in progress.
     if (pendingAttachment.uploadState === 'uploading') {
       pendingAttachment.sendOnComplete = true;
       toast('Waiting for upload to complete...');
       return;
     }
-
     if (pendingAttachment.uploadState === 'failed') {
       toast('Upload failed — please retry or remove the attachment');
       return;
@@ -1875,7 +1828,7 @@ async function sendAttachmentNow() {
 
         // success path
         if (uploadResult) {
-          pendingAttachment.uploadState = 'done';
+          pendingAttachment.uploadState = 'complete';
           pendingAttachment.progress = 100;
           pendingAttachment.id = uploadResult.id;
           pendingAttachment.url = uploadResult.url;
@@ -2328,17 +2281,7 @@ function uploadFileToServer(file, onProgress){
         requestAnimationFrame(()=> setTimeout(()=> messageEl.classList.add('show'), 20));
         messagesEl.scrollTop = messagesEl.scrollHeight;
       }
-      // 🟢 خزّن الرسالة في localStorage
-try {
-  let msgs = JSON.parse(localStorage.getItem('chatMessages') || '[]');
-  if (m) {                // ✅ تأكد أن m موجودة
-    msgs.push(m);
-    localStorage.setItem('chatMessages', JSON.stringify(msgs));
-  }
-} catch(e) {
-  console.warn('localStorage save failed', e);
-}
-  
+
       // Typing indicator — do not force scroll if user is scrolled up (autoScrollEnabled will control)
       function showTyping(){
   // 🔹 احذف أي مؤشر كتابة قديم
@@ -3807,22 +3750,14 @@ else if (act === 'sendFeedback') {
         }
       });
 
-            // ensure history and savedConvos are up-to-date on load
+      // ensure history and savedConvos are up-to-date on load
       loadHistory();
       renderHistoryPanel();
 
-      // Export a small API for debugging / external control
-      window.__study_chat = {
-        messages,
-        sendMessage,
-        exportConversation,
-        openConvoPanel,
-        closeConvoPanel
-      };
+      window.__study_chat = { messages, sendMessage, exportConversation, openConvoPanel, closeConvoPanel };
 
-      // close DOMContentLoaded listener and IIFE safely
-    }); // end DOMContentLoaded listener
-})(); // end immediate-invoked function expression (IIFE)
+    });
+  })();
 </script>
 
 <!-- Puter regen/edit integration: delegated handler to support regenerate & edit using sendMessage() -->
