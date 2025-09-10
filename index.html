@@ -1618,14 +1618,14 @@ startUploadSimulation(pendingAttachment, outer, rect, () => {
         }
       }
 
-      // === (NEW) sendAttachmentNow ===
+      // === sendAttachmentNow (fixed) ===
 async function sendAttachmentNow(){
   try{
     if(!pendingAttachment) return;
     if(pendingAttachment._sending) return;
 
-    // if still in simulated upload -> ask to wait and mark sendOnComplete
-    if (pendingAttachment.uploadState === 'uploading' || pendingAttachment.uploadState === 'pending') {
+    // only block if a real upload is already in progress.
+    if (pendingAttachment.uploadState === 'uploading') {
       pendingAttachment.sendOnComplete = true;
       toast('Waiting for upload to complete...');
       return;
@@ -1636,37 +1636,47 @@ async function sendAttachmentNow(){
     }
 
     pendingAttachment._sending = true;
-
     let uploadResult = null;
 
     // If we have a File object, perform real upload now
     if (pendingAttachment && pendingAttachment.file) {
       try {
         toast('Uploading file...');
+        // signal that real upload should run (so simulation can stop)
         pendingAttachment._useRealUpload = true;
 
-        // stop any simulation
-        try { if (pendingAttachment._uploadInterval) { clearInterval(pendingAttachment._uploadInterval); pendingAttachment._uploadInterval = null; } } catch(e){}
+        // stop any running simulation interval
+        try {
+          if (pendingAttachment._uploadInterval) {
+            clearInterval(pendingAttachment._uploadInterval);
+            pendingAttachment._uploadInterval = null;
+          }
+        } catch(e){}
 
         const rectEl = pendingAttachment._rect || null;
         const outerEl = pendingAttachment._outer || null;
 
         // ensure ring shows uploading state
-        try { if (outerEl) { outerEl.classList.remove('upload-failed','upload-complete'); outerEl.classList.add('uploading'); } } catch(e){}
+        try {
+          if (outerEl) {
+            outerEl.classList.remove('upload-failed','upload-complete');
+            outerEl.classList.add('uploading');
+          }
+        } catch(e){}
 
         // real upload with progress callback
         uploadResult = await uploadFileToServer(pendingAttachment.file, (pct, loaded, total) => {
-  try {
-    pendingAttachment.progress = pct;
-    pendingAttachment.uploadState = 'uploading';
-    // تحديث الشريط
-    if (rectEl && typeof rectEl.getTotalLength === 'function') {
-      const len = rectEl.getTotalLength();
-      const draw = Math.max(0, Math.round(len * (1 - (pct/100))));
-      rectEl.style.strokeDashoffset = draw;
-    }
-  } catch(e){}
-});
+          try {
+            pendingAttachment.progress = pct;
+            pendingAttachment.uploadState = 'uploading';
+            // update visual ring if present
+            if (rectEl && typeof rectEl.getTotalLength === 'function') {
+              const len = rectEl.getTotalLength();
+              const draw = Math.max(0, Math.round(len * (1 - (pct/100))));
+              rectEl.style.strokeDashoffset = draw;
+            }
+          } catch(e){}
+        });
 
         // success path
         if (uploadResult) {
@@ -1690,7 +1700,6 @@ async function sendAttachmentNow(){
               setTimeout(()=>{ try{ outerEl.classList.add('clean-ring'); }catch(e){} }, 600);
             }
           } catch(e){}
-
           toast('Upload complete!');
         }
 
@@ -1700,7 +1709,10 @@ async function sendAttachmentNow(){
         pendingAttachment.progress = 0;
         // update visuals
         try {
-          if (pendingAttachment._outer) { pendingAttachment._outer.classList.remove('uploading'); pendingAttachment._outer.classList.add('upload-failed'); }
+          if (pendingAttachment._outer) {
+            pendingAttachment._outer.classList.remove('uploading');
+            pendingAttachment._outer.classList.add('upload-failed');
+          }
         } catch(e){}
         toast('Upload failed — message will be queued locally and retried');
       }
