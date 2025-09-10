@@ -43,6 +43,19 @@
     color:#111; text-decoration:none; font-weight:600; padding:6px 8px; border-radius:8px;
   }
   .nav-links a:hover { color:var(--accent); background: rgba(3,100,170,0.04); }
+  /* make image preview reasonably large and clear */
+.att-image {
+  display: block;
+  max-width: 420px;    /* تعيين قياس أكبر قليلاً */
+  max-height: 320px;
+  width: auto;
+  height: auto;
+  border-radius: 10px;
+  object-fit: cover;
+  margin-top: 8px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+  cursor: pointer;
+}
 
   /* SIDE MENU (HAMBURGER) */
   .side-menu {
@@ -1323,70 +1336,107 @@
       const UPLOAD_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
 
       
-      // === startUploadSimulation ===
-// Simulated progress for preview ring. Calls onComplete() when simulation finishes
-// or when a real upload starts (pending._useRealUpload === true).
-function startUploadSimulation(pending, outerEl, rectEl, onComplete, onTick) {
+      // === startUploadSimulation (fixed, robust) ===
+// Simulated progress for preview ring. This function will:
+// - slowly advance a simulated progress up to 98%,
+// - stop immediately and call onComplete() if pending._useRealUpload becomes true,
+// - clean up intervals and call onComplete when simulation finishes.
+function startUploadSimulation(pending, outer, rect, onComplete, onTick) {
   try {
     if (!pending) return;
 
-    // clear existing interval
+    // clear any existing interval
     if (pending._uploadInterval) {
       clearInterval(pending._uploadInterval);
       pending._uploadInterval = null;
     }
 
-    // reset state
-    pending.uploadState = pending.uploadState || 'uploading';
+    // ensure state
+    pending.uploadState = pending.uploadState || 'pending';
     pending.progress = pending.progress || 0;
 
-    // prepare SVG stroke
-    let len = null;
+    // prepare SVG stroke if available
+    let totalLen = null;
     try {
-      if (rectEl && typeof rectEl.getTotalLength === 'function') {
-        len = rectEl.getTotalLength();
-        rectEl.style.strokeDasharray = String(len);
-        rectEl.style.strokeDashoffset = String(len);
-        rectEl.style.transition = 'stroke-dashoffset 120ms linear, opacity .6s ease';
+      if (rect && typeof rect.getTotalLength === 'function') {
+        totalLen = rect.getTotalLength();
+        rect.style.strokeDasharray = String(totalLen);
+        // start _fully_ hidden then draw according to progress
+        const startOffset = Math.round(totalLen * (1 - (pending.progress || 0) / 100));
+        rect.style.strokeDashoffset = String(startOffset);
+        rect.style.transition = 'stroke-dashoffset 120ms linear, opacity .6s ease';
       }
-    } catch (e) {}
+    } catch (e) {
+      console.error('startUploadSimulation setup error', e);
+    }
 
-    // start simulation interval
+    let lastTime = Date.now();
+
     pending._uploadInterval = setInterval(() => {
       try {
         if (!pending) {
-          clearInterval(pending._uploadInterval);
-          pending._uploadInterval = null;
-          return;
-        }
-
-        // stop if marked complete or failed
-        if (pending.uploadState === 'failed' || pending.uploadState === 'complete') {
-          clearInterval(pending._uploadInterval);
-          pending._uploadInterval = null;
-          if (pending.uploadState === 'complete' && typeof onComplete === 'function') {
-            onComplete();
+          if (pending && pending._uploadInterval) {
+            clearInterval(pending._uploadInterval);
+            pending._uploadInterval = null;
           }
           return;
         }
 
-        // gentle random progress increment but allow reaching 99
-        const inc = 2 + Math.floor(Math.random() * 5);
-        pending.progress = Math.min(99, (pending.progress || 0) + inc);
-
-        if (rectEl && len) {
-          const draw = Math.max(0, Math.round(len * (1 - pending.progress / 100)));
-          rectEl.style.strokeDashoffset = draw;
+        // if a real upload was triggered, stop simulation and notify
+        if (pending._useRealUpload) {
+          if (pending._uploadInterval) {
+            clearInterval(pending._uploadInterval);
+            pending._uploadInterval = null;
+          }
+          pending.uploadState = pending.uploadState || 'pending';
+          if (typeof onComplete === 'function') onComplete();
+          return;
         }
 
-        // tick callback
-        if (typeof onTick === 'function') onTick();
+        // stop if failed or already complete
+        if (pending.uploadState === 'failed' || pending.uploadState === 'complete') {
+          if (pending._uploadInterval) {
+            clearInterval(pending._uploadInterval);
+            pending._uploadInterval = null;
+          }
+          if (pending.uploadState === 'complete' && typeof onComplete === 'function') onComplete();
+          return;
+        }
 
+        // gentle random progress increment but leave room for the real upload
+        const now = Date.now();
+        const dt = Math.max(80, Math.min(1200, now - lastTime));
+        lastTime = now;
+
+        const inc = 1 + Math.floor(Math.random() * 4); // small bump
+        pending.progress = Math.min(98, (pending.progress || 0) + inc);
+
+        // update ring visually
+        if (rect && totalLen) {
+          const draw = Math.max(0, Math.round(totalLen * (1 - (pending.progress / 100))));
+          rect.style.strokeDashoffset = draw;
+        }
+
+        // tick callback (update UI)
+        if (typeof onTick === 'function') {
+          try { onTick(); } catch(e){}
+        }
+
+        // if we reached simulation threshold -> stop and call onComplete
+        if ((pending.progress || 0) >= 98) {
+          if (pending._uploadInterval) {
+            clearInterval(pending._uploadInterval);
+            pending._uploadInterval = null;
+          }
+          // mark ready (not actually uploaded yet)
+          pending.uploadState = 'pending';
+          if (typeof onComplete === 'function') onComplete();
+          return;
+        }
       } catch (e) {
         console.error('startUploadSimulation tick error', e);
       }
-    }, 250);
-
+    }, 120 + Math.round(Math.random() * 180));
   } catch (e) {
     console.error('startUploadSimulation error', e);
   }
@@ -2001,75 +2051,62 @@ function uploadFileToServer(file, onProgress){
 
         
           if (m.attachment) {
-            const att = m.attachment;
-            // normalize mime/type fields
-            const mime = att.mime_type || att.attachment_type || att.type || '';
-            const name = att.filename || att.name || att.filename || att.attachment_name || att.attachmentName || 'file';
-            let url = att.url || att.src || att.attachment_url || att.attachmentUrl || null;
-if (url && url.startsWith('http://')) {
-  url = url.replace('http://', 'https://');
-}
-            const isImage = typeof mime === 'string' && mime.startsWith && mime.startsWith('image/');
-            const elWrap = document.createElement('div');
-            elWrap.className = 'file-card';
-            if (isImage && url) {
-              const thumb = document.createElement('div');
-              thumb.className = 'file-thumb-img';
-              const img = document.createElement('img');
-              img.alt = name;
-              img.src = url;
-              thumb.appendChild(img);
-              elWrap.appendChild(thumb);
-            } else {
-              const icon = document.createElement('div');
-              icon.className = 'file-icon';
-              icon.innerHTML = '&nbsp;'; // keep layout
-              elWrap.appendChild(icon);
-            }
-            if (isImage && url) {
-  const thumb = document.createElement('div');
-  thumb.className = 'file-thumb-img';
-  const img = document.createElement('img');
-  img.alt = name;
-  img.src = url;
-  img.style.maxWidth = '200px';   // حجم مناسب
-  img.style.borderRadius = '8px'; // زوايا ناعمة
-  img.style.display = 'block';
-  thumb.appendChild(img);
-  elWrap.appendChild(thumb);
-} else {
-  // باقي الملفات (PDF, Word ...)
-  const icon = document.createElement('div');
-  icon.className = 'file-icon';
-  icon.innerHTML = '&nbsp;';
-  elWrap.appendChild(icon);
+  const att = m.attachment;
+  // normalize mime/type fields
+  const mime = (att.mime_type || att.attachment_type || att.type || '').toLowerCase();
+  const name = att.filename || att.name || att.attachment_name || att.attachmentName || 'file';
+  let url = att.url || att.src || att.attachment_url || att.attachmentUrl || null;
 
-  const info = document.createElement('div');
-  info.className = 'file-info';
-  const title = document.createElement('div');
-  title.className = 'file-name';
-  title.textContent = name;
-  info.appendChild(title);
-  if (mime) {
-    const mt = document.createElement('div');
-    mt.className = 'file-type';
-    mt.textContent = mime;
-    info.appendChild(mt);
+  // force https for http links to avoid mixed-content (if backend returns http)
+  if (url && url.startsWith && url.startsWith('http://')) {
+    url = url.replace(/^http:\/\//i, 'https://');
   }
-  elWrap.appendChild(info);
+
+  const isImage = mime.startsWith('image/') && url;
+
+  if (isImage) {
+    // show image thumbnail only (no filename text)
+    const img = document.createElement('img');
+    img.className = 'att-image';
+    img.alt = name;
+    img.src = url;
+    bubble.appendChild(img);
+  } else {
+    // non-image: keep file-card UI
+    const elWrap = document.createElement('div');
+    elWrap.className = 'file-card';
+
+    const icon = document.createElement('div');
+    icon.className = 'file-icon';
+    icon.innerHTML = '&nbsp;';
+    elWrap.appendChild(icon);
+
+    const info = document.createElement('div');
+    info.className = 'file-info';
+    const title = document.createElement('div');
+    title.className = 'file-name';
+    title.textContent = name;
+    info.appendChild(title);
+    if (mime) {
+      const mt = document.createElement('div');
+      mt.className = 'file-type';
+      mt.textContent = mime;
+      info.appendChild(mt);
+    }
+    elWrap.appendChild(info);
+
+    if (url) {
+      const a = document.createElement('a');
+      a.href = url;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.className = 'file-link';
+      a.textContent = 'Open';
+      elWrap.appendChild(a);
+    }
+    bubble.appendChild(elWrap);
+  }
 }
-;
-            if (url) {
-              const a = document.createElement('a');
-              a.href = url;
-              a.target = '_blank';
-              a.rel = 'noopener noreferrer';
-              a.className = 'file-link';
-              a.textContent = 'Open';
-              elWrap.appendChild(a);
-            }
-            bubble.appendChild(elWrap);
-          }
 
 
         if(!m.attachment && m.content){
