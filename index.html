@@ -1656,18 +1656,17 @@ async function sendAttachmentNow(){
 
         // real upload with progress callback
         uploadResult = await uploadFileToServer(pendingAttachment.file, (pct, loaded, total) => {
-          try {
-            pendingAttachment.progress = pct;
-            pendingAttachment.uploadState = 'uploading';
-            if (rectEl && typeof rectEl.getTotalLength === 'function') {
-              const len = rectEl.getTotalLength();
-              const draw = Math.max(0, Math.round(len * (1 - (pct/100))));
-              rectEl.style.strokeDashoffset = draw;
-            }
-            // ensure UI updates
-            updateSendVisibility && updateSendVisibility();
-          } catch(e){}
-        });
+  try {
+    pendingAttachment.progress = pct;
+    pendingAttachment.uploadState = 'uploading';
+    // تحديث الشريط
+    if (rectEl && typeof rectEl.getTotalLength === 'function') {
+      const len = rectEl.getTotalLength();
+      const draw = Math.max(0, Math.round(len * (1 - (pct/100))));
+      rectEl.style.strokeDashoffset = draw;
+    }
+  } catch(e){}
+});
 
         // success path
         if (uploadResult) {
