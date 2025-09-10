@@ -450,9 +450,18 @@
     border:1px solid #eaf4ff;
   }
   .file-icon {
-    width:52px; height:52px; border-radius:8px; display:flex; align-items:center; justify-content:center; background:#fff; box-shadow:0 8px 20px rgba(6,30,60,0.06);
-    font-weight:800; color:var(--accent); font-size:14px;
-  }
+  width: 42px;
+  height: 42px;
+  border-radius: 6px;
+  background: #f0f2f5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+  color: #333;
+  margin-right: 8px;
+}
   .file-meta { display:flex; flex-direction:column; gap:4px; }
   .file-name { font-weight:800; color:#0b2633; }
   .file-size { font-size:12px; color:var(--muted); }
@@ -1514,18 +1523,8 @@ function startUploadSimulation(pending, outer, rect, onComplete, onTick) {
             
             pendingAttachment._outer = outer;
             pendingAttachment._rect = rect;
-startUploadSimulation(pendingAttachment, outer, rect, () => {
-              updateSendVisibility();
-              if(pendingAttachment && pendingAttachment.sendOnComplete){
-                pendingAttachment.sendOnComplete = false;
-                setTimeout(()=> {
-                  try { sendAttachmentNow(); } catch(e){ console.error(e); }
-                }, 10);
-              }
-            }, () => {
-              updateSendVisibility();
-            });
-          };
+            // بمجرد اختيار الملف، ابدأ رفعه مباشرة
+sendAttachmentNow();
           reader.readAsDataURL(file);
 
           closeBtn.addEventListener('click', (ev)=>{
@@ -2052,58 +2051,40 @@ function uploadFileToServer(file, onProgress){
         
           if (m.attachment) {
   const att = m.attachment;
-  // normalize mime/type fields
-  const mime = (att.mime_type || att.attachment_type || att.type || '').toLowerCase();
-  const name = att.filename || att.name || att.attachment_name || att.attachmentName || 'file';
-  let url = att.url || att.src || att.attachment_url || att.attachmentUrl || null;
+  const mime = att.mime_type || att.type || '';
+  const name = att.filename || att.name || 'file';
+  let url = att.url || att.src || null;
 
-  // force https for http links to avoid mixed-content (if backend returns http)
-  if (url && url.startsWith && url.startsWith('http://')) {
-    url = url.replace(/^http:\/\//i, 'https://');
-  }
+  const elWrap = document.createElement('div');
+  elWrap.className = 'file-card';
 
-  const isImage = mime.startsWith('image/') && url;
+  // 🔹 أيقونة فيها الامتداد
+  const icon = document.createElement('div');
+  icon.className = 'file-icon';
+  // خذ الامتداد من اسم الملف (مثلاً pdf, html, png)
+  const ext = name.split('.').pop().toUpperCase();
+  icon.textContent = ext;
+  elWrap.appendChild(icon);
 
-  if (isImage) {
-    // show image thumbnail only (no filename text)
-    const img = document.createElement('img');
-    img.className = 'att-image';
-    img.alt = name;
-    img.src = url;
-    bubble.appendChild(img);
+  // 🔹 اسم الملف فقط (دون زر Open أو نوع mime)
+  const info = document.createElement('div');
+  info.className = 'file-info';
+  const title = document.createElement('div');
+  title.className = 'file-name';
+  title.textContent = name;
+  info.appendChild(title);
+  elWrap.appendChild(info);
+
+  // 🔹 إذا فيه رابط نخلي البطاقة كلها قابلة للضغط
+  if (url) {
+    const a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.className = 'file-download';
+    a.appendChild(elWrap);
+    bubble.appendChild(a);
   } else {
-    // non-image: keep file-card UI
-    const elWrap = document.createElement('div');
-    elWrap.className = 'file-card';
-
-    const icon = document.createElement('div');
-    icon.className = 'file-icon';
-    icon.innerHTML = '&nbsp;';
-    elWrap.appendChild(icon);
-
-    const info = document.createElement('div');
-    info.className = 'file-info';
-    const title = document.createElement('div');
-    title.className = 'file-name';
-    title.textContent = name;
-    info.appendChild(title);
-    if (mime) {
-      const mt = document.createElement('div');
-      mt.className = 'file-type';
-      mt.textContent = mime;
-      info.appendChild(mt);
-    }
-    elWrap.appendChild(info);
-
-    if (url) {
-      const a = document.createElement('a');
-      a.href = url;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      a.className = 'file-link';
-      a.textContent = 'Open';
-      elWrap.appendChild(a);
-    }
     bubble.appendChild(elWrap);
   }
 }
