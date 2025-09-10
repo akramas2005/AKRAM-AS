@@ -1666,17 +1666,25 @@ async function sendAttachmentNow(){
 
         // real upload with progress callback
         uploadResult = await uploadFileToServer(pendingAttachment.file, (pct, loaded, total) => {
-          try {
-            pendingAttachment.progress = pct;
-            pendingAttachment.uploadState = 'uploading';
-            // update visual ring if present
-            if (rectEl && typeof rectEl.getTotalLength === 'function') {
-              const len = rectEl.getTotalLength();
-              const draw = Math.max(0, Math.round(len * (1 - (pct/100))));
-              rectEl.style.strokeDashoffset = draw;
-            }
-          } catch(e){}
-        });
+  try {
+    pendingAttachment.progress = pct;
+    pendingAttachment.uploadState = 'uploading';
+
+    if (rectEl && typeof rectEl.getTotalLength === 'function') {
+      const len = rectEl.getTotalLength();
+      const draw = Math.max(0, Math.round(len * (1 - (pct / 100))));
+      rectEl.style.strokeDashoffset = draw;
+    }
+
+    // لما يوصل فعلياً 100%
+    if (pct >= 100 && outerEl) {
+      setTimeout(() => {
+        outerEl.classList.add('clean-ring'); // يخلي الأنيميشن الصغير
+        setTimeout(() => { outerEl.remove(); }, 800); // يخفيه من DOM بعد ثانية تقريباً
+      }, 500);
+    }
+  } catch (e) {}
+});
 
         // success path
         if (uploadResult) {
@@ -2018,19 +2026,39 @@ if (url && url.startsWith('http://')) {
               icon.innerHTML = '&nbsp;'; // keep layout
               elWrap.appendChild(icon);
             }
-            const info = document.createElement('div');
-            info.className = 'file-info';
-            const title = document.createElement('div');
-            title.className = 'file-name';
-            title.textContent = name;
-            info.appendChild(title);
-            if (mime) {
-              const mt = document.createElement('div');
-              mt.className = 'file-type';
-              mt.textContent = mime;
-              info.appendChild(mt);
-            }
-            elWrap.appendChild(info);
+            if (isImage && url) {
+  const thumb = document.createElement('div');
+  thumb.className = 'file-thumb-img';
+  const img = document.createElement('img');
+  img.alt = name;
+  img.src = url;
+  img.style.maxWidth = '200px';   // حجم مناسب
+  img.style.borderRadius = '8px'; // زوايا ناعمة
+  img.style.display = 'block';
+  thumb.appendChild(img);
+  elWrap.appendChild(thumb);
+} else {
+  // باقي الملفات (PDF, Word ...)
+  const icon = document.createElement('div');
+  icon.className = 'file-icon';
+  icon.innerHTML = '&nbsp;';
+  elWrap.appendChild(icon);
+
+  const info = document.createElement('div');
+  info.className = 'file-info';
+  const title = document.createElement('div');
+  title.className = 'file-name';
+  title.textContent = name;
+  info.appendChild(title);
+  if (mime) {
+    const mt = document.createElement('div');
+    mt.className = 'file-type';
+    mt.textContent = mime;
+    info.appendChild(mt);
+  }
+  elWrap.appendChild(info);
+}
+;
             if (url) {
               const a = document.createElement('a');
               a.href = url;
