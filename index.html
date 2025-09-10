@@ -1177,6 +1177,7 @@
   } catch(e) {
     console.warn('localStorage load failed', e);
   }
+});
 
       const rotator = document.getElementById('rotator');
       const rotatorText = document.getElementById('rotatorText');
@@ -2305,21 +2306,20 @@ function uploadFileToServer(file, onProgress){
         if(scrollToBottom) messagesEl.scrollTop = messagesEl.scrollHeight;
       }
       
-      function appendMessage(message, idx) {
-  const messageEl = createMessageElement(message, idx);
-  messagesEl.appendChild(messageEl);
-  requestAnimationFrame(()=> setTimeout(()=> messageEl.classList.add('show'), 20));
-  messagesEl.scrollTop = messagesEl.scrollHeight;
-
-  // 🟢 خزّن الرسالة في localStorage
+      function appendMessage(m, idx) {
+        const messageEl = createMessageElement(m, idx);
+        messagesEl.appendChild(messageEl);
+        requestAnimationFrame(()=> setTimeout(()=> messageEl.classList.add('show'), 20));
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+      // 🟢 خزّن الرسالة في localStorage
   try {
     let msgs = JSON.parse(localStorage.getItem('chatMessages') || '[]');
-    msgs.push(message);
+    msgs.push(m);
     localStorage.setItem('chatMessages', JSON.stringify(msgs));
   } catch(e) {
     console.warn('localStorage save failed', e);
   }
-}
   
       // Typing indicator — do not force scroll if user is scrolled up (autoScrollEnabled will control)
       function showTyping(){
