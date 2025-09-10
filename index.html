@@ -1452,103 +1452,103 @@ function startUploadSimulation(pending, outer, rect, onComplete, onTick) {
 }
 
       // show image preview
-      function showImagePreview(file){
-        try {
-          if(!filePreviewContainer) return;
-          clearPreview();
-          filePreviewContainer.setAttribute('aria-hidden','false');
+function showImagePreview(file){
+  try {
+    if(!filePreviewContainer) return;
+    clearPreview();
+    filePreviewContainer.setAttribute('aria-hidden','false');
 
-          const outer = document.createElement('div');
-          outer.className = 'thumb-outer';
+    const outer = document.createElement('div');
+    outer.className = 'thumb-outer';
 
-          const svgNS = 'http://www.w3.org/2000/svg';
-          const svgEl = document.createElementNS(svgNS, 'svg');
-          svgEl.setAttribute('class', 'thumb-svg');
-          svgEl.setAttribute('viewBox', '0 0 100 100');
-          svgEl.setAttribute('preserveAspectRatio', 'none');
-          svgEl.style.transform = 'rotate(-90deg)';
-          svgEl.style.transformOrigin = '50% 50%';
+    const svgNS = 'http://www.w3.org/2000/svg';
+    const svgEl = document.createElementNS(svgNS, 'svg');
+    svgEl.setAttribute('class', 'thumb-svg');
+    svgEl.setAttribute('viewBox', '0 0 100 100');
+    svgEl.setAttribute('preserveAspectRatio', 'none');
+    svgEl.style.transform = 'rotate(-90deg)';
+    svgEl.style.transformOrigin = '50% 50%';
 
-          const rect = document.createElementNS(svgNS, 'rect');
-          rect.setAttribute('x', '6'); rect.setAttribute('y', '6');
-          rect.setAttribute('width', '88'); rect.setAttribute('height', '88');
-          rect.setAttribute('rx', '12'); rect.setAttribute('ry', '12');
-          rect.setAttribute('fill', 'none');
-          rect.setAttribute('stroke', 'rgba(0,120,255,0.98)');
-          rect.setAttribute('stroke-width', '4');
-          rect.setAttribute('stroke-linecap', 'round');
-          rect.setAttribute('stroke-linejoin', 'round');
-          rect.style.transition = 'stroke-dashoffset 120ms linear, opacity .6s ease';
+    const rect = document.createElementNS(svgNS, 'rect');
+    rect.setAttribute('x', '6'); rect.setAttribute('y', '6');
+    rect.setAttribute('width', '88'); rect.setAttribute('height', '88');
+    rect.setAttribute('rx', '12'); rect.setAttribute('ry', '12');
+    rect.setAttribute('fill', 'none');
+    rect.setAttribute('stroke', 'rgba(0,120,255,0.98)');
+    rect.setAttribute('stroke-width', '4');
+    rect.setAttribute('stroke-linecap', 'round');
+    rect.setAttribute('stroke-linejoin', 'round');
+    rect.style.transition = 'stroke-dashoffset 120ms linear, opacity .6s ease';
 
-          svgEl.appendChild(rect);
-          outer.appendChild(svgEl);
+    svgEl.appendChild(rect);
+    outer.appendChild(svgEl);
 
-          const imgWrap = document.createElement('div');
-          imgWrap.className = 'file-thumb-img';
-          const imgEl = document.createElement('img');
-          imgEl.alt = file.name || 'image';
-          imgWrap.appendChild(imgEl);
-          outer.appendChild(imgWrap);
+    const imgWrap = document.createElement('div');
+    imgWrap.className = 'file-thumb-img';
+    const imgEl = document.createElement('img');
+    imgEl.alt = file.name || 'image';
+    imgWrap.appendChild(imgEl);
+    outer.appendChild(imgWrap);
 
-          const retry = document.createElement('div');
-          retry.className = 'retry-overlay';
-          retry.title = 'Retry upload';
-          retry.innerHTML = '↻';
-          outer.appendChild(retry);
+    const retry = document.createElement('div');
+    retry.className = 'retry-overlay';
+    retry.title = 'Retry upload';
+    retry.innerHTML = '↻';
+    outer.appendChild(retry);
 
-          const closeBtn = document.createElement('button');
-          closeBtn.className = 'thumb-close';
-          closeBtn.title = 'Remove';
-          closeBtn.innerText = '×';
-          outer.appendChild(closeBtn);
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'thumb-close';
+    closeBtn.title = 'Remove';
+    closeBtn.innerText = '×';
+    outer.appendChild(closeBtn);
 
-          filePreviewContainer.appendChild(outer);
-          updateComposerSpacing();
+    filePreviewContainer.appendChild(outer);
+    updateComposerSpacing();
 
-          const reader = new FileReader();
-          reader.onload = function(ev){
-            imgEl.src = ev.target.result;
-            pendingAttachment = {
-              type: 'image',
-              name: file.name,
-              size: file.size,
-              src: ev.target.result,
-              file: file,
-              progress: 0,
-              uploadState: 'pending',
-              sendOnComplete: false,
-              _sending: false
-            };
-            updateSendVisibility();
+    const reader = new FileReader();
+    reader.onload = function(ev){
+      imgEl.src = ev.target.result;
+      pendingAttachment = {
+        type: 'image',
+        name: file.name,
+        size: file.size,
+        src: ev.target.result,
+        file: file,
+        progress: 0,
+        uploadState: 'pending',
+        sendOnComplete: false,
+        _sending: false
+      };
+      updateSendVisibility();
 
-pendingAttachment._outer = outer;
-pendingAttachment._rect = rect;
+      pendingAttachment._outer = outer;
+      pendingAttachment._rect = rect;
 
-// بمجرد اختيار الملف، ابدأ رفعه مباشرة
-sendAttachmentNow();
+      // بمجرد اختيار الملف، ابدأ رفعه مباشرة
+      sendAttachmentNow();
+    };
+    reader.readAsDataURL(file);
 
-reader.readAsDataURL(file);
+    closeBtn.addEventListener('click', (ev)=>{
+      ev.preventDefault();
+      clearPreview();
+    });
 
-closeBtn.addEventListener('click', (ev)=>{
-  ev.preventDefault();
-  clearPreview();
-});
+    retry.addEventListener('click', (ev)=>{
+      ev.preventDefault();
+      if(!pendingAttachment) return;
+      pendingAttachment.progress = 0;
+      pendingAttachment.uploadState = 'pending';
+      outer.classList.remove('upload-failed','upload-complete','clean-ring');
 
-retry.addEventListener('click', (ev)=>{
-  ev.preventDefault();
-  if(!pendingAttachment) return;
-  pendingAttachment.progress = 0;
-  pendingAttachment.uploadState = 'pending';
-  outer.classList.remove('upload-failed','upload-complete','clean-ring');
+      // إعادة رفع الملف مباشرة
+      sendAttachmentNow();
+    });
 
-  // بمجرد الضغط على إعادة المحاولة، نعيد رفع الملف مباشرة
-  sendAttachmentNow();
-});
-
-} catch(e){
-  console.error('preview image error', e);
+  } catch(e){
+    console.error('preview image error', e);
+  }
 }
-
 
       // show generic file preview
       function showFilePreview(file){
