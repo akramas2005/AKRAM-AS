@@ -1320,36 +1320,7 @@
       }
 
       // ===== upload simulation (keeps previous behavior) =====
-      const UPLOAD_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
-
-      
-      // === startUploadSimulation ===
-// Simulated progress for preview ring. Calls onComplete() when simulation finishes
-// or when a real upload starts (pending._useRealUpload === true).
-function startUploadSimulation(pending, outerEl, rectEl, onComplete, onTick) {
-  try {
-    if (!pending) return;
-
-    // clear existing interval
-    if (pending._uploadInterval) {
-      clearInterval(pending._uploadInterval);
-      pending._uploadInterval = null;
-    }
-
-    // reset state
-    pending.uploadState = pending.uploadState || 'uploading';
-    pending.progress = pending.progress || 0;
-
-    // prepare SVG stroke
-    let len = null;
-    try {
-      if (rectEl && typeof rectEl.getTotalLength === 'function') {
-        len = rectEl.getTotalLength();
-        rectEl.style.strokeDasharray = String(len);
-        rectEl.style.strokeDashoffset = String(len);
-        rectEl.style.transition = 'stroke-dashoffset 120ms linear, opacity .6s ease';
-      }
-    } catch (e) {}
+      const UPLOAD_TIMEOUT_MS = 3 * 60 * 1000; // 3 minute
 
     // start simulation interval
     pending._uploadInterval = setInterval(() => {
