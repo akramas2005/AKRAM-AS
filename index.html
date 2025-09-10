@@ -1546,13 +1546,16 @@ sendAttachmentNow();
               }
             }, () => {
               updateSendVisibility();
-            });
-          });
+});
 
-        } catch(e){
-          console.error('preview image error', e);
-        }
-      }
+// ✂️ هنا كان فيه startUploadSimulation(...) مع }) زايدة
+// استبدلناه بـ:
+sendAttachmentNow();
+
+} catch(e){
+  console.error('preview image error', e);
+}
+
 
       // show generic file preview
       function showFilePreview(file){
