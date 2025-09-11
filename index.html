@@ -1710,16 +1710,11 @@ try {
   if (rect && typeof rect.getTotalLength === 'function') {
     const totalLen = rect.getTotalLength();
     rect.style.strokeDasharray = String(totalLen);
-    rect.style.strokeDashoffset = String(totalLen); // يبدأ فارغ تماماً
-    rect.style.transition = 'stroke-dashoffset 180ms linear, opacity .6s ease';
 
-    // Force a paint frame so the initial hidden state is registered before any later changes
-    requestAnimationFrame(() => {
-      try {
-        // keep it hidden until progress events update it
-        rect.style.strokeDashoffset = String(totalLen);
-      } catch (e) {}
-    });
+    // يبدأ فارغ (0%)
+    rect.style.strokeDashoffset = String(totalLen);
+
+    rect.style.transition = 'stroke-dashoffset 180ms linear, opacity .6s ease';
   }
 } catch(e) {
   console.error('file stroke init error', e);
