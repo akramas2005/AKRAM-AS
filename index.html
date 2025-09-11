@@ -1623,14 +1623,22 @@ function showImagePreview(file){
     // زر الإغلاق
     closeBtn.addEventListener('click', async (ev)=>{
       ev.preventDefault();
-      if (pendingAttachment && pendingAttachment.id) {
-        try {
-          await fetch(API_BASE + '/api/files/' + pendingAttachment.id, { method: 'DELETE' });
-        } catch(e){
-          console.warn('delete failed', e);
+      try {
+        if (pendingAttachment && pendingAttachment.id) {
+          await fetch(API_BASE + '/api/files/' + pendingAttachment.id, { method: 'DELETE' }).catch(()=>{});
         }
+      } catch(e){
+        console.warn('delete failed', e);
       }
+      // cleanup
+      try { 
+        if (pendingAttachment && pendingAttachment._objectUrl) {
+          URL.revokeObjectURL(pendingAttachment._objectUrl); 
+        } 
+      } catch(e){}
       clearPreview();
+      pendingAttachment = null;
+      updateSendVisibility();
     });
 
     // زر الإعادة
