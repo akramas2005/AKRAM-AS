@@ -56,6 +56,37 @@
   box-shadow: 0 2px 10px rgba(0,0,0,0.08);
   cursor: pointer;
 }
+  /* make image preview reasonably large and clear */
+.att-image {
+  display: block;
+  max-width: 420px;
+  max-height: 320px;
+  width: auto;
+  height: auto;
+  border-radius: 10px;
+  object-fit: cover;
+  margin-top: 8px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+  cursor: pointer;
+}
+
+/* file icon extension label */
+.file-icon {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:48px;
+  height:48px;
+  border-radius:8px;
+  background: #f5f8fb;
+  font-weight:700;
+  font-size:12px;
+  color:#0b2633;
+}
+.file-icon-ext {
+  pointer-events:none;
+  user-select:none;
+}
 
   /* SIDE MENU (HAMBURGER) */
   .side-menu {
@@ -1647,116 +1678,189 @@ function showImagePreview(file){
 
       // show generic file preview
       function showFilePreview(file){
-        try {
-          if(!filePreviewContainer) return;
-          clearPreview();
-          filePreviewContainer.setAttribute('aria-hidden','false');
+  try {
+    if(!filePreviewContainer) return;
+    clearPreview();
+    filePreviewContainer.setAttribute('aria-hidden','false');
 
-          const outer = document.createElement('div');
-          outer.className = 'thumb-outer';
+    const outer = document.createElement('div');
+    outer.className = 'thumb-outer';
 
-          const svgNS = 'http://www.w3.org/2000/svg';
-          const svgEl = document.createElementNS(svgNS, 'svg');
-          svgEl.setAttribute('class', 'thumb-svg');
-          svgEl.setAttribute('viewBox', '0 0 100 100');
-          svgEl.setAttribute('preserveAspectRatio', 'none');
-          svgEl.style.transform = 'rotate(-90deg)';
-          svgEl.style.transformOrigin = '50% 50%';
+    const svgNS = 'http://www.w3.org/2000/svg';
+    const svgEl = document.createElementNS(svgNS, 'svg');
+    svgEl.setAttribute('class', 'thumb-svg');
+    svgEl.setAttribute('viewBox', '0 0 100 100');
+    svgEl.setAttribute('preserveAspectRatio', 'none');
+    svgEl.style.transform = 'rotate(-90deg)';
+    svgEl.style.transformOrigin = '50% 50%';
 
-          const rect = document.createElementNS(svgNS, 'rect');
-          rect.setAttribute('x', '6'); rect.setAttribute('y', '6');
-          rect.setAttribute('width', '88'); rect.setAttribute('height', '88');
-          rect.setAttribute('rx', '12'); rect.setAttribute('ry', '12');
-          rect.setAttribute('fill', 'none');
-          rect.setAttribute('stroke', 'rgba(0,120,255,0.98)');
-          rect.setAttribute('stroke-width', '4');
-          rect.setAttribute('stroke-linecap', 'round');
-          rect.setAttribute('stroke-linejoin', 'round');
-          rect.style.transition = 'stroke-dashoffset 120ms linear, opacity .6s ease';
+    const rect = document.createElementNS(svgNS, 'rect');
+    rect.setAttribute('x', '6'); rect.setAttribute('y', '6');
+    rect.setAttribute('width', '88'); rect.setAttribute('height', '88');
+    rect.setAttribute('rx', '12'); rect.setAttribute('ry', '12');
+    rect.setAttribute('fill', 'none');
+    rect.setAttribute('stroke', 'rgba(0,120,255,0.98)');
+    rect.setAttribute('stroke-width', '4');
+    rect.setAttribute('stroke-linecap', 'round');
+    rect.setAttribute('stroke-linejoin', 'round');
+    rect.style.transition = 'stroke-dashoffset 120ms linear, opacity .6s ease';
 
-          svgEl.appendChild(rect);
-          outer.appendChild(svgEl);
-
-          const metaWrap = document.createElement('div');
-          metaWrap.className = 'file-thumb-meta';
-          const fn = document.createElement('div');
-          fn.className = 'fname';
-          fn.textContent = file.name.split('.').slice(0,2).join('.');
-          metaWrap.appendChild(fn);
-          outer.appendChild(metaWrap);
-
-          const retry = document.createElement('div');
-          retry.className = 'retry-overlay';
-          retry.title = 'Retry upload';
-          retry.innerHTML = '↻';
-          outer.appendChild(retry);
-
-          const closeBtn = document.createElement('button');
-          closeBtn.className = 'thumb-close';
-          closeBtn.title = 'Remove';
-          closeBtn.innerText = '×';
-          outer.appendChild(closeBtn);
-
-          filePreviewContainer.appendChild(outer);
-          updateComposerSpacing();
-
-          const objectUrl = URL.createObjectURL(file);
-
-          pendingAttachment = {
-            type: 'file',
-            name: file.name,
-            size: file.size,
-            src: objectUrl,
-            file: file,
-            _objectUrl: objectUrl,
-            progress: 0,
-            uploadState: 'pending',
-            sendOnComplete: false,
-            _sending: false
-          };
-          updateSendVisibility();
-
-          setTimeout(()=> {
-            
-            pendingAttachment._outer = outer;
-            pendingAttachment._rect = rect;
-startUploadSimulation(pendingAttachment, outer, rect, () => {
-              updateSendVisibility();
-              if(pendingAttachment && pendingAttachment.sendOnComplete){
-                pendingAttachment.sendOnComplete = false;
-                setTimeout(()=> { try { sendAttachmentNow(); } catch(e){ console.error(e); } }, 10);
-              }
-            }, () => {
-              updateSendVisibility();
-            });
-          }, 60);
-
-          closeBtn.addEventListener('click', (ev)=>{
-            ev.preventDefault();
-            clearPreview();
-          });
-
-          retry.addEventListener('click', (ev)=>{
-            ev.preventDefault();
-            if(!pendingAttachment) return;
-            pendingAttachment.progress = 0;
-            pendingAttachment.uploadState = 'pending';
-            outer.classList.remove('upload-failed','upload-complete','clean-ring');
-            startUploadSimulation(pendingAttachment, outer, rect, () => {
-              updateSendVisibility();
-              if(pendingAttachment && pendingAttachment.sendOnComplete){
-                pendingAttachment.sendOnComplete = false;
-                setTimeout(()=> { try { sendAttachmentNow(); } catch(e){ console.error(e); } }, 10);
-              }
-            }, () => {
-              updateSendVisibility();
-            });
-          });
-
-        } catch(e){
-          console.error('preview file error', e);
-        }
+    // prepare stroke so we can update offset by progress
+    try {
+      if (rect && typeof rect.getTotalLength === 'function') {
+        const totalLen = rect.getTotalLength();
+        rect.style.strokeDasharray = String(totalLen);
+        // start fully hidden (draw from 0)
+        const startOffset = Math.round(totalLen * (1 - (0 / 100)));
+        rect.style.strokeDashoffset = String(totalLen);
+        rect.style.strokeDashoffset = String(startOffset);
       }
+    } catch(e){}
+
+    svgEl.appendChild(rect);
+    outer.appendChild(svgEl);
+
+    // meta area
+    const metaWrap = document.createElement('div');
+    metaWrap.className = 'file-thumb-meta';
+    const fn = document.createElement('div');
+    fn.className = 'fname';
+    fn.textContent = file.name.split('.').slice(0,2).join('.');
+    metaWrap.appendChild(fn);
+    outer.appendChild(metaWrap);
+
+    const retry = document.createElement('div');
+    retry.className = 'retry-overlay';
+    retry.title = 'Retry upload';
+    retry.innerHTML = '↻';
+    outer.appendChild(retry);
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'thumb-close';
+    closeBtn.title = 'Remove';
+    closeBtn.innerText = '×';
+    outer.appendChild(closeBtn);
+
+    filePreviewContainer.appendChild(outer);
+    updateComposerSpacing();
+
+    const objectUrl = URL.createObjectURL(file);
+
+    pendingAttachment = {
+      type: 'file',
+      name: file.name,
+      size: file.size,
+      src: objectUrl,
+      file: file,
+      _objectUrl: objectUrl,
+      progress: 0,
+      uploadState: 'pending',
+      sendOnComplete: false,
+      _sending: false,
+      _outer: outer,
+      _rect: rect
+    };
+    updateSendVisibility();
+
+    // ---- start real upload immediately for files (same behavior as images) ----
+    uploadFileToServer(file, (pct, loaded, total) => {
+      try {
+        pendingAttachment.progress = pct;
+        pendingAttachment.uploadState = 'uploading';
+        // update svg ring
+        if (rect && typeof rect.getTotalLength === 'function') {
+          const len = rect.getTotalLength();
+          const draw = Math.max(0, Math.round(len * (1 - (pct/100))));
+          rect.style.strokeDashoffset = draw;
+        }
+        updateSendVisibility();
+      } catch(_){}
+    }).then(result => {
+      // success
+      pendingAttachment.uploadState = 'done';
+      pendingAttachment.progress = 100;
+      pendingAttachment.id = result.id;
+      pendingAttachment.url = result.url;
+      pendingAttachment.filename = result.filename;
+      pendingAttachment.mime_type = result.mime_type;
+      pendingAttachment._uploadResult = result;
+
+      // visual finish
+      try {
+        if (rect && typeof rect.getTotalLength === 'function') rect.style.strokeDashoffset = 0;
+        if (outer) {
+          outer.classList.remove('uploading','upload-failed');
+          outer.classList.add('upload-complete');
+          setTimeout(()=>{ try{ outer.classList.add('clean-ring'); }catch(e){} }, 600);
+        }
+      } catch(e){}
+
+      toast('Upload complete! Click send to post it.');
+      updateSendVisibility();
+    }).catch(err => {
+      console.error('retry upload failed', err);
+      pendingAttachment.uploadState = 'failed';
+      pendingAttachment.progress = 0;
+      try { if (outer) { outer.classList.remove('uploading'); outer.classList.add('upload-failed'); } } catch(e){}
+      toast('Upload failed, try again.');
+      updateSendVisibility();
+    });
+
+    // close button: if uploaded, try delete remote file; always clear preview and revoke objectURL
+    closeBtn.addEventListener('click', async (ev)=>{
+      ev.preventDefault();
+      try {
+        if (pendingAttachment && pendingAttachment.id) {
+          await fetch(API_BASE + '/api/files/' + pendingAttachment.id, { method: 'DELETE' }).catch(()=>{});
+        }
+      } catch(e){
+        console.warn('delete failed', e);
+      }
+      // cleanup
+      try { if (pendingAttachment && pendingAttachment._objectUrl) URL.revokeObjectURL(pendingAttachment._objectUrl); } catch(e){}
+      clearPreview();
+    });
+
+    // retry overlay — re-run the real upload
+    retry.addEventListener('click', (ev)=>{
+      ev.preventDefault();
+      if(!pendingAttachment || !pendingAttachment.file) return;
+      pendingAttachment.progress = 0;
+      pendingAttachment.uploadState = 'pending';
+      outer.classList.remove('upload-failed','upload-complete','clean-ring');
+      // start upload again
+      uploadFileToServer(pendingAttachment.file, (pct)=> {
+        try {
+          pendingAttachment.progress = pct;
+          pendingAttachment.uploadState = 'uploading';
+          if (rect && typeof rect.getTotalLength === 'function') {
+            const len = rect.getTotalLength();
+            const draw = Math.max(0, Math.round(len * (1 - (pct/100))));
+            rect.style.strokeDashoffset = draw;
+          }
+          updateSendVisibility();
+        } catch(e){}
+      }).then(result => {
+        pendingAttachment.uploadState = 'done';
+        pendingAttachment.progress = 100;
+        pendingAttachment.id = result.id;
+        pendingAttachment.url = result.url;
+        pendingAttachment.filename = result.filename;
+        pendingAttachment.mime_type = result.mime_type;
+        pendingAttachment._uploadResult = result;
+        updateSendVisibility();
+        toast('Upload complete! Click send to post it.');
+      }).catch(err => {
+        console.warn('retry upload failed', err);
+        pendingAttachment.uploadState = 'failed';
+        updateSendVisibility();
+      });
+    });
+
+  } catch(e){
+    console.error('preview file error', e);
+  }
+}
 
       // === sendAttachmentNow (fixed) ===
 async function sendAttachmentNow(){
@@ -1764,155 +1868,146 @@ async function sendAttachmentNow(){
     if(!pendingAttachment) return;
     if(pendingAttachment._sending) return;
 
-    // only block if a real upload is already in progress.
-    if (pendingAttachment.uploadState === 'uploading') {
+    // If upload already finished and we have remote URL -> send immediately
+    if (pendingAttachment.uploadState === 'done' && pendingAttachment.url) {
+      const text = (composer.value || '').trim();
+      const userMessage = {
+        id: genId(),
+        role: 'user',
+        content: text || '',
+        attachment: {
+          id: pendingAttachment.id,
+          url: pendingAttachment.url,
+          filename: pendingAttachment.filename || pendingAttachment.name,
+          mime_type: pendingAttachment.mime_type || pendingAttachment.type || ''
+        },
+        meta: {}
+      };
+
+      // append locally
+      messages.push(userMessage);
+      appendMessage(userMessage, messages.length - 1);
+      saveSession();
+
+      // clear composer & preview
+      composer.value = '';
+      updateSendVisibility();
+      autoGrowTextarea();
+      try { if(pendingAttachment && pendingAttachment._objectUrl) URL.revokeObjectURL(pendingAttachment._objectUrl); } catch(e){}
+
+      // send to backend via existing function (postMessageToServer)
+      postMessageToServer(userMessage).catch(err => {
+        console.warn('postMessageToServer failed for attachment message', err);
+        scheduleSync();
+      });
+
+      // clear preview and pendingAttachment
+      clearPreview();
+      pendingAttachment = null;
+
+      // trigger assistant reply
+      regenerateAssistantForParent(messages.length - 1);
+      return;
+    }
+
+    // If still uploading -> mark sendOnComplete and ask user to wait
+    if (pendingAttachment.uploadState === 'uploading' || pendingAttachment.uploadState === 'pending') {
       pendingAttachment.sendOnComplete = true;
       toast('Waiting for upload to complete...');
       return;
     }
+
     if (pendingAttachment.uploadState === 'failed') {
       toast('Upload failed — please retry or remove the attachment');
       return;
     }
 
+    // Otherwise — if we reach here and file object exists but not yet uploaded,
+    // perform the upload now (fallback).
     pendingAttachment._sending = true;
     let uploadResult = null;
 
-    // If we have a File object, perform real upload now
     if (pendingAttachment && pendingAttachment.file) {
       try {
         toast('Uploading file...');
-        // signal that real upload should run (so simulation can stop)
-        pendingAttachment._useRealUpload = true;
-
-        // stop any running simulation interval
-        try {
-          if (pendingAttachment._uploadInterval) {
-            clearInterval(pendingAttachment._uploadInterval);
-            pendingAttachment._uploadInterval = null;
-          }
-        } catch(e){}
+        // ensure any simulation is stopped
+        try { if (pendingAttachment._uploadInterval) { clearInterval(pendingAttachment._uploadInterval); pendingAttachment._uploadInterval = null; } } catch(e){}
 
         const rectEl = pendingAttachment._rect || null;
         const outerEl = pendingAttachment._outer || null;
 
-        // ensure ring shows uploading state
-        try {
-          if (outerEl) {
-            outerEl.classList.remove('upload-failed','upload-complete');
-            outerEl.classList.add('uploading');
-          }
-        } catch(e){}
+        if (outerEl) { outerEl.classList.remove('upload-failed','upload-complete'); outerEl.classList.add('uploading'); }
 
-        // real upload with progress callback
         uploadResult = await uploadFileToServer(pendingAttachment.file, (pct, loaded, total) => {
-  try {
-    pendingAttachment.progress = pct;
-    pendingAttachment.uploadState = 'uploading';
-
-    if (rectEl && typeof rectEl.getTotalLength === 'function') {
-      const len = rectEl.getTotalLength();
-      const draw = Math.max(0, Math.round(len * (1 - (pct / 100))));
-      rectEl.style.strokeDashoffset = draw;
-    }
-
-    // لما يوصل فعلياً 100%
-    if (pct >= 100 && outerEl) {
-      setTimeout(() => {
-        outerEl.classList.add('clean-ring'); // يخلي الأنيميشن الصغير
-        setTimeout(() => { outerEl.remove(); }, 800); // يخفيه من DOM بعد ثانية تقريباً
-      }, 500);
-    }
-  } catch (e) {}
-});
-
-        // success path
-        if (uploadResult) {
-          pendingAttachment.uploadState = 'complete';
-          pendingAttachment.progress = 100;
-          pendingAttachment.id = uploadResult.id;
-          pendingAttachment.url = uploadResult.url;
-          pendingAttachment.filename = uploadResult.filename;
-          pendingAttachment.mime_type = uploadResult.mime_type;
-          pendingAttachment._uploadResult = uploadResult;
-
-          // update outer/visuals
           try {
+            pendingAttachment.progress = pct;
+            pendingAttachment.uploadState = 'uploading';
             if (rectEl && typeof rectEl.getTotalLength === 'function') {
-              rectEl.style.strokeDashoffset = 0;
-            }
-            if (outerEl) {
-              outerEl.classList.remove('uploading','upload-failed');
-              outerEl.classList.add('upload-complete');
-              // small cleanup animation
-              setTimeout(()=>{ try{ outerEl.classList.add('clean-ring'); }catch(e){} }, 600);
+              const len = rectEl.getTotalLength();
+              const draw = Math.max(0, Math.round(len * (1 - (pct/100))));
+              rectEl.style.strokeDashoffset = draw;
             }
           } catch(e){}
-          toast('Upload complete!');
-        }
-
+        });
       } catch (err) {
         console.warn('uploadFileToServer failed', err);
         pendingAttachment.uploadState = 'failed';
         pendingAttachment.progress = 0;
-        // update visuals
-        try {
-          if (pendingAttachment._outer) {
-            pendingAttachment._outer.classList.remove('uploading');
-            pendingAttachment._outer.classList.add('upload-failed');
-          }
-        } catch(e){}
+        try { if (pendingAttachment._outer) { pendingAttachment._outer.classList.remove('uploading'); pendingAttachment._outer.classList.add('upload-failed'); } } catch(e){}
         toast('Upload failed — message will be queued locally and retried');
       }
     }
 
-    // Build attachment object to attach to message
-    const attCopy = uploadResult ? {
-      id: uploadResult.id,
-      url: uploadResult.url,
-      filename: uploadResult.filename,
-      mime_type: uploadResult.mime_type
-    } : {
-      type: pendingAttachment.type,
-      name: pendingAttachment.name,
-      size: pendingAttachment.size,
-      src: pendingAttachment.src
-    };
+    // If we have uploadResult (or upload finished) -> build message and send
+    if (uploadResult || (pendingAttachment.uploadState === 'done' && pendingAttachment.url)) {
+      const res = uploadResult || pendingAttachment._uploadResult || {};
+      // ensure we have final fields
+      pendingAttachment.uploadState = 'done';
+      pendingAttachment.progress = 100;
+      pendingAttachment.id = pendingAttachment.id || res.id;
+      pendingAttachment.url = pendingAttachment.url || res.url;
+      pendingAttachment.filename = pendingAttachment.filename || res.filename || pendingAttachment.name;
+      pendingAttachment.mime_type = pendingAttachment.mime_type || res.mime_type || pendingAttachment.type;
 
-    // Compose user message
-    const text = (composer.value || '').trim();
-    const userMessage = {
-      id: genId(),
-      role: 'user',
-      content: text || '',
-      attachment: attCopy,
-      meta: {}
-    };
+      // build user message
+      const text = (composer.value || '').trim();
+      const userMessage = {
+        id: genId(),
+        role: 'user',
+        content: text || '',
+        attachment: {
+          id: pendingAttachment.id,
+          url: pendingAttachment.url,
+          filename: pendingAttachment.filename,
+          mime_type: pendingAttachment.mime_type
+        },
+        meta: {}
+      };
 
-    // append locally and persist
-    messages.push(userMessage);
-    appendMessage(userMessage, messages.length - 1);
-    saveSession();
-    updateWelcomeVisibility();
+      // append locally
+      messages.push(userMessage);
+      appendMessage(userMessage, messages.length - 1);
+      saveSession();
 
-    // clear composer
-    composer.value = '';
-    updateSendVisibility();
-    autoGrowTextarea();
+      // clear composer & preview
+      composer.value = '';
+      updateSendVisibility();
+      autoGrowTextarea();
+      try { if(pendingAttachment && pendingAttachment._objectUrl) URL.revokeObjectURL(pendingAttachment._objectUrl); } catch(e){}
 
-    // send to backend (if uploaded we have id/url)
-    postMessageToServer(userMessage).catch((err) => {
-      console.warn('postMessageToServer failed for attachment message', err);
-      scheduleSync();
-    });
+      // persist to server
+      postMessageToServer(userMessage).catch(err => {
+        console.warn('postMessageToServer failed for attachment message', err);
+        scheduleSync();
+      });
 
-    // clear preview area
-    clearPreview();
+      // cleanup
+      clearPreview();
+      pendingAttachment = null;
 
-    // trigger assistant reply
-    regenerateAssistantForParent(messages.length - 1);
-
-    return;
+      // assistant reply
+      regenerateAssistantForParent(messages.length - 1);
+    }
 
   } catch (e){
     console.error('sendAttachmentNow error', e);
@@ -2166,6 +2261,14 @@ function uploadFileToServer(file, onProgress){
     icon.textContent = (mime.split('/')[1] || mime || 'FILE').toUpperCase();
     elWrap.appendChild(icon);
 
+    // put extension abbreviation inside icon
+const ext = (name && name.split('.').pop()) ? name.split('.').pop().toLowerCase() : '';
+const extLabel = document.createElement('div');
+extLabel.className = 'file-icon-ext';
+extLabel.textContent = ext ? ext.toUpperCase() : '';
+icon.appendChild(extLabel);
+
+
     const info = document.createElement('div');
     info.className = 'file-info';
     const title = document.createElement('div');
@@ -2175,14 +2278,15 @@ function uploadFileToServer(file, onProgress){
     elWrap.appendChild(info);
 
     if (url) {
-      const a = document.createElement('a');
-      a.href = url;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      a.className = 'file-link';
-      a.textContent = 'Open';
-      elWrap.appendChild(a);
-    }
+  // instead of textual "Open" link, show download by clicking the whole card (keeps layout)
+  elWrap.addEventListener('click', (ev) => {
+    // open in new tab
+    try { window.open(url, '_blank', 'noopener'); } catch(e){}
+  });
+
+  // ensure cursor pointer
+  elWrap.style.cursor = 'pointer';
+}
 
     bubble.appendChild(elWrap);
   }
