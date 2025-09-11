@@ -3789,14 +3789,22 @@ else if (act === 'sendFeedback') {
         }
       });
 
-      // ensure history and savedConvos are up-to-date on load
+            // ensure history and savedConvos are up-to-date on load
       loadHistory();
       renderHistoryPanel();
 
-      window.__study_chat = { messages, sendMessage, exportConversation, openConvoPanel, closeConvoPanel };
+      // Export a small API for debugging / external control
+      window.__study_chat = {
+        messages,
+        sendMessage,
+        exportConversation,
+        openConvoPanel,
+        closeConvoPanel
+      };
 
-    });
-  })();
+      // close DOMContentLoaded listener and IIFE safely
+    }); // end DOMContentLoaded listener
+  })(); // end immediate-invoked function expression (IIFE)
 </script>
 
 <!-- Puter regen/edit integration: delegated handler to support regenerate & edit using sendMessage() -->
