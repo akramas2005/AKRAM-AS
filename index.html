@@ -2261,13 +2261,6 @@ function uploadFileToServer(file, onProgress){
     icon.textContent = (mime.split('/')[1] || mime || 'FILE').toUpperCase();
     elWrap.appendChild(icon);
 
-    // put extension abbreviation inside icon
-const ext = (name && name.split('.').pop()) ? name.split('.').pop().toLowerCase() : '';
-const extLabel = document.createElement('div');
-extLabel.className = 'file-icon-ext';
-extLabel.textContent = ext ? ext.toUpperCase() : '';
-icon.appendChild(extLabel);
-
 
     const info = document.createElement('div');
     info.className = 'file-info';
