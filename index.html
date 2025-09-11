@@ -1712,10 +1712,6 @@ try {
     rect.style.strokeDasharray = String(totalLen);
     rect.style.strokeDashoffset = String(totalLen); // يبدأ فارغ تماماً
     rect.style.transition = 'stroke-dashoffset 180ms linear, opacity .6s ease';
-  }
-} catch(e) {
-  console.error('file stroke init error', e);
-}
 
     // Force a paint frame so the initial hidden state is registered before any later changes
     requestAnimationFrame(() => {
@@ -1725,8 +1721,8 @@ try {
       } catch (e) {}
     });
   }
-} catch (e) {
-  console.error('init stroke error', e);
+} catch(e) {
+  console.error('file stroke init error', e);
 }
 
     svgEl.appendChild(rect);
