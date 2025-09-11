@@ -1399,88 +1399,91 @@ function startUploadSimulation(pending, outer, rect, onComplete, onTick) {
     pending.progress = pending.progress || 0;
 
     // prepare SVG stroke if available
-let totalLen = null;
-try {
-  if (rect && typeof rect.getTotalLength === 'function') {
-    totalLen = rect.getTotalLength();
-    rect.style.strokeDasharray = String(totalLen);
-
-    // 🟢 البداية: الشريط ممتلئ (مخفي تماماً) = 100%
-    rect.style.strokeDashoffset = String(totalLen);
-
-    rect.style.transition = 'stroke-dashoffset 120ms linear, opacity .6s ease';
-  }
-} catch (e) {
-  console.error('startUploadSimulation setup error', e);
-}
-
-let lastTime = Date.now();
-
-pending._uploadInterval = setInterval(() => {
-  try {
-    if (!pending) {
-      if (pending && pending._uploadInterval) {
-        clearInterval(pending._uploadInterval);
-        pending._uploadInterval = null;
+    let totalLen = null;
+    try {
+      if (rect && typeof rect.getTotalLength === 'function') {
+        totalLen = rect.getTotalLength();
+        rect.style.strokeDasharray = String(totalLen);
+        // start _fully_ hidden then draw according to progress
+        const startOffset = Math.round(totalLen * (1 - (pending.progress || 0) / 100));
+        rect.style.strokeDashoffset = String(startOffset);
+        rect.style.transition = 'stroke-dashoffset 120ms linear, opacity .6s ease';
       }
-      return;
+    } catch (e) {
+      console.error('startUploadSimulation setup error', e);
     }
 
-    // if a real upload was triggered, stop simulation and notify
-    if (pending._useRealUpload) {
-      if (pending._uploadInterval) {
-        clearInterval(pending._uploadInterval);
-        pending._uploadInterval = null;
+    let lastTime = Date.now();
+
+    pending._uploadInterval = setInterval(() => {
+      try {
+        if (!pending) {
+          if (pending && pending._uploadInterval) {
+            clearInterval(pending._uploadInterval);
+            pending._uploadInterval = null;
+          }
+          return;
+        }
+
+        // if a real upload was triggered, stop simulation and notify
+        if (pending._useRealUpload) {
+          if (pending._uploadInterval) {
+            clearInterval(pending._uploadInterval);
+            pending._uploadInterval = null;
+          }
+          pending.uploadState = pending.uploadState || 'pending';
+          if (typeof onComplete === 'function') onComplete();
+          return;
+        }
+
+        // stop if failed or already complete
+        if (pending.uploadState === 'failed' || pending.uploadState === 'complete') {
+          if (pending._uploadInterval) {
+            clearInterval(pending._uploadInterval);
+            pending._uploadInterval = null;
+          }
+          if (pending.uploadState === 'complete' && typeof onComplete === 'function') onComplete();
+          return;
+        }
+
+        // gentle random progress increment but leave room for the real upload
+        const now = Date.now();
+        const dt = Math.max(80, Math.min(1200, now - lastTime));
+        lastTime = now;
+
+        const inc = 1 + Math.floor(Math.random() * 4); // small bump
+        pending.progress = Math.min(98, (pending.progress || 0) + inc);
+
+        // update ring visually
+        if (rect && totalLen) {
+          const draw = Math.max(0, Math.round(totalLen * (1 - (pending.progress / 100))));
+          rect.style.strokeDashoffset = draw;
+        }
+
+        // tick callback (update UI)
+        if (typeof onTick === 'function') {
+          try { onTick(); } catch(e){}
+        }
+
+        // if we reached simulation threshold -> stop and call onComplete
+        if ((pending.progress || 0) >= 98) {
+          if (pending._uploadInterval) {
+            clearInterval(pending._uploadInterval);
+            pending._uploadInterval = null;
+          }
+          // mark ready (not actually uploaded yet)
+          pending.uploadState = 'pending';
+          if (typeof onComplete === 'function') onComplete();
+          return;
+        }
+      } catch (e) {
+        console.error('startUploadSimulation tick error', e);
       }
-      pending.uploadState = pending.uploadState || 'pending';
-      if (typeof onComplete === 'function') onComplete();
-      return;
-    }
-
-    // stop if failed or already complete
-    if (pending.uploadState === 'failed' || pending.uploadState === 'complete') {
-      if (pending._uploadInterval) {
-        clearInterval(pending._uploadInterval);
-        pending._uploadInterval = null;
-      }
-      if (pending.uploadState === 'complete' && typeof onComplete === 'function') onComplete();
-      return;
-    }
-
-    // gentle random progress increment but leave room for the real upload
-    const now = Date.now();
-    const dt = Math.max(80, Math.min(1200, now - lastTime));
-    lastTime = now;
-
-    const inc = 1 + Math.floor(Math.random() * 4); // small bump
-    pending.progress = Math.min(98, (pending.progress || 0) + inc);
-
-    // 🟢 تحديث الشريط حسب نسبة التقدم
-    if (rect && totalLen) {
-      const draw = Math.max(0, Math.round(totalLen * (1 - (pending.progress / 100))));
-      rect.style.strokeDashoffset = draw;
-    }
-
-    // tick callback (update UI)
-    if (typeof onTick === 'function') {
-      try { onTick(); } catch(e){}
-    }
-
-    // if we reached simulation threshold -> stop and call onComplete
-    if ((pending.progress || 0) >= 98) {
-      if (pending._uploadInterval) {
-        clearInterval(pending._uploadInterval);
-        pending._uploadInterval = null;
-      }
-      // mark ready (not actually uploaded yet)
-      pending.uploadState = 'pending';
-      if (typeof onComplete === 'function') onComplete();
-      return;
-    }
+    }, 120 + Math.round(Math.random() * 180));
   } catch (e) {
-    console.error('startUploadSimulation tick error', e);
+    console.error('startUploadSimulation error', e);
   }
-}, 120 + Math.round(Math.random() * 180));
+}
 
       // show image preview
 function showImagePreview(file){
@@ -3982,4 +3985,3 @@ else if (act === 'sendFeedback') {
 </body>
 
 </html>
-
