@@ -1294,10 +1294,38 @@ function setRectProgress(rect, pct) {
       document.body.appendChild(imageInput);
       document.body.appendChild(fileInput);
 
-      // allowed types
-      const allowedExt = ['png','jpg','jpeg','webp','gif','bmp','pdf','txt','html','htm'];
-      const allowedMimePrefixes = ['image/'];
-      const allowedMimesExtra = ['application/pdf','text/plain','text/html'];
+      // allowed types (extensions)
+const allowedExt = [
+  // صور
+  'png','jpg','jpeg','webp','gif','bmp','svg',
+
+  // نصوص وأكواد
+  'txt','md','log','json','js','ts','css','html','htm','xml','csv','yml','yaml',
+
+  // مستندات
+  'pdf','doc','docx','ppt','pptx','xls','xlsx'
+];
+
+// السماح بأي نوع يبدأ بـ image/ + بعض الأنواع الإضافية
+const allowedMimePrefixes = ['image/'];
+
+// أنواع إضافية صريحة
+const allowedMimesExtra = [
+  'application/pdf',
+  'text/plain',
+  'text/html',
+  'application/json',
+  'application/javascript',
+  'text/css',
+  'application/xml',
+  'text/csv',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // docx
+  'application/msword',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+];
 
       // pendingAttachment holds current file preview & upload state
       let pendingAttachment = null;
@@ -3886,46 +3914,39 @@ else if (act === 'sendFeedback') {
           if(chatPanel.classList.contains('show')){ closeChatSimple(); return; }
         }
       });
-      // Optional: analyze image/file URL with Puter or backend vision endpoint
-async function analyzeImageWithPuter(imageUrl){
+      // ✅ دالة تحليل الصور والملفات باستخدام Puter
+async function analyzeImageWithPuter(fileOrUrl) {
   try {
-    if (!imageUrl) return null;
+    let result;
 
-    // prefer puter.ai if available
-    if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.vision === 'function') {
-      try {
-        const r = await puter.ai.vision(imageUrl);
-        return r;
-      } catch (_) { /* fallback */ }
+    // لو جالك ملف (Blob أو File)
+    if (fileOrUrl instanceof File || fileOrUrl instanceof Blob) {
+      result = await puter.ai.vision(fileOrUrl);
+    }
+    // لو جالك رابط URL
+    else if (typeof fileOrUrl === 'string') {
+      result = await puter.ai.vision(fileOrUrl);
+    } else {
+      throw new Error("Unsupported input for vision");
     }
 
-    // fallback to your backend (ensure you have /api/vision endpoint)
-    if (API_BASE) {
-      try {
-        const resp = await fetch(API_BASE + '/api/vision', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image_url: imageUrl })
-        });
-        if (!resp.ok) throw new Error('vision api failed: ' + resp.status);
-        const data = await resp.json();
-
-        // optionally append assistant message with result summary (if you want)
-        const analysisText = data && (data.description || data.text || data.summary || JSON.stringify(data));
-        if (analysisText) {
-          const botMsg = { id: genId(), role: 'assistant', content: String(analysisText).slice(0, 15000), meta: {} };
-          messages.push(botMsg);
-          appendMessage(botMsg, messages.length - 1);
-          saveSession();
-        }
-        return data;
-      } catch (e) {
-        console.warn('analyze fallback failed', e);
-      }
+    // ✨ لو في نتيجة، نضيفها كرسالة بوت في الشات
+    if (result) {
+      const analysisText = result.description || result.text || JSON.stringify(result);
+      const botMsg = {
+        id: genId(),
+        role: 'assistant',
+        content: String(analysisText).slice(0, 15000),
+        meta: {}
+      };
+      messages.push(botMsg);
+      appendMessage(botMsg, messages.length - 1);
+      saveSession();
     }
-    return null;
-  } catch(e){
-    console.error('analyzeImageWithPuter error', e);
+
+    return result;
+  } catch (err) {
+    console.error("analyzeImageWithPuter error", err);
     return null;
   }
 }
