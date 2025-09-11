@@ -1705,23 +1705,17 @@ function showImagePreview(file){
     rect.setAttribute('stroke-linejoin', 'round');
     rect.style.transition = 'stroke-dashoffset 120ms linear, opacity .6s ease';
 
-    // prepare stroke so we can update offset by progress (robust init to avoid showing full ring)
+    // prepare stroke so we can update offset by progress (files)
 try {
   if (rect && typeof rect.getTotalLength === 'function') {
     const totalLen = rect.getTotalLength();
-
-    // set dasharray + transition (ensure transition exists before we animate)
     rect.style.strokeDasharray = String(totalLen);
+    rect.style.strokeDashoffset = String(totalLen); // يبدأ فارغ تماماً
     rect.style.transition = 'stroke-dashoffset 180ms linear, opacity .6s ease';
-
-    // Start _fully hidden_ (offset == totalLen). Apply immediately so browser paints initial hidden state.
-    rect.style.strokeDashoffset = String(totalLen);
-
-    // Make sure outer shows uploading state (remove any "complete" classes that might show a filled ring)
-    if (outer) {
-      outer.classList.remove('upload-complete', 'upload-failed', 'clean-ring');
-      outer.classList.add('uploading');
-    }
+  }
+} catch(e) {
+  console.error('file stroke init error', e);
+}
 
     // Force a paint frame so the initial hidden state is registered before any later changes
     requestAnimationFrame(() => {
