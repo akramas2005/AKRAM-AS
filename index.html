@@ -1171,6 +1171,44 @@
       t.classList.add('show');
       setTimeout(()=> t.classList.remove('show'), duration);
     }
+    // helper: try to initialize SVG rect stroke length safely (retries via rAF)
+function ensureRectInitialized(rect, cb) {
+  let attempts = 0;
+  function tryInit() {
+    try {
+      if (!rect || typeof rect.getTotalLength !== 'function') throw new Error('no-getTotalLength');
+      const len = rect.getTotalLength();
+      rect._totalLen = len;
+      rect.style.strokeDasharray = String(len);
+      rect.style.strokeDashoffset = String(len); // hide initially
+      rect.style.transition = 'stroke-dashoffset 120ms linear, opacity .6s ease';
+      if (typeof cb === 'function') cb(len);
+      return;
+    } catch (err) {
+      attempts++;
+      if (attempts < 8) {
+        // try next paint frame
+        requestAnimationFrame(tryInit);
+      } else {
+        console.warn('ensureRectInitialized failed after retries', err);
+        if (typeof cb === 'function') cb(null);
+      }
+    }
+  }
+  tryInit();
+}
+
+// helper to set progress (uses stored _totalLen if available)
+function setRectProgress(rect, pct) {
+  try {
+    const len = rect && (rect._totalLen || (typeof rect.getTotalLength === 'function' ? rect.getTotalLength() : null));
+    if (!len && len !== 0) return;
+    const draw = Math.max(0, Math.round(len * (1 - (Number(pct) || 0) / 100)));
+    rect.style.strokeDashoffset = String(draw);
+  } catch (e) {
+    // ignore
+  }
+}
 
     // copy helper with fallback (fixes mobile "copy not available")
     async function copyTextToClipboard(text){
@@ -1512,7 +1550,6 @@ function showImagePreview(file){
     rect.setAttribute('stroke-width', '4');
     rect.setAttribute('stroke-linecap', 'round');
     rect.setAttribute('stroke-linejoin', 'round');
-    rect.style.transition = 'stroke-dashoffset 120ms linear, opacity .6s ease';
 
     svgEl.appendChild(rect);
     outer.appendChild(svgEl);
@@ -1530,10 +1567,12 @@ function showImagePreview(file){
     retry.innerHTML = '↻';
     outer.appendChild(retry);
 
+    // زر الإغلاق مخفي حتى ينتهي الرفع (أو يحدث فشل)
     const closeBtn = document.createElement('button');
     closeBtn.className = 'thumb-close';
     closeBtn.title = 'Remove';
     closeBtn.innerText = '×';
+    closeBtn.style.display = 'none';
     outer.appendChild(closeBtn);
 
     filePreviewContainer.appendChild(outer);
@@ -1541,10 +1580,10 @@ function showImagePreview(file){
 
     const reader = new FileReader();
     reader.onload = function(ev){
-      // عرض الصورة من الـ data URL
+      // show image
       imgEl.src = ev.target.result;
 
-      // أنشئ pendingAttachment
+      // prepare pendingAttachment
       pendingAttachment = {
         type: 'image',
         name: file.name,
@@ -1554,34 +1593,29 @@ function showImagePreview(file){
         progress: 0,
         uploadState: 'pending',
         sendOnComplete: false,
-        _sending: false
+        _sending: false,
+        _outer: outer,
+        _rect: rect
       };
 
-      pendingAttachment._outer = outer;
-      pendingAttachment._rect = rect;
       updateSendVisibility();
 
-      // 🔹 تهيئة شريط التقدم من البداية
-      if (rect && typeof rect.getTotalLength === 'function') {
-        const len = rect.getTotalLength();
-        rect.style.strokeDasharray = String(len);
-        rect.style.strokeDashoffset = len; // يبدأ فارغ (0%)
-      }
+      // ensure rect length is initialized (safely)
+      ensureRectInitialized(rect, (len)=>{
+        // rect initialized (or failed). if there's already some progress, reflect it
+        try { setRectProgress(rect, pendingAttachment.progress || 0); } catch(e){}
+      });
 
-      // 🔹 ابدأ الرفع الفعلي مع التقدم
+      // start real upload (with progress callback)
       uploadFileToServer(file, (pct, loaded, total) => {
         try {
           pendingAttachment.progress = pct;
           pendingAttachment.uploadState = 'uploading';
-          if (rect && typeof rect.getTotalLength === 'function') {
-            const len = rect.getTotalLength();
-            const draw = Math.max(0, Math.round(len * (1 - (pct/100))));
-            rect.style.strokeDashoffset = draw;
-          }
+          setRectProgress(rect, pct);
           updateSendVisibility();
         } catch(_){}
       }).then(result => {
-        // نجاح الرفع — خزّن بيانات الملف من السيرفر
+        // success
         pendingAttachment.uploadState = 'done';
         pendingAttachment.progress = 100;
         pendingAttachment.id = result.id;
@@ -1590,93 +1624,93 @@ function showImagePreview(file){
         pendingAttachment.mime_type = result.mime_type;
         pendingAttachment._uploadResult = result;
 
-        if (outer) {
-  outer.classList.add('upload-complete');
-  // 🟢 بدلاً من clearPreview، خلينا فقط ننظف حلقة التقدم ونترك الصورة
-  setTimeout(()=> { 
-    try { outer.classList.add('clean-ring'); } catch(e){}
-  }, 600);
-}
+        // show close button now that file is uploaded
+        try { closeBtn.style.display = 'block'; } catch(e){}
 
-        // تحديث الشكل النهائي للحلقة
         try {
-          if (rect && typeof rect.getTotalLength === 'function') rect.style.strokeDashoffset = 0;
+          setRectProgress(rect, 100);
           if (outer) {
             outer.classList.remove('uploading','upload-failed');
             outer.classList.add('upload-complete');
             setTimeout(()=>{ try{ outer.classList.add('clean-ring'); }catch(e){} }, 600);
           }
         } catch(e){}
+
         toast('Upload complete! Click send to post it.');
         updateSendVisibility();
+
+        // optional: analyze image if function present
+        try {
+          if (typeof analyzeImageWithPuter === 'function') {
+            analyzeImageWithPuter(result.url).catch(()=>{});
+          } else if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.vision === 'function') {
+            // if puter has a vision API
+            (async ()=>{ try { await puter.ai.vision(result.url); } catch(e){} })();
+          }
+        } catch(e){}
       }).catch(err => {
         console.error('upload failed', err);
         pendingAttachment.uploadState = 'failed';
         pendingAttachment.progress = 0;
-        try { if (outer) { outer.classList.remove('uploading'); outer.classList.add('upload-failed'); } } catch(e){}
+        try {
+          if (outer) { outer.classList.remove('uploading'); outer.classList.add('upload-failed'); }
+          // show close so user can remove failed preview
+          closeBtn.style.display = 'block';
+        } catch(e){}
         toast('Upload failed, try again.');
         updateSendVisibility();
       });
     };
     reader.readAsDataURL(file);
 
-    // زر الإغلاق
+    // close button: delete remote file (if uploaded) and clear preview
     closeBtn.addEventListener('click', async (ev)=>{
       ev.preventDefault();
       try {
-        if (pendingAttachment && pendingAttachment.id) {
-          await fetch(API_BASE + '/api/files/' + pendingAttachment.id, { method: 'DELETE' }).catch(()=>{});
+        const remoteId = pendingAttachment && (pendingAttachment.id || (pendingAttachment._uploadResult && pendingAttachment._uploadResult.id));
+        if (remoteId) {
+          await fetch(API_BASE + '/api/files/' + remoteId, { method: 'DELETE' }).catch(()=>{});
         }
       } catch(e){
         console.warn('delete failed', e);
       }
-      // cleanup
-      try { 
-        if (pendingAttachment && pendingAttachment._objectUrl) {
-          URL.revokeObjectURL(pendingAttachment._objectUrl); 
-        } 
-      } catch(e){}
+      try { if (pendingAttachment && pendingAttachment._objectUrl) URL.revokeObjectURL(pendingAttachment._objectUrl); } catch(e){}
       clearPreview();
       pendingAttachment = null;
       updateSendVisibility();
     });
 
-    // زر الإعادة
+    // retry button
     retry.addEventListener('click', (ev)=>{
       ev.preventDefault();
-      if(!pendingAttachment) return;
+      if(!pendingAttachment || !pendingAttachment.file) return;
       pendingAttachment.progress = 0;
       pendingAttachment.uploadState = 'pending';
       outer.classList.remove('upload-failed','upload-complete','clean-ring');
-
-      if (pendingAttachment.file) {
-        uploadFileToServer(pendingAttachment.file, (pct)=> {
-          try {
-            pendingAttachment.progress = pct;
-            pendingAttachment.uploadState = 'uploading';
-            if (rect && typeof rect.getTotalLength === 'function') {
-              const len = rect.getTotalLength();
-              const draw = Math.max(0, Math.round(len * (1 - (pct/100))));
-              rect.style.strokeDashoffset = draw;
-            }
-            updateSendVisibility();
-          } catch(e){}
-        }).then(result => {
-          pendingAttachment.uploadState = 'done';
-          pendingAttachment.progress = 100;
-          pendingAttachment.id = result.id;
-          pendingAttachment.url = result.url;
-          pendingAttachment.filename = result.filename;
-          pendingAttachment.mime_type = result.mime_type;
-          pendingAttachment._uploadResult = result;
+      // restart upload
+      uploadFileToServer(pendingAttachment.file, (pct)=> {
+        try {
+          pendingAttachment.progress = pct;
+          pendingAttachment.uploadState = 'uploading';
+          setRectProgress(rect, pct);
           updateSendVisibility();
-          toast('Upload complete! Click send to post it.');
-        }).catch(err => {
-          console.warn('retry upload failed', err);
-          pendingAttachment.uploadState = 'failed';
-          updateSendVisibility();
-        });
-      }
+        } catch(e){}
+      }).then(result => {
+        pendingAttachment.uploadState = 'done';
+        pendingAttachment.progress = 100;
+        pendingAttachment.id = result.id;
+        pendingAttachment.url = result.url;
+        pendingAttachment.filename = result.filename;
+        pendingAttachment.mime_type = result.mime_type;
+        pendingAttachment._uploadResult = result;
+        try { closeBtn.style.display = 'block'; } catch(e){}
+        updateSendVisibility();
+        toast('Upload complete! Click send to post it.');
+      }).catch(err => {
+        console.warn('retry upload failed', err);
+        pendingAttachment.uploadState = 'failed';
+        updateSendVisibility();
+      });
     });
 
   } catch(e){
@@ -1711,19 +1745,6 @@ function showFilePreview(file){
     rect.setAttribute('stroke-width', '4');
     rect.setAttribute('stroke-linecap', 'round');
     rect.setAttribute('stroke-linejoin', 'round');
-    rect.style.transition = 'stroke-dashoffset 120ms linear, opacity .6s ease';
-
-    // prepare stroke so we can update offset by progress (files)
-    try {
-      if (rect && typeof rect.getTotalLength === 'function') {
-        const totalLen = rect.getTotalLength();
-        rect.style.strokeDasharray = String(totalLen);
-        rect.style.strokeDashoffset = String(totalLen); // يبدأ فارغ (0%)
-        rect.style.transition = 'stroke-dashoffset 180ms linear, opacity .6s ease';
-      }
-    } catch(e) {
-      console.error('file stroke init error', e);
-    }
 
     svgEl.appendChild(rect);
     outer.appendChild(svgEl);
@@ -1747,6 +1768,7 @@ function showFilePreview(file){
     closeBtn.className = 'thumb-close';
     closeBtn.title = 'Remove';
     closeBtn.innerText = '×';
+    closeBtn.style.display = 'none'; // hidden until upload done/failed
     outer.appendChild(closeBtn);
 
     filePreviewContainer.appendChild(outer);
@@ -1770,16 +1792,18 @@ function showFilePreview(file){
     };
     updateSendVisibility();
 
+    // ensure rect initialized safely
+    ensureRectInitialized(rect, (len) => {
+      // reflect any existing progress
+      try { setRectProgress(rect, pendingAttachment.progress || 0); } catch(e){}
+    });
+
     // ---- start real upload immediately for files ----
     uploadFileToServer(file, (pct, loaded, total) => {
       try {
         pendingAttachment.progress = pct;
         pendingAttachment.uploadState = 'uploading';
-        if (rect && typeof rect.getTotalLength === 'function') {
-          const len = rect.getTotalLength();
-          const draw = Math.max(0, Math.round(len * (1 - (pct/100))));
-          rect.style.strokeDashoffset = draw;
-        }
+        setRectProgress(rect, pct);
         updateSendVisibility();
       } catch(_){}
     }).then(result => {
@@ -1792,7 +1816,7 @@ function showFilePreview(file){
       pendingAttachment._uploadResult = result;
 
       try {
-        if (rect && typeof rect.getTotalLength === 'function') rect.style.strokeDashoffset = 0;
+        setRectProgress(rect, 100);
         if (outer) {
           outer.classList.remove('uploading','upload-failed');
           outer.classList.add('upload-complete');
@@ -1800,38 +1824,47 @@ function showFilePreview(file){
         }
       } catch(e){}
 
+      // show delete X now
+      try { closeBtn.style.display = 'block'; } catch(e){}
+
       toast('Upload complete! Click send to post it.');
       updateSendVisibility();
+
+      // optional: if it's an image-like file or you want to analyze general files
+      try {
+        if (typeof analyzeImageWithPuter === 'function') {
+          analyzeImageWithPuter(result.url).catch(()=>{});
+        }
+      } catch(e){}
     }).catch(err => {
       console.error('retry upload failed', err);
       pendingAttachment.uploadState = 'failed';
       pendingAttachment.progress = 0;
       try { if (outer) { outer.classList.remove('uploading'); outer.classList.add('upload-failed'); } } catch(e){}
+      // show delete so user can remove failed preview
+      try { closeBtn.style.display = 'block'; } catch(e){}
       toast('Upload failed, try again.');
       updateSendVisibility();
     });
 
-    // 🔹 زر الإغلاق: يحذف الملف من السيرفر + الشات
+    // close button: delete remote file + cleanup
     closeBtn.addEventListener('click', async (ev)=>{
       ev.preventDefault();
       try {
-        if (pendingAttachment && pendingAttachment.id) {
-          await fetch(API_BASE + '/api/files/' + pendingAttachment.id, { method: 'DELETE' }).catch(()=>{});
+        const remoteId = pendingAttachment && (pendingAttachment.id || (pendingAttachment._uploadResult && pendingAttachment._uploadResult.id));
+        if (remoteId) {
+          await fetch(API_BASE + '/api/files/' + remoteId, { method: 'DELETE' }).catch(()=>{});
         }
       } catch(e){
         console.warn('delete failed', e);
       }
-      try { 
-        if (pendingAttachment && pendingAttachment._objectUrl) {
-          URL.revokeObjectURL(pendingAttachment._objectUrl); 
-        }
-      } catch(e){}
+      try { if (pendingAttachment && pendingAttachment._objectUrl) URL.revokeObjectURL(pendingAttachment._objectUrl); } catch(e){}
       clearPreview();
       pendingAttachment = null;
       updateSendVisibility();
     });
 
-    // زر الإعادة (retry)
+    // retry overlay — re-run the real upload
     retry.addEventListener('click', (ev)=>{
       ev.preventDefault();
       if(!pendingAttachment || !pendingAttachment.file) return;
@@ -1842,11 +1875,7 @@ function showFilePreview(file){
         try {
           pendingAttachment.progress = pct;
           pendingAttachment.uploadState = 'uploading';
-          if (rect && typeof rect.getTotalLength === 'function') {
-            const len = rect.getTotalLength();
-            const draw = Math.max(0, Math.round(len * (1 - (pct/100))));
-            rect.style.strokeDashoffset = draw;
-          }
+          setRectProgress(rect, pct);
           updateSendVisibility();
         } catch(e){}
       }).then(result => {
@@ -1857,6 +1886,7 @@ function showFilePreview(file){
         pendingAttachment.filename = result.filename;
         pendingAttachment.mime_type = result.mime_type;
         pendingAttachment._uploadResult = result;
+        try { closeBtn.style.display = 'block'; } catch(e){}
         updateSendVisibility();
         toast('Upload complete! Click send to post it.');
       }).catch(err => {
@@ -3856,6 +3886,49 @@ else if (act === 'sendFeedback') {
           if(chatPanel.classList.contains('show')){ closeChatSimple(); return; }
         }
       });
+      // Optional: analyze image/file URL with Puter or backend vision endpoint
+async function analyzeImageWithPuter(imageUrl){
+  try {
+    if (!imageUrl) return null;
+
+    // prefer puter.ai if available
+    if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.vision === 'function') {
+      try {
+        const r = await puter.ai.vision(imageUrl);
+        return r;
+      } catch (_) { /* fallback */ }
+    }
+
+    // fallback to your backend (ensure you have /api/vision endpoint)
+    if (API_BASE) {
+      try {
+        const resp = await fetch(API_BASE + '/api/vision', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image_url: imageUrl })
+        });
+        if (!resp.ok) throw new Error('vision api failed: ' + resp.status);
+        const data = await resp.json();
+
+        // optionally append assistant message with result summary (if you want)
+        const analysisText = data && (data.description || data.text || data.summary || JSON.stringify(data));
+        if (analysisText) {
+          const botMsg = { id: genId(), role: 'assistant', content: String(analysisText).slice(0, 15000), meta: {} };
+          messages.push(botMsg);
+          appendMessage(botMsg, messages.length - 1);
+          saveSession();
+        }
+        return data;
+      } catch (e) {
+        console.warn('analyze fallback failed', e);
+      }
+    }
+    return null;
+  } catch(e){
+    console.error('analyzeImageWithPuter error', e);
+    return null;
+  }
+}
 
       // ensure history and savedConvos are up-to-date on load
       loadHistory();
