@@ -1170,6 +1170,14 @@
     window.addEventListener('DOMContentLoaded', () => {
       // set a base history state so the phone back button behaves sensibly on the main card screen
       try { history.replaceState({ui:'root'}, ''); } catch(e){}
+      // 🟢 استرجاع الرسائل من localStorage
+  try {
+    const saved = JSON.parse(localStorage.getItem('chatMessages') || '[]');
+    saved.forEach((m, i) => appendMessage(m, i));
+  } catch(e) {
+    console.warn('localStorage load failed', e);
+  }
+});
 
       const rotator = document.getElementById('rotator');
       const rotatorText = document.getElementById('rotatorText');
@@ -1759,17 +1767,40 @@ startUploadSimulation(pendingAttachment, outer, rect, () => {
       }
 
       // === sendAttachmentNow (fixed) ===
-async function sendAttachmentNow(){
-  try{
-    if(!pendingAttachment) return;
-    if(pendingAttachment._sending) return;
+async function sendAttachmentNow() {
+  try {
+    if (!pendingAttachment) return;
+    if (pendingAttachment._sending) return;
 
-    // only block if a real upload is already in progress.
+    // ✅ إذا الملف مرفوع بالكامل بالفعل
+    if (pendingAttachment.uploadState === 'done' && pendingAttachment.url) {
+      const msg = {
+        id: 'local-' + Date.now(),
+        type: 'outgoing',
+        text: '',
+        attachment: {
+          type: pendingAttachment.type,
+          src: pendingAttachment.url,
+          name: pendingAttachment.filename || pendingAttachment.name,
+          mime: pendingAttachment.mime_type || '',
+        },
+        created_at: new Date().toISOString()
+      };
+
+      appendMessage(msg);        // يظهر في الواجهة
+      clearPreview();            // يمسح من المعاينة
+      socketSend(msg);           // يرسله للسيرفر (أو fetch، حسب اللي عندك)
+      pendingAttachment = null;  // نرجع للحالة الطبيعية
+      return;
+    }
+
+    // لو لسه بيرفع → نمنع الإرسال وننتظر
     if (pendingAttachment.uploadState === 'uploading') {
       pendingAttachment.sendOnComplete = true;
       toast('Waiting for upload to complete...');
       return;
     }
+
     if (pendingAttachment.uploadState === 'failed') {
       toast('Upload failed — please retry or remove the attachment');
       return;
@@ -2281,7 +2312,15 @@ function uploadFileToServer(file, onProgress){
         requestAnimationFrame(()=> setTimeout(()=> messageEl.classList.add('show'), 20));
         messagesEl.scrollTop = messagesEl.scrollHeight;
       }
-
+      // 🟢 خزّن الرسالة في localStorage
+  try {
+    let msgs = JSON.parse(localStorage.getItem('chatMessages') || '[]');
+    msgs.push(m);
+    localStorage.setItem('chatMessages', JSON.stringify(msgs));
+  } catch(e) {
+    console.warn('localStorage save failed', e);
+  }
+  
       // Typing indicator — do not force scroll if user is scrolled up (autoScrollEnabled will control)
       function showTyping(){
   // 🔹 احذف أي مؤشر كتابة قديم
