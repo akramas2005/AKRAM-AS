@@ -1705,17 +1705,35 @@ function showImagePreview(file){
     rect.setAttribute('stroke-linejoin', 'round');
     rect.style.transition = 'stroke-dashoffset 120ms linear, opacity .6s ease';
 
-    // prepare stroke so we can update offset by progress
-    try {
-      if (rect && typeof rect.getTotalLength === 'function') {
-        const totalLen = rect.getTotalLength();
-        rect.style.strokeDasharray = String(totalLen);
-        // start fully hidden (draw from 0)
-        const startOffset = Math.round(totalLen * (1 - (0 / 100)));
+    // prepare stroke so we can update offset by progress (robust init to avoid showing full ring)
+try {
+  if (rect && typeof rect.getTotalLength === 'function') {
+    const totalLen = rect.getTotalLength();
+
+    // set dasharray + transition (ensure transition exists before we animate)
+    rect.style.strokeDasharray = String(totalLen);
+    rect.style.transition = 'stroke-dashoffset 180ms linear, opacity .6s ease';
+
+    // Start _fully hidden_ (offset == totalLen). Apply immediately so browser paints initial hidden state.
+    rect.style.strokeDashoffset = String(totalLen);
+
+    // Make sure outer shows uploading state (remove any "complete" classes that might show a filled ring)
+    if (outer) {
+      outer.classList.remove('upload-complete', 'upload-failed', 'clean-ring');
+      outer.classList.add('uploading');
+    }
+
+    // Force a paint frame so the initial hidden state is registered before any later changes
+    requestAnimationFrame(() => {
+      try {
+        // keep it hidden until progress events update it
         rect.style.strokeDashoffset = String(totalLen);
-        rect.style.strokeDashoffset = String(startOffset);
-      }
-    } catch(e){}
+      } catch (e) {}
+    });
+  }
+} catch (e) {
+  console.error('init stroke error', e);
+}
 
     svgEl.appendChild(rect);
     outer.appendChild(svgEl);
@@ -2169,9 +2187,10 @@ function uploadFileToServer(file, onProgress){
             xhr._totalSize = e.total;
             const pct = Math.round((e.loaded / e.total) * 100);
             if (typeof onProgress === 'function') onProgress(pct, e.loaded, e.total);
-          } else {
-            if (typeof onProgress === 'function') onProgress(50, 0, 0);
-          }
+         } else {
+  // lengthComputable = false -> treat as unknown; start from 0 and let the UI show indeterminate/small animation if desired
+  if (typeof onProgress === 'function') onProgress(0, 0, 0);
+}
         } catch(e){}
       };
 
