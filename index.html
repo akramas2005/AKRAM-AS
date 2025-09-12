@@ -1929,7 +1929,7 @@ function showFilePreview(file){
   }
 }
 
-// === sendAttachmentNow (updated: analyze AFTER send, not during preview) ===
+      // === sendAttachmentNow (fixed) ===
 async function sendAttachmentNow(){
   try{
     if(!pendingAttachment) return;
@@ -1956,39 +1956,24 @@ async function sendAttachmentNow(){
       appendMessage(userMessage, messages.length - 1);
       saveSession();
 
-      // clear composer & preview UI
+      // clear composer & preview
       composer.value = '';
       updateSendVisibility();
       autoGrowTextarea();
       try { if(pendingAttachment && pendingAttachment._objectUrl) URL.revokeObjectURL(pendingAttachment._objectUrl); } catch(e){}
 
-      // send to backend (fire & forget)
+      // send to backend via existing function (postMessageToServer)
       postMessageToServer(userMessage).catch(err => {
         console.warn('postMessageToServer failed for attachment message', err);
         scheduleSync();
       });
 
-      // --- NOW: analyze the attachment via Puter (if available) ---
-      let analysisAppended = false;
-      try {
-        const urlToAnalyze = userMessage.attachment.url || userMessage.attachment.src || null;
-        if (urlToAnalyze) {
-          const res = await analyzeFileWithPuter(urlToAnalyze);
-          // analyzeFileWithPuter appends assistant message when successful, so if it returned something -> assume appended
-          if (res) analysisAppended = true;
-        }
-      } catch (err) {
-        console.warn('Attachment analysis failed', err);
-      }
-
-      // cleanup preview & pending
+      // clear preview and pendingAttachment
       clearPreview();
       pendingAttachment = null;
 
-      // Only regenerate assistant if analysis did NOT already produce an assistant reply
-      if (!analysisAppended) {
-        regenerateAssistantForParent(messages.length - 1);
-      }
+      // trigger assistant reply
+      regenerateAssistantForParent(messages.length - 1);
       return;
     }
 
@@ -2004,14 +1989,17 @@ async function sendAttachmentNow(){
       return;
     }
 
-    // Otherwise, perform upload now (fallback)
+    // Otherwise — if we reach here and file object exists but not yet uploaded,
+    // perform the upload now (fallback).
     pendingAttachment._sending = true;
     let uploadResult = null;
 
     if (pendingAttachment && pendingAttachment.file) {
       try {
         toast('Uploading file...');
+        // ensure any simulation is stopped
         try { if (pendingAttachment._uploadInterval) { clearInterval(pendingAttachment._uploadInterval); pendingAttachment._uploadInterval = null; } } catch(e){}
+
         const rectEl = pendingAttachment._rect || null;
         const outerEl = pendingAttachment._outer || null;
 
@@ -2037,9 +2025,10 @@ async function sendAttachmentNow(){
       }
     }
 
-    // If uploadResult or finished -> send same as above
+    // If we have uploadResult (or upload finished) -> build message and send
     if (uploadResult || (pendingAttachment.uploadState === 'done' && pendingAttachment.url)) {
       const res = uploadResult || pendingAttachment._uploadResult || {};
+      // ensure we have final fields
       pendingAttachment.uploadState = 'done';
       pendingAttachment.progress = 100;
       pendingAttachment.id = pendingAttachment.id || res.id;
@@ -2047,6 +2036,7 @@ async function sendAttachmentNow(){
       pendingAttachment.filename = pendingAttachment.filename || res.filename || pendingAttachment.name;
       pendingAttachment.mime_type = pendingAttachment.mime_type || res.mime_type || pendingAttachment.type;
 
+      // build user message
       const text = (composer.value || '').trim();
       const userMessage = {
         id: genId(),
@@ -2061,39 +2051,29 @@ async function sendAttachmentNow(){
         meta: {}
       };
 
+      // append locally
       messages.push(userMessage);
       appendMessage(userMessage, messages.length - 1);
       saveSession();
 
+      // clear composer & preview
       composer.value = '';
       updateSendVisibility();
       autoGrowTextarea();
       try { if(pendingAttachment && pendingAttachment._objectUrl) URL.revokeObjectURL(pendingAttachment._objectUrl); } catch(e){}
 
+      // persist to server
       postMessageToServer(userMessage).catch(err => {
         console.warn('postMessageToServer failed for attachment message', err);
         scheduleSync();
       });
 
-      // analyze attachment now (after it is sent)
-      let analysisAppended = false;
-      try {
-        const urlToAnalyze = userMessage.attachment.url || userMessage.attachment.src || null;
-        if (urlToAnalyze) {
-          const r = await analyzeFileWithPuter(urlToAnalyze);
-          if (r) analysisAppended = true;
-        }
-      } catch (err) {
-        console.warn('Attachment analysis failed', err);
-      }
-
-      // cleanup UI state
+      // cleanup
       clearPreview();
       pendingAttachment = null;
 
-      if (!analysisAppended) {
-        regenerateAssistantForParent(messages.length - 1);
-      }
+      // assistant reply
+      regenerateAssistantForParent(messages.length - 1);
     }
 
   } catch (e){
@@ -2301,134 +2281,74 @@ function uploadFileToServer(file, onProgress){
     }
   });
 }
-      // ===== helper: normalize/parse Puter result into readable text =====
-function parsePuterResult(res) {
-  try {
-    if (!res) return null;
-    if (typeof res === 'string') return res;
-    // common Puter shape: { message: { content: "..." } }
-    if (res.message && (res.message.content || res.message.text)) return res.message.content || res.message.text;
-    // direct text-like fields
-    if (typeof res.text === 'string') return res.text;
-    if (typeof res.description === 'string') return res.description;
-    if (typeof res.summary === 'string') return res.summary;
-    // choices array (some completions)
-    if (Array.isArray(res.choices) && res.choices.length) {
-      const c = res.choices[0];
-      if (c.text) return c.text;
-      if (c.message && (c.message.content || c.message.text)) return c.message.content || c.message.text;
-    }
-    // output/data fields
-    if (typeof res.output === 'string') return res.output;
-    if (res.output && typeof res.output === 'object') {
-      try { return JSON.stringify(res.output); } catch(_) {}
-    }
-    if (res.data && typeof res.data === 'string') return res.data;
-    // final fallback: stringify object but try to keep it short
-    const txt = JSON.stringify(res);
-    return txt.length > 14000 ? txt.slice(0,14000) + '…' : txt;
-  } catch (e) {
-    try { return String(res); } catch(_) { return null; }
-  }
-}
-      // ✅ تحليل صورة عبر Puter (يستخدم puter.ai.chat)
-// تضع صورة عامة (URL أو data URL) كـ imageUrl
+      // ✅ دالة تحليل الصور باستخدام Puter
 async function analyzeImageWithPuter(imageUrl) {
   try {
     if (!imageUrl) return null;
-    // show typing indicator to improve UX (if implemented)
+
     const typingEl = (typeof showTyping === 'function') ? showTyping() : null;
 
     if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
       try {
-        const prompt = `صف محتوى الصورة باختصار (عناصر رئيسية، ألوان / حالة)، وحاول استخراج أي نص ظاهر داخل الصورة إن وُجد. أعطِ ملخصاً قصيراً ونقاطاً.`;
-        const puterResp = await puter.ai.chat(prompt, imageUrl, { model: 'gpt-5-nano' });
-        const text = parsePuterResult(puterResp);
-        if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
+        const prompt = `صف محتوى الصورة باختصار (عناصر رئيسية، ألوان/حالة)، وحاول استخراج أي نص ظاهر داخل الصورة.`;
+        const puterResp = await puter.ai.chat(prompt, imageUrl, { model: "gpt-5-nano" });
 
-        if (text) {
-          const botMsg = { id: genId(), role: 'assistant', content: String(text).trim(), meta: {} };
+        const analysisText = (typeof puterResp === 'string')
+          ? puterResp
+          : (puterResp && (puterResp.text || puterResp.description || JSON.stringify(puterResp)));
+
+        if (typingEl && typingEl.parentNode) typingEl.remove();
+
+        if (analysisText) {
+          const botMsg = { id: genId(), role: 'assistant', content: analysisText.slice(0,15000), meta: {} };
           messages.push(botMsg);
           appendMessage(botMsg, messages.length - 1);
-          try { saveSession(); } catch(_) {}
+          saveSession?.();
         }
+
         return puterResp;
       } catch (err) {
-        console.warn('analyzeImageWithPuter (puter.ai.chat) failed', err);
-        if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
-        return null;
+        console.warn('analyzeImageWithPuter failed', err);
       }
-    } else {
-      if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
-      return null;
     }
+
+    if (typingEl && typingEl.parentNode) typingEl.remove();
+    return null;
   } catch (e) {
     console.error('analyzeImageWithPuter error', e);
     return null;
   }
 }
 
-// ✅ تحليل ملف عام (URL أو File object)
-// - لو string وامتداد صورة => ينادي analyzeImageWithPuter
-// - لو URL غير صورة -> يرسل طلب Puter (chat) يطلب تحليل الملف عند الرابط
-// - لو File نصّي (js,json,txt,html,css,md...) -> يقرأ محتواه ويرسله للتحليل
+// ✅ دالة تحليل الملفات باستخدام Puter
 async function analyzeFileWithPuter(fileOrUrl) {
   try {
     const appendAssistantText = (text) => {
       if (!text) return;
-      const botMsg = { id: genId(), role: 'assistant', content: String(text).trim(), meta: {} };
+      const botMsg = { id: genId(), role: 'assistant', content: text.slice(0,15000), meta: {} };
       messages.push(botMsg);
       appendMessage(botMsg, messages.length - 1);
-      try { saveSession(); } catch(_) {}
+      saveSession?.();
     };
 
-    // string (URL or data URL)
     if (typeof fileOrUrl === 'string') {
       const lower = fileOrUrl.toLowerCase();
-      if (lower.startsWith('data:image/') || /\.(png|jpe?g|webp|gif|bmp)(?:[?#].*)?$/.test(lower)) {
-        // image-like -> reuse image analyzer
+      if (lower.match(/\.(png|jpe?g|webp|gif|bmp)(?:[?#].*)?$/)) {
         return analyzeImageWithPuter(fileOrUrl);
       } else {
         if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
           try {
-            const prompt = `Please analyze the file at this URL: ${fileOrUrl}\nSummarize and extract any human-readable text if present.`;
-            const r = await puter.ai.chat(prompt, null, { model: 'gpt-5-nano' });
-            const txt = parsePuterResult(r);
+            const prompt = `حلل هذا الملف (ملخص، أي نص داخله، نوع الملف): ${fileOrUrl}`;
+            const r = await puter.ai.chat(prompt, null, { model: "gpt-5-nano" });
+            const txt = (typeof r === 'string') ? r : (r?.text || r?.summary || JSON.stringify(r));
             appendAssistantText(txt);
             return r;
           } catch (e) {
             console.warn('analyzeFileWithPuter via URL failed', e);
-            return null;
           }
         }
-        return null;
       }
     }
-
-    // File object (local upload)
-    if (fileOrUrl instanceof File) {
-      const ext = (fileOrUrl.name || '').split('.').pop().toLowerCase();
-      // text-like files
-      const textLike = ['txt','json','js','html','htm','css','py','md','xml','csv'];
-      if (textLike.includes(ext)) {
-        try {
-          const txtContent = await fileOrUrl.text();
-          if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
-            const prompt = `حلل هذا الملف (${ext}). أعطِ ملخصاً ونقاطاً مهمة، واستخراج أي نص واضح:\n\n${txtContent.slice(0, 8000)}`;
-            const r = await puter.ai.chat(prompt, null, { model: 'gpt-5-nano' });
-            const parsed = parsePuterResult(r);
-            appendAssistantText(parsed);
-            return r;
-          }
-        } catch (e) {
-          console.warn('analyzeFileWithPuter read text failed', e);
-        }
-      }
-      // For binary/PDF/complex files we return null here; recommend server extractor
-      toast('File analysis for PDF/binary files requires a server-side extractor (upload & parse).');
-      return null;
-    }
-
     return null;
   } catch (e) {
     console.error('analyzeFileWithPuter error', e);
