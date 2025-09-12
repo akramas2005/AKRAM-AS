@@ -1666,16 +1666,6 @@ function showImagePreview(file){
 
         toast('Upload complete! Click send to post it.');
         updateSendVisibility();
-
-        // optional: analyze image if function present
-        try {
-          if (typeof analyzeImageWithPuter === 'function') {
-            analyzeImageWithPuter(result.url).catch(()=>{});
-          } else if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.vision === 'function') {
-            // if puter has a vision API
-            (async ()=>{ try { await puter.ai.vision(result.url); } catch(e){} })();
-          }
-        } catch(e){}
       }).catch(err => {
         console.error('upload failed', err);
         pendingAttachment.uploadState = 'failed';
@@ -1857,13 +1847,6 @@ function showFilePreview(file){
 
       toast('Upload complete! Click send to post it.');
       updateSendVisibility();
-
-      // optional: if it's an image-like file or you want to analyze general files
-      try {
-        if (typeof analyzeImageWithPuter === 'function') {
-          analyzeImageWithPuter(result.url).catch(()=>{});
-        }
-      } catch(e){}
     }).catch(err => {
       console.error('retry upload failed', err);
       pendingAttachment.uploadState = 'failed';
