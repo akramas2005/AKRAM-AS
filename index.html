@@ -1171,44 +1171,6 @@
       t.classList.add('show');
       setTimeout(()=> t.classList.remove('show'), duration);
     }
-    // helper: try to initialize SVG rect stroke length safely (retries via rAF)
-function ensureRectInitialized(rect, cb) {
-  let attempts = 0;
-  function tryInit() {
-    try {
-      if (!rect || typeof rect.getTotalLength !== 'function') throw new Error('no-getTotalLength');
-      const len = rect.getTotalLength();
-      rect._totalLen = len;
-      rect.style.strokeDasharray = String(len);
-      rect.style.strokeDashoffset = String(len); // hide initially
-      rect.style.transition = 'stroke-dashoffset 120ms linear, opacity .6s ease';
-      if (typeof cb === 'function') cb(len);
-      return;
-    } catch (err) {
-      attempts++;
-      if (attempts < 8) {
-        // try next paint frame
-        requestAnimationFrame(tryInit);
-      } else {
-        console.warn('ensureRectInitialized failed after retries', err);
-        if (typeof cb === 'function') cb(null);
-      }
-    }
-  }
-  tryInit();
-}
-
-// helper to set progress (uses stored _totalLen if available)
-function setRectProgress(rect, pct) {
-  try {
-    const len = rect && (rect._totalLen || (typeof rect.getTotalLength === 'function' ? rect.getTotalLength() : null));
-    if (!len && len !== 0) return;
-    const draw = Math.max(0, Math.round(len * (1 - (Number(pct) || 0) / 100)));
-    rect.style.strokeDashoffset = String(draw);
-  } catch (e) {
-    // ignore
-  }
-}
 
     // copy helper with fallback (fixes mobile "copy not available")
     async function copyTextToClipboard(text){
@@ -1294,38 +1256,10 @@ function setRectProgress(rect, pct) {
       document.body.appendChild(imageInput);
       document.body.appendChild(fileInput);
 
-      // allowed types (extensions)
-const allowedExt = [
-  // صور
-  'png','jpg','jpeg','webp','gif','bmp','svg',
-
-  // نصوص وأكواد
-  'txt','md','log','json','js','ts','css','html','htm','xml','csv','yml','yaml',
-
-  // مستندات
-  'pdf','doc','docx','ppt','pptx','xls','xlsx'
-];
-
-// السماح بأي نوع يبدأ بـ image/ + بعض الأنواع الإضافية
-const allowedMimePrefixes = ['image/'];
-
-// أنواع إضافية صريحة
-const allowedMimesExtra = [
-  'application/pdf',
-  'text/plain',
-  'text/html',
-  'application/json',
-  'application/javascript',
-  'text/css',
-  'application/xml',
-  'text/csv',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // docx
-  'application/msword',
-  'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'application/vnd.ms-powerpoint',
-  'application/vnd.openxmlformats-officedocument.presentationml.presentation'
-];
+      // allowed types
+      const allowedExt = ['png','jpg','jpeg','webp','gif','bmp','pdf','txt','html','htm'];
+      const allowedMimePrefixes = ['image/'];
+      const allowedMimesExtra = ['application/pdf','text/plain','text/html'];
 
       // pendingAttachment holds current file preview & upload state
       let pendingAttachment = null;
@@ -1578,6 +1512,7 @@ function showImagePreview(file){
     rect.setAttribute('stroke-width', '4');
     rect.setAttribute('stroke-linecap', 'round');
     rect.setAttribute('stroke-linejoin', 'round');
+    rect.style.transition = 'stroke-dashoffset 120ms linear, opacity .6s ease';
 
     svgEl.appendChild(rect);
     outer.appendChild(svgEl);
@@ -1595,12 +1530,10 @@ function showImagePreview(file){
     retry.innerHTML = '↻';
     outer.appendChild(retry);
 
-    // زر الإغلاق مخفي حتى ينتهي الرفع (أو يحدث فشل)
     const closeBtn = document.createElement('button');
     closeBtn.className = 'thumb-close';
     closeBtn.title = 'Remove';
     closeBtn.innerText = '×';
-    closeBtn.style.display = 'none';
     outer.appendChild(closeBtn);
 
     filePreviewContainer.appendChild(outer);
@@ -1608,10 +1541,10 @@ function showImagePreview(file){
 
     const reader = new FileReader();
     reader.onload = function(ev){
-      // show image
+      // عرض الصورة من الـ data URL
       imgEl.src = ev.target.result;
 
-      // prepare pendingAttachment
+      // أنشئ pendingAttachment
       pendingAttachment = {
         type: 'image',
         name: file.name,
@@ -1621,29 +1554,34 @@ function showImagePreview(file){
         progress: 0,
         uploadState: 'pending',
         sendOnComplete: false,
-        _sending: false,
-        _outer: outer,
-        _rect: rect
+        _sending: false
       };
 
+      pendingAttachment._outer = outer;
+      pendingAttachment._rect = rect;
       updateSendVisibility();
 
-      // ensure rect length is initialized (safely)
-      ensureRectInitialized(rect, (len)=>{
-        // rect initialized (or failed). if there's already some progress, reflect it
-        try { setRectProgress(rect, pendingAttachment.progress || 0); } catch(e){}
-      });
+      // 🔹 تهيئة شريط التقدم من البداية
+      if (rect && typeof rect.getTotalLength === 'function') {
+        const len = rect.getTotalLength();
+        rect.style.strokeDasharray = String(len);
+        rect.style.strokeDashoffset = len; // يبدأ فارغ (0%)
+      }
 
-      // start real upload (with progress callback)
+      // 🔹 ابدأ الرفع الفعلي مع التقدم
       uploadFileToServer(file, (pct, loaded, total) => {
         try {
           pendingAttachment.progress = pct;
           pendingAttachment.uploadState = 'uploading';
-          setRectProgress(rect, pct);
+          if (rect && typeof rect.getTotalLength === 'function') {
+            const len = rect.getTotalLength();
+            const draw = Math.max(0, Math.round(len * (1 - (pct/100))));
+            rect.style.strokeDashoffset = draw;
+          }
           updateSendVisibility();
         } catch(_){}
       }).then(result => {
-        // success
+        // نجاح الرفع — خزّن بيانات الملف من السيرفر
         pendingAttachment.uploadState = 'done';
         pendingAttachment.progress = 100;
         pendingAttachment.id = result.id;
@@ -1652,93 +1590,93 @@ function showImagePreview(file){
         pendingAttachment.mime_type = result.mime_type;
         pendingAttachment._uploadResult = result;
 
-        // show close button now that file is uploaded
-        try { closeBtn.style.display = 'block'; } catch(e){}
+        if (outer) {
+  outer.classList.add('upload-complete');
+  // 🟢 بدلاً من clearPreview، خلينا فقط ننظف حلقة التقدم ونترك الصورة
+  setTimeout(()=> { 
+    try { outer.classList.add('clean-ring'); } catch(e){}
+  }, 600);
+}
 
+        // تحديث الشكل النهائي للحلقة
         try {
-          setRectProgress(rect, 100);
+          if (rect && typeof rect.getTotalLength === 'function') rect.style.strokeDashoffset = 0;
           if (outer) {
             outer.classList.remove('uploading','upload-failed');
             outer.classList.add('upload-complete');
             setTimeout(()=>{ try{ outer.classList.add('clean-ring'); }catch(e){} }, 600);
           }
         } catch(e){}
-
         toast('Upload complete! Click send to post it.');
         updateSendVisibility();
-
-        // optional: analyze image if function present
-        try {
-          if (typeof analyzeImageWithPuter === 'function') {
-            analyzeImageWithPuter(result.url).catch(()=>{});
-          } else if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.vision === 'function') {
-            // if puter has a vision API
-            (async ()=>{ try { await puter.ai.vision(result.url); } catch(e){} })();
-          }
-        } catch(e){}
       }).catch(err => {
         console.error('upload failed', err);
         pendingAttachment.uploadState = 'failed';
         pendingAttachment.progress = 0;
-        try {
-          if (outer) { outer.classList.remove('uploading'); outer.classList.add('upload-failed'); }
-          // show close so user can remove failed preview
-          closeBtn.style.display = 'block';
-        } catch(e){}
+        try { if (outer) { outer.classList.remove('uploading'); outer.classList.add('upload-failed'); } } catch(e){}
         toast('Upload failed, try again.');
         updateSendVisibility();
       });
     };
     reader.readAsDataURL(file);
 
-    // close button: delete remote file (if uploaded) and clear preview
+    // زر الإغلاق
     closeBtn.addEventListener('click', async (ev)=>{
       ev.preventDefault();
       try {
-        const remoteId = pendingAttachment && (pendingAttachment.id || (pendingAttachment._uploadResult && pendingAttachment._uploadResult.id));
-        if (remoteId) {
-          await fetch(API_BASE + '/api/files/' + remoteId, { method: 'DELETE' }).catch(()=>{});
+        if (pendingAttachment && pendingAttachment.id) {
+          await fetch(API_BASE + '/api/files/' + pendingAttachment.id, { method: 'DELETE' }).catch(()=>{});
         }
       } catch(e){
         console.warn('delete failed', e);
       }
-      try { if (pendingAttachment && pendingAttachment._objectUrl) URL.revokeObjectURL(pendingAttachment._objectUrl); } catch(e){}
+      // cleanup
+      try { 
+        if (pendingAttachment && pendingAttachment._objectUrl) {
+          URL.revokeObjectURL(pendingAttachment._objectUrl); 
+        } 
+      } catch(e){}
       clearPreview();
       pendingAttachment = null;
       updateSendVisibility();
     });
 
-    // retry button
+    // زر الإعادة
     retry.addEventListener('click', (ev)=>{
       ev.preventDefault();
-      if(!pendingAttachment || !pendingAttachment.file) return;
+      if(!pendingAttachment) return;
       pendingAttachment.progress = 0;
       pendingAttachment.uploadState = 'pending';
       outer.classList.remove('upload-failed','upload-complete','clean-ring');
-      // restart upload
-      uploadFileToServer(pendingAttachment.file, (pct)=> {
-        try {
-          pendingAttachment.progress = pct;
-          pendingAttachment.uploadState = 'uploading';
-          setRectProgress(rect, pct);
+
+      if (pendingAttachment.file) {
+        uploadFileToServer(pendingAttachment.file, (pct)=> {
+          try {
+            pendingAttachment.progress = pct;
+            pendingAttachment.uploadState = 'uploading';
+            if (rect && typeof rect.getTotalLength === 'function') {
+              const len = rect.getTotalLength();
+              const draw = Math.max(0, Math.round(len * (1 - (pct/100))));
+              rect.style.strokeDashoffset = draw;
+            }
+            updateSendVisibility();
+          } catch(e){}
+        }).then(result => {
+          pendingAttachment.uploadState = 'done';
+          pendingAttachment.progress = 100;
+          pendingAttachment.id = result.id;
+          pendingAttachment.url = result.url;
+          pendingAttachment.filename = result.filename;
+          pendingAttachment.mime_type = result.mime_type;
+          pendingAttachment._uploadResult = result;
           updateSendVisibility();
-        } catch(e){}
-      }).then(result => {
-        pendingAttachment.uploadState = 'done';
-        pendingAttachment.progress = 100;
-        pendingAttachment.id = result.id;
-        pendingAttachment.url = result.url;
-        pendingAttachment.filename = result.filename;
-        pendingAttachment.mime_type = result.mime_type;
-        pendingAttachment._uploadResult = result;
-        try { closeBtn.style.display = 'block'; } catch(e){}
-        updateSendVisibility();
-        toast('Upload complete! Click send to post it.');
-      }).catch(err => {
-        console.warn('retry upload failed', err);
-        pendingAttachment.uploadState = 'failed';
-        updateSendVisibility();
-      });
+          toast('Upload complete! Click send to post it.');
+        }).catch(err => {
+          console.warn('retry upload failed', err);
+          pendingAttachment.uploadState = 'failed';
+          updateSendVisibility();
+        });
+      }
     });
 
   } catch(e){
@@ -1773,6 +1711,7 @@ function showFilePreview(file){
     rect.setAttribute('stroke-width', '4');
     rect.setAttribute('stroke-linecap', 'round');
     rect.setAttribute('stroke-linejoin', 'round');
+    rect.style.transition = 'stroke-dashoffset 120ms linear, opacity .6s ease';
 
     svgEl.appendChild(rect);
     outer.appendChild(svgEl);
@@ -1796,11 +1735,25 @@ function showFilePreview(file){
     closeBtn.className = 'thumb-close';
     closeBtn.title = 'Remove';
     closeBtn.innerText = '×';
-    closeBtn.style.display = 'none'; // hidden until upload done/failed
     outer.appendChild(closeBtn);
 
     filePreviewContainer.appendChild(outer);
     updateComposerSpacing();
+
+    // 🟢 جهز stroke بعد ما أضفنا العنصر للـ DOM
+    requestAnimationFrame(() => {
+      try {
+        if (rect && typeof rect.getTotalLength === 'function') {
+          const totalLen = rect.getTotalLength();
+          rect.style.strokeDasharray = String(totalLen);
+          rect.style.strokeDashoffset = String(totalLen); // يبدأ فارغ (0%)
+          rect.style.transition = 'stroke-dashoffset 180ms linear, opacity .6s ease';
+          if (pendingAttachment) pendingAttachment._totalLen = totalLen;
+        }
+      } catch(e) {
+        console.error('file stroke init error', e);
+      }
+    });
 
     const objectUrl = URL.createObjectURL(file);
 
@@ -1820,21 +1773,21 @@ function showFilePreview(file){
     };
     updateSendVisibility();
 
-    // ensure rect initialized safely
-    ensureRectInitialized(rect, (len) => {
-      // reflect any existing progress
-      try { setRectProgress(rect, pendingAttachment.progress || 0); } catch(e){}
-    });
-
-    // ---- start real upload immediately for files ----
+    // ---- start real upload immediately for files (same behavior as images) ----
     uploadFileToServer(file, (pct, loaded, total) => {
       try {
         pendingAttachment.progress = pct;
         pendingAttachment.uploadState = 'uploading';
-        setRectProgress(rect, pct);
+        // update svg ring
+        if (rect && typeof rect.getTotalLength === 'function') {
+          const len = rect.getTotalLength();
+          const draw = Math.max(0, Math.round(len * (1 - (pct/100))));
+          rect.style.strokeDashoffset = draw;
+        }
         updateSendVisibility();
       } catch(_){}
     }).then(result => {
+      // success
       pendingAttachment.uploadState = 'done';
       pendingAttachment.progress = 100;
       pendingAttachment.id = result.id;
@@ -1843,8 +1796,9 @@ function showFilePreview(file){
       pendingAttachment.mime_type = result.mime_type;
       pendingAttachment._uploadResult = result;
 
+      // visual finish
       try {
-        setRectProgress(rect, 100);
+        if (rect && typeof rect.getTotalLength === 'function') rect.style.strokeDashoffset = 0;
         if (outer) {
           outer.classList.remove('uploading','upload-failed');
           outer.classList.add('upload-complete');
@@ -1852,78 +1806,16 @@ function showFilePreview(file){
         }
       } catch(e){}
 
-      // show delete X now
-      try { closeBtn.style.display = 'block'; } catch(e){}
-
       toast('Upload complete! Click send to post it.');
       updateSendVisibility();
-
-      // optional: if it's an image-like file or you want to analyze general files
-      try {
-        if (typeof analyzeImageWithPuter === 'function') {
-          analyzeImageWithPuter(result.url).catch(()=>{});
-        }
-      } catch(e){}
     }).catch(err => {
       console.error('retry upload failed', err);
       pendingAttachment.uploadState = 'failed';
       pendingAttachment.progress = 0;
       try { if (outer) { outer.classList.remove('uploading'); outer.classList.add('upload-failed'); } } catch(e){}
-      // show delete so user can remove failed preview
-      try { closeBtn.style.display = 'block'; } catch(e){}
       toast('Upload failed, try again.');
       updateSendVisibility();
     });
-
-    // close button: delete remote file + cleanup
-    closeBtn.addEventListener('click', async (ev)=>{
-      ev.preventDefault();
-      try {
-        const remoteId = pendingAttachment && (pendingAttachment.id || (pendingAttachment._uploadResult && pendingAttachment._uploadResult.id));
-        if (remoteId) {
-          await fetch(API_BASE + '/api/files/' + remoteId, { method: 'DELETE' }).catch(()=>{});
-        }
-      } catch(e){
-        console.warn('delete failed', e);
-      }
-      try { if (pendingAttachment && pendingAttachment._objectUrl) URL.revokeObjectURL(pendingAttachment._objectUrl); } catch(e){}
-      clearPreview();
-      pendingAttachment = null;
-      updateSendVisibility();
-    });
-
-    // retry overlay — re-run the real upload
-    retry.addEventListener('click', (ev)=>{
-      ev.preventDefault();
-      if(!pendingAttachment || !pendingAttachment.file) return;
-      pendingAttachment.progress = 0;
-      pendingAttachment.uploadState = 'pending';
-      outer.classList.remove('upload-failed','upload-complete','clean-ring');
-      uploadFileToServer(pendingAttachment.file, (pct)=> {
-        try {
-          pendingAttachment.progress = pct;
-          pendingAttachment.uploadState = 'uploading';
-          setRectProgress(rect, pct);
-          updateSendVisibility();
-        } catch(e){}
-      }).then(result => {
-        pendingAttachment.uploadState = 'done';
-        pendingAttachment.progress = 100;
-        pendingAttachment.id = result.id;
-        pendingAttachment.url = result.url;
-        pendingAttachment.filename = result.filename;
-        pendingAttachment.mime_type = result.mime_type;
-        pendingAttachment._uploadResult = result;
-        try { closeBtn.style.display = 'block'; } catch(e){}
-        updateSendVisibility();
-        toast('Upload complete! Click send to post it.');
-      }).catch(err => {
-        console.warn('retry upload failed', err);
-        pendingAttachment.uploadState = 'failed';
-        updateSendVisibility();
-      });
-    });
-
   } catch(e){
     console.error('preview file error', e);
   }
@@ -2280,80 +2172,6 @@ function uploadFileToServer(file, onProgress){
       reject(err);
     }
   });
-}
-      // ✅ دالة تحليل الصور باستخدام Puter
-async function analyzeImageWithPuter(imageUrl) {
-  try {
-    if (!imageUrl) return null;
-
-    const typingEl = (typeof showTyping === 'function') ? showTyping() : null;
-
-    if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
-      try {
-        const prompt = `صف محتوى الصورة باختصار (عناصر رئيسية، ألوان/حالة)، وحاول استخراج أي نص ظاهر داخل الصورة.`;
-        const puterResp = await puter.ai.chat(prompt, imageUrl, { model: "gpt-5-nano" });
-
-        const analysisText = (typeof puterResp === 'string')
-          ? puterResp
-          : (puterResp && (puterResp.text || puterResp.description || JSON.stringify(puterResp)));
-
-        if (typingEl && typingEl.parentNode) typingEl.remove();
-
-        if (analysisText) {
-          const botMsg = { id: genId(), role: 'assistant', content: analysisText.slice(0,15000), meta: {} };
-          messages.push(botMsg);
-          appendMessage(botMsg, messages.length - 1);
-          saveSession?.();
-        }
-
-        return puterResp;
-      } catch (err) {
-        console.warn('analyzeImageWithPuter failed', err);
-      }
-    }
-
-    if (typingEl && typingEl.parentNode) typingEl.remove();
-    return null;
-  } catch (e) {
-    console.error('analyzeImageWithPuter error', e);
-    return null;
-  }
-}
-
-// ✅ دالة تحليل الملفات باستخدام Puter
-async function analyzeFileWithPuter(fileOrUrl) {
-  try {
-    const appendAssistantText = (text) => {
-      if (!text) return;
-      const botMsg = { id: genId(), role: 'assistant', content: text.slice(0,15000), meta: {} };
-      messages.push(botMsg);
-      appendMessage(botMsg, messages.length - 1);
-      saveSession?.();
-    };
-
-    if (typeof fileOrUrl === 'string') {
-      const lower = fileOrUrl.toLowerCase();
-      if (lower.match(/\.(png|jpe?g|webp|gif|bmp)(?:[?#].*)?$/)) {
-        return analyzeImageWithPuter(fileOrUrl);
-      } else {
-        if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
-          try {
-            const prompt = `حلل هذا الملف (ملخص، أي نص داخله، نوع الملف): ${fileOrUrl}`;
-            const r = await puter.ai.chat(prompt, null, { model: "gpt-5-nano" });
-            const txt = (typeof r === 'string') ? r : (r?.text || r?.summary || JSON.stringify(r));
-            appendAssistantText(txt);
-            return r;
-          } catch (e) {
-            console.warn('analyzeFileWithPuter via URL failed', e);
-          }
-        }
-      }
-    }
-    return null;
-  } catch (e) {
-    console.error('analyzeFileWithPuter error', e);
-    return null;
-  }
 }
 
       function saveDraft(){ localStorage.setItem(DRAFT_KEY, composer.value || ''); }
@@ -3988,204 +3806,6 @@ else if (act === 'sendFeedback') {
           if(chatPanel.classList.contains('show')){ closeChatSimple(); return; }
         }
       });
-      // ✅ دالة تحليل الصور والملفات باستخدام Puter
-async function analyzeImageWithPuter(imageUrl) {
-  try {
-    if (!imageUrl) return null;
-
-    // show typing indicator (if available) so UX feels like assistant is thinking
-    const typingEl = (typeof showTyping === 'function') ? showTyping() : null;
-
-    // 1) Prefer Puter client SDK if loaded and supports .chat
-    if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
-      try {
-        // Prompt instructs model to describe + extract visible text
-        const prompt = `صف محتوى الصورة باختصار (عناصر رئيسية، ألوان/حالة)، وحاول استخراج أي نص ظاهر داخل الصورة إن وُجد. أعطِ ملخصاً قصيراً ونقاطاً.`;
-
-        // Example from their playground: puter.ai.chat(prompt, imageUrl, { model: 'gpt-5-nano' })
-        const puterResp = await puter.ai.chat(prompt, imageUrl, { model: 'gpt-5-nano' });
-
-        // puterResp can be a string or an object — coerce to readable
-        const analysisText = (typeof puterResp === 'string')
-          ? puterResp
-          : (puterResp && (puterResp.text || puterResp.description || JSON.stringify(puterResp)));
-
-        // remove typing indicator and append assistant reply
-        if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
-
-        if (analysisText) {
-          const botMsg = { id: genId(), role: 'assistant', content: String(analysisText).slice(0,15000), meta: {} };
-          messages.push(botMsg);
-          appendMessage(botMsg, messages.length - 1);
-          try { saveSession(); } catch(_) {}
-        }
-
-        return puterResp;
-      } catch (err) {
-        console.warn('analyzeImageWithPuter (puter.ai.chat) failed', err);
-        // fall through to backend fallback
-      }
-    }
-
-    // 2) Fallback to your backend vision endpoint (POST /api/vision expecting { image_url })
-    if (typeof API_BASE === 'string' && API_BASE) {
-      try {
-        const resp = await fetch(API_BASE + '/api/vision', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image_url: imageUrl })
-        });
-        if (!resp.ok) throw new Error('vision api failed: ' + resp.status);
-        const data = await resp.json();
-        const analysisText = data && (data.description || data.text || data.summary || JSON.stringify(data));
-
-        if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
-
-        if (analysisText) {
-          const botMsg = { id: genId(), role: 'assistant', content: String(analysisText).slice(0,15000), meta: {} };
-          messages.push(botMsg);
-          appendMessage(botMsg, messages.length - 1);
-          try { saveSession(); } catch(_) {}
-        }
-        return data;
-      } catch (e) {
-        console.warn('analyzeImageWithPuter fallback failed', e);
-      }
-    }
-
-    // cleanup typing if still present
-    if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
-    return null;
-  } catch (e) {
-    console.error('analyzeImageWithPuter error', e);
-    return null;
-  }
-}
-
-// analyze an arbitrary File object or a public URL.
-// - If it's an image -> call analyzeImageWithPuter(urlOrDataUrl)
-// - If it's a text-like file -> read text client-side and ask Puter to analyze content
-// - For PDFs / binary files: best to upload and let server extract text, then call Puter on the extracted text.
-async function analyzeFileWithPuter(fileOrUrl) {
-  try {
-    // helper to append assistant reply text
-    const appendAssistantText = (text) => {
-      if (!text) return;
-      const botMsg = { id: genId(), role: 'assistant', content: String(text).slice(0,15000), meta: {} };
-      messages.push(botMsg);
-      appendMessage(botMsg, messages.length - 1);
-      try { saveSession(); } catch(_) {}
-    };
-
-    // if argument is a string -> treat as URL
-    if (typeof fileOrUrl === 'string') {
-      // basic image extension test
-      const lower = fileOrUrl.toLowerCase();
-      if (lower.startsWith('data:image/') || /\.(png|jpe?g|webp|gif|bmp)(?:[?#].*)?$/.test(lower)) {
-        return analyzeImageWithPuter(fileOrUrl);
-      } else {
-        // try Puter with URL as "context" (some endpoints accept arbitrary URLs but not guaranteed)
-        // We'll attempt a generic chat call asking to inspect the resource at that URL.
-        if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
-          try {
-            const prompt = `Please analyze the file at this URL (summarize, extract any human-readable text, note format): ${fileOrUrl}`;
-            const r = await puter.ai.chat(prompt, null, { model: 'gpt-5-nano' });
-            const txt = (typeof r === 'string') ? r : (r && (r.text || r.summary || JSON.stringify(r)));
-            appendAssistantText(txt);
-            return r;
-          } catch (e) {
-            console.warn('analyzeFileWithPuter via URL failed', e);
-          }
-        }
-        // otherwise fallback to server-side analyze endpoint
-        if (typeof API_BASE === 'string' && API_BASE) {
-          try {
-            const resp = await fetch(API_BASE + '/api/vision', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ file_url: fileOrUrl })
-            });
-            if (!resp.ok) throw new Error('vision api failed: ' + resp.status);
-            const data = await resp.json();
-            const analysisText = data && (data.description || data.text || data.summary || JSON.stringify(data));
-            appendAssistantText(analysisText);
-            return data;
-          } catch (e) {
-            console.warn('analyzeFileWithPuter (server) failed', e);
-            return null;
-          }
-        }
-        return null;
-      }
-    }
-
-    // if argument is a File object
-    if (fileOrUrl instanceof File) {
-      const f = fileOrUrl;
-      if (f.type && f.type.startsWith('image/')) {
-        // read dataURL and analyze (Puter example supports URL; dataURL often works)
-        const dataUrl = await new Promise((res, rej) => {
-          const r = new FileReader();
-          r.onload = () => res(r.result);
-          r.onerror = rej;
-          r.readAsDataURL(f);
-        });
-        return analyzeImageWithPuter(dataUrl);
-      }
-
-      // text-like content (js, json, txt, html, css...)
-      const textLike = (f.type && (f.type.startsWith('text/') || f.type === 'application/json' || f.name.match(/\.(js|json|txt|html?|css|md|py|java|c|cpp|rb)$/i)));
-      if (textLike) {
-        const txt = await new Promise((res, rej) => {
-          const r = new FileReader();
-          r.onload = () => res(String(r.result || ''));
-          r.onerror = rej;
-          r.readAsText(f);
-        });
-        // send text directly to Puter (or fallback to server)
-        if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
-          try {
-            const prompt = `You are an assistant. Analyze and summarize the following file contents. If code, highlight main functions/issues. Provide a concise Arabic summary:\n\n`;
-            const r = await puter.ai.chat(prompt + txt, null, { model: 'gpt-5-nano' });
-            const analysisText = (typeof r === 'string') ? r : (r && (r.text || r.summary || JSON.stringify(r)));
-            appendAssistantText(analysisText);
-            return r;
-          } catch (e) {
-            console.warn('analyzeFileWithPuter(text) failed', e);
-          }
-        }
-        // fallback: send file text to your backend (if you have analyze endpoint)
-        if (typeof API_BASE === 'string' && API_BASE) {
-          try {
-            const resp = await fetch(API_BASE + '/api/analyze-text-file', { // you may need to implement this endpoint
-              method: 'POST',
-              headers: {'Content-Type':'application/json'},
-              body: JSON.stringify({ filename: f.name, text: txt })
-            });
-            if (!resp.ok) throw new Error('server analyze failed: ' + resp.status);
-            const data = await resp.json();
-            appendAssistantText(data.summary || JSON.stringify(data));
-            return data;
-          } catch (e) {
-            console.warn('analyzeFileWithPuter(text -> server) failed', e);
-          }
-        }
-        return null;
-      }
-
-      // For PDF / complex binary files: recommend server-side extraction
-      toast('File analysis for PDF/binary files requires a server-side extractor (upload & parse).');
-      return null;
-    }
-
-    return null;
-  } catch (e) {
-    console.error('analyzeFileWithPuter error', e);
-    return null;
-  }
-}
-      puter.ai.chat(prompt, imageUrl, { model: 'gpt-5-nano' })
-
 
       // ensure history and savedConvos are up-to-date on load
       loadHistory();
