@@ -1934,7 +1934,7 @@ function parsePuterResult(res) {
       if (getString(res[k])) return res[k];
     }
 
-    // shape: { message: { content: ... } } or { message: { text: ... } }
+    // shape: { message: { content: ... } }
     if (res.message) {
       const c = res.message.content || res.message.text || res.message;
       if (getString(c)) return c;
@@ -1951,7 +1951,7 @@ function parsePuterResult(res) {
       }
     }
 
-    // choices array (some models)
+    // choices array
     if (Array.isArray(res.choices) && res.choices.length) {
       const c = res.choices[0];
       if (getString(c.text)) return c.text;
@@ -1978,12 +1978,9 @@ function parsePuterResult(res) {
       }
       return null;
     };
-    const leaf = findStringLeaf(res, 0);
-    if (leaf && leaf.length > 3) return leaf;
-
-    return null;
+    return findStringLeaf(res, 0);
   } catch (e) {
-    try { return (typeof res === 'string' ? res : null); } catch(_) { return null; }
+    return null;
   }
 }
 
@@ -1993,15 +1990,11 @@ async function analyzeImageWithPuter(imageUrl) {
     if (!imageUrl) return null;
 
     if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
-      try {
-        const prompt = `صف محتوى هذه الصورة باختصار (عناصر رئيسية، ألوان/حالة)، وحاول استخراج أي نص ظاهر داخلها.`;
-        const r = await puter.ai.chat(prompt, imageUrl, { model: "gpt-5-nano" });
-        const txt = parsePuterResult(r);
-        return txt; // فقط النص — لا تضيف رسالة هنا
-      } catch (err) {
-        console.warn('analyzeImageWithPuter (puter.ai.chat) failed', err);
-      }
+      const prompt = `صف محتوى هذه الصورة باختصار (عناصر رئيسية، ألوان/حالة)، وحاول استخراج أي نص ظاهر داخلها.`;
+      const r = await puter.ai.chat(prompt, imageUrl, { model: "gpt-5-nano" });
+      return parsePuterResult(r); // ✅ فقط نرجع النص
     }
+
     return null;
   } catch (e) {
     console.error('analyzeImageWithPuter error', e);
@@ -2009,7 +2002,7 @@ async function analyzeImageWithPuter(imageUrl) {
   }
 }
 
-// ===== analyze general file (File object or URL) - returns text or null =====
+// ===== analyze general file (returns plain text or null) =====
 async function analyzeFileWithPuter(fileOrUrl) {
   try {
     if (!fileOrUrl) return null;
@@ -2020,14 +2013,9 @@ async function analyzeFileWithPuter(fileOrUrl) {
         return analyzeImageWithPuter(fileOrUrl);
       }
       if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
-        try {
-          const prompt = `حلّل الملف الموجود على هذا الرابط بشكل مختصر (ملخص، أي نص داخلي): ${fileOrUrl}`;
-          const r = await puter.ai.chat(prompt, null, { model: "gpt-5-nano" });
-          return parsePuterResult(r);
-        } catch (e) {
-          console.warn('analyzeFileWithPuter via URL failed', e);
-          return null;
-        }
+        const prompt = `حلّل الملف الموجود على هذا الرابط بشكل مختصر (ملخص، أي نص داخلي): ${fileOrUrl}`;
+        const r = await puter.ai.chat(prompt, null, { model: "gpt-5-nano" });
+        return parsePuterResult(r); // ✅ نرجع النص فقط
       }
       return null;
     }
@@ -2039,9 +2027,9 @@ async function analyzeFileWithPuter(fileOrUrl) {
         try {
           const txtContent = await fileOrUrl.text();
           if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
-            const prompt = `حلل هذا الملف (${ext}) وقدم ملخصاً ونقاطاً مهمة، واذكر أي نص داخلي:\n\n${txtContent.slice(0,8000)}`;
+            const prompt = `حلل هذا الملف (${ext}) وقدم ملخصاً ونقاطاً مهمة:\n\n${txtContent.slice(0,8000)}`;
             const r = await puter.ai.chat(prompt, null, { model: "gpt-5-nano" });
-            return parsePuterResult(r);
+            return parsePuterResult(r); // ✅ نرجع النص فقط
           }
         } catch (e) {
           console.warn('analyzeFileWithPuter read text failed', e);
