@@ -2050,12 +2050,11 @@ try {
     appendMessage(botMsg, messages.length - 1);
     try { saveSession(); } catch(_) {}
   } else {
-    // fallback: استخدم مولد الرد الاعتيادي إن أردت
-    regenerateAssistantForParent(messages.length - 1);
+    // fallback: لا شيء. لا يوجد رد إذا فشل التحليل.
   }
 } catch (err) {
   console.warn('attachment analysis failed', err);
-  regenerateAssistantForParent(messages.length - 1);
+  // لا يوجد fallback. يمكن إضافة رسالة خطأ بسيطة هنا إن أردت.
 } finally {
   if (typingEl && typingEl.parentNode) {
     try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
@@ -2171,10 +2170,6 @@ try {
       // cleanup
       clearPreview();
       pendingAttachment = null;
-
-      // assistant reply
-      regenerateAssistantForParent(messages.length - 1);
-    }
 
   } catch (e) {
     console.error('sendAttachmentNow error', e);
