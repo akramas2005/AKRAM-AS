@@ -2454,15 +2454,6 @@ function uploadFileToServer(file, onProgress){
     }
   });
 }
-      // 🟢 دالة تنظيف نتائج Puter
-function parsePuterResult(r) {
-  if (!r) return '';
-  if (typeof r === 'string') return r;
-  if (r.text) return r.text;
-  if (r.description) return r.description;
-  if (r.summary) return r.summary;
-  return JSON.stringify(r, null, 2); // fallback مرتب بدل JSON خام
-}
 
 // 🟢 تحليل الصور
 async function analyzeImageWithPuter(imageUrl) {
@@ -2477,9 +2468,9 @@ async function analyzeImageWithPuter(imageUrl) {
 
       if (typingEl && typingEl.parentNode) typingEl.remove();
 
-      if (txt) appendAssistantText(txt);
-      return r;
-    }
+      if (txt) return txt; // فقط ترجع النص للتحليل
+return null;
+
 
     if (typingEl && typingEl.parentNode) typingEl.remove();
     return null;
@@ -2509,9 +2500,9 @@ async function analyzeFileWithPuter(fileOrUrl) {
 
       if (typingEl && typingEl.parentNode) typingEl.remove();
 
-      if (txt) appendAssistantText(txt);
-      return r;
-    }
+      if (txt) return txt; // فقط ترجع النص للتحليل
+return null;
+
 
     if (typingEl && typingEl.parentNode) typingEl.remove();
     return null;
