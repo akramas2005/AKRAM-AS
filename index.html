@@ -1687,14 +1687,7 @@ function showImagePreview(file){
     // close button: delete remote file (if uploaded) and clear preview
     closeBtn.addEventListener('click', async (ev)=>{
       ev.preventDefault();
-      try {
-        const remoteId = pendingAttachment && (pendingAttachment.id || (pendingAttachment._uploadResult && pendingAttachment._uploadResult.id));
-        if (remoteId) {
-          await fetch(API_BASE + '/api/files/' + remoteId, { method: 'DELETE' }).catch(()=>{});
-        }
-      } catch(e){
-        console.warn('delete failed', e);
-      }
+      
       try { if (pendingAttachment && pendingAttachment._objectUrl) URL.revokeObjectURL(pendingAttachment._objectUrl); } catch(e){}
       clearPreview();
       pendingAttachment = null;
@@ -4111,22 +4104,6 @@ async function analyzeImageWithPuter(imageUrl) {
       return txt || null;
     }
 
-    // (optional) server fallback: if you have API_BASE + /api/vision that returns description/text
-    if (typeof API_BASE === 'string' && API_BASE) {
-      try {
-        const resp = await fetch(API_BASE + '/api/vision', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image_url: imageUrl })
-        });
-        if (resp.ok) {
-          const data = await resp.json();
-          const txt = (data && (data.description || data.text || data.summary)) || null;
-          if (typingEl && typingEl.parentNode) typingEl.remove();
-          return txt || null;
-        }
-      } catch (_) { /* ignore */ }
-    }
 
     if (typingEl && typingEl.parentNode) typingEl.remove();
     return null;
