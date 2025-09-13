@@ -1961,14 +1961,21 @@ async function sendAttachmentNow() {
       if (userMessage.attachment && (typeof analyzeFileWithPuter === 'function' || typeof analyzeImageWithPuter === 'function')) {
         let res = null;
         if (typeof analyzeFileWithPuter === 'function') {
-          res = await analyzeFileWithPuter(userMessage.attachment.url || userMessage.attachment.src);
-        } else {
-          res = await analyzeImageWithPuter(userMessage.attachment.url || userMessage.attachment.src);
-        }
+  res = await analyzeFileWithPuter(userMessage.attachment.url || userMessage.attachment.src);
+} else if (typeof analyzeImageWithPuter === 'function' && userMessage.attachment.type === 'image') {
+  res = await analyzeImageWithPuter(userMessage.attachment.url || userMessage.attachment.src);
+}
 
         const parsed = (typeof parsePuterResult === 'function')
           ? parsePuterResult(res)
           : (res && String(res));
+        if (parsed) {
+  const botMsg = { id: genId(), role: 'assistant', content: String(parsed).trim(), meta: {} };
+  messages.push(botMsg);
+  appendMessage(botMsg, messages.length - 1);
+  try { saveSession(); } catch(_) {}
+}
+
 
         const last = messages.length ? messages[messages.length - 1] : null;
         if (parsed && !(last && last.role === 'assistant' && String(last.content).trim() === String(parsed).trim())) {
