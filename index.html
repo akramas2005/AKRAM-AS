@@ -1914,21 +1914,21 @@ function showFilePreview(file){
 
       // === sendAttachmentNow (fixed) ===
 async function sendAttachmentNow() {
+  if (!pendingAttachment) return;
+
   try {
-    if (!pendingAttachment) return;
+    pendingAttachment._sending = true;
 
     const userMessage = {
       id: genId(),
-      role: 'user',
-      content: '',
+      role: "user",
+      content: "",
       attachment: {
         type: pendingAttachment.type,
         name: pendingAttachment.name,
-        size: pendingAttachment.size,
-        url: pendingAttachment.url || pendingAttachment.src,
-        id: pendingAttachment.id,
-        mime_type: pendingAttachment.mime_type
-      }
+        url: pendingAttachment.url
+      },
+      ts: Date.now()
     };
 
     // append locally
@@ -1937,18 +1937,18 @@ async function sendAttachmentNow() {
     saveSession();
 
     // clear composer & preview
-    composer.value = '';
+    composer.value = "";
     updateSendVisibility();
     autoGrowTextarea();
     try {
       if (pendingAttachment && pendingAttachment._objectUrl) {
         URL.revokeObjectURL(pendingAttachment._objectUrl);
       }
-    } catch(e){}
+    } catch (e) {}
 
     // persist to server
-    postMessageToServer(userMessage).catch(err => {
-      console.warn('postMessageToServer failed for attachment message', err);
+    postMessageToServer(userMessage).catch(error => {
+      console.warn("postMessageToServer failed for attachment message", error);
       scheduleSync();
     });
 
@@ -1956,44 +1956,27 @@ async function sendAttachmentNow() {
     clearPreview();
     pendingAttachment = null;
 
-    // ===== START: analyze attachment AFTER user sends it =====
-    try {
-      if (userMessage.attachment && (typeof analyzeFileWithPuter === 'function' || typeof analyzeImageWithPuter === 'function')) {
-        let res = null;
-        if (typeof analyzeFileWithPuter === 'function') {
-  res = await analyzeFileWithPuter(userMessage.attachment.url || userMessage.attachment.src);
-} else if (typeof analyzeImageWithPuter === 'function' && userMessage.attachment.type === 'image') {
-  res = await analyzeImageWithPuter(userMessage.attachment.url || userMessage.attachment.src);
-}
+    // show typing animation
+    const typingEl = showTypingIndicator();
 
-        const parsed = (typeof parsePuterResult === 'function')
-          ? parsePuterResult(res)
-          : (res && String(res));
-        if (parsed) {
-  const botMsg = { id: genId(), role: 'assistant', content: String(parsed).trim(), meta: {} };
-  messages.push(botMsg);
-  appendMessage(botMsg, messages.length - 1);
-  try { saveSession(); } catch(_) {}
-}
-
-
-        const last = messages.length ? messages[messages.length - 1] : null;
-        if (parsed && !(last && last.role === 'assistant' && String(last.content).trim() === String(parsed).trim())) {
-          const botMsg = { id: genId(), role: 'assistant', content: String(parsed).trim(), meta: {} };
-          messages.push(botMsg);
-          appendMessage(botMsg, messages.length - 1);
-          try { saveSession(); } catch(_) {}
-        }
-        return;
-      }
-
-      if (typeof regenerateAssistantForParent === 'function') {
-        await regenerateAssistantForParent(messages.length - 1);
-      }
-    } catch (e) {
-      console.error('post-attachment assistant error', e);
-      try { if (typeof regenerateAssistantForParent === 'function') await regenerateAssistantForParent(messages.length - 1); } catch(_){}
+    // run analysis (after send)
+    let r = null;
+    if (userMessage.attachment.type === "image") {
+      r = await analyzeImageWithPuter(userMessage.attachment.url);
+    } else {
+      r = await analyzeFileWithPuter(userMessage.attachment.url);
     }
+
+    // remove typing animation
+    if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl);
+
+  } catch (e) {
+    console.error("sendAttachmentNow error", e);
+    toast("Send failed");
+  } finally {
+    try { if (pendingAttachment) pendingAttachment._sending = false; } catch (e) {}
+  }
+}
     // ===== END: analyze attachment =====
 
   } catch (e) {
@@ -2224,41 +2207,38 @@ function parsePuterResult(res) {
     try { return String(res); } catch(_) { return null; }
   }
 }
-      // ✅ دالة تحليل الصور باستخدام Puter
-async function analyzeImageWithPuter(imageUrl) {
+  // helper to parse Puter AI results into clean text
+function parsePuterResult(r) {
+  if (!r) return "";
+  if (typeof r === "string") return r.trim();
+  if (r.message && r.message.content) return r.message.content.trim();
   try {
-    if (!imageUrl) return null;
+    return JSON.stringify(r, null, 2);
+  } catch {
+    return String(r);
+  }
+}
+      // ✅ دالة تحليل الصور باستخدام Puter
+async function analyzeImageWithPuter(fileOrUrl) {
+  try {
+    const r = await puter.ai.chat("Analyze this image:", fileOrUrl, { model: "gpt-5-nano" });
 
-    const typingEl = (typeof showTyping === 'function') ? showTyping() : null;
-
-    if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
-      try {
-        const prompt = `صف محتوى الصورة باختصار (عناصر رئيسية، ألوان/حالة)، وحاول استخراج أي نص ظاهر داخل الصورة.`;
-        const puterResp = await puter.ai.chat(prompt, imageUrl, { model: "gpt-5-nano" });
-
-        const analysisText = (typeof puterResp === 'string')
-          ? puterResp
-          : (puterResp && (puterResp.text || puterResp.description || JSON.stringify(puterResp)));
-
-        if (typingEl && typingEl.parentNode) typingEl.remove();
-
-        if (analysisText) {
-          const botMsg = { id: genId(), role: 'assistant', content: analysisText.slice(0,15000), meta: {} };
-          messages.push(botMsg);
-          appendMessage(botMsg, messages.length - 1);
-          saveSession?.();
-        }
-
-        return puterResp;
-      } catch (err) {
-        console.warn('analyzeImageWithPuter failed', err);
-      }
+    const parsed = parsePuterResult(r);
+    if (parsed) {
+      const botMsg = {
+        id: genId(),
+        role: "assistant",
+        content: parsed,
+        meta: {}
+      };
+      messages.push(botMsg);
+      appendMessage(botMsg, messages.length - 1);
+      try { saveSession(); } catch(_) {}
     }
 
-    if (typingEl && typingEl.parentNode) typingEl.remove();
-    return null;
+    return r;
   } catch (e) {
-    console.error('analyzeImageWithPuter error', e);
+    console.error("analyzeImageWithPuter error", e);
     return null;
   }
 }
