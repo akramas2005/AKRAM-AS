@@ -1960,7 +1960,11 @@ async function sendAttachmentNow() {
       composer.value = '';
       updateSendVisibility();
       autoGrowTextarea();
-      try { if (pendingAttachment && pendingAttachment._objectUrl) URL.revokeObjectURL(pendingAttachment._objectUrl); } catch(e){}
+      try {
+        if (pendingAttachment && pendingAttachment._objectUrl) {
+          URL.revokeObjectURL(pendingAttachment._objectUrl);
+        }
+      } catch (e) {}
 
       // send to backend
       postMessageToServer(userMessage).catch(err => {
@@ -1988,7 +1992,7 @@ async function sendAttachmentNow() {
         regenerateAssistantForParent(messages.length - 1);
       } finally {
         if (typingEl && typingEl.parentNode) {
-          try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
+          try { typingEl.parentNode.removeChild(typingEl); } catch (_) {}
         }
       }
 
@@ -2015,10 +2019,19 @@ async function sendAttachmentNow() {
     if (pendingAttachment && pendingAttachment.file) {
       try {
         toast('Uploading file...');
-        try { if (pendingAttachment._uploadInterval) { clearInterval(pendingAttachment._uploadInterval); pendingAttachment._uploadInterval = null; } } catch(e){}
+        try {
+          if (pendingAttachment._uploadInterval) {
+            clearInterval(pendingAttachment._uploadInterval);
+            pendingAttachment._uploadInterval = null;
+          }
+        } catch (e) {}
+
         const rectEl = pendingAttachment._rect || null;
         const outerEl = pendingAttachment._outer || null;
-        if (outerEl) { outerEl.classList.remove('upload-failed','upload-complete'); outerEl.classList.add('uploading'); }
+        if (outerEl) {
+          outerEl.classList.remove('upload-failed', 'upload-complete');
+          outerEl.classList.add('uploading');
+        }
 
         uploadResult = await uploadFileToServer(pendingAttachment.file, (pct, loaded, total) => {
           try {
@@ -2026,16 +2039,21 @@ async function sendAttachmentNow() {
             pendingAttachment.uploadState = 'uploading';
             if (rectEl && typeof rectEl.getTotalLength === 'function') {
               const len = rectEl.getTotalLength();
-              const draw = Math.max(0, Math.round(len * (1 - (pct/100))));
+              const draw = Math.max(0, Math.round(len * (1 - (pct / 100))));
               rectEl.style.strokeDashoffset = draw;
             }
-          } catch(e){}
+          } catch (e) {}
         });
       } catch (err) {
         console.warn('uploadFileToServer failed', err);
         pendingAttachment.uploadState = 'failed';
         pendingAttachment.progress = 0;
-        try { if (pendingAttachment._outer) { pendingAttachment._outer.classList.remove('uploading'); pendingAttachment._outer.classList.add('upload-failed'); } } catch(e){}
+        try {
+          if (pendingAttachment._outer) {
+            pendingAttachment._outer.classList.remove('uploading');
+            pendingAttachment._outer.classList.add('upload-failed');
+          }
+        } catch (e) {}
         toast('Upload failed — message will be queued locally and retried');
       }
     }
@@ -2074,27 +2092,31 @@ async function sendAttachmentNow() {
       updateSendVisibility();
       autoGrowTextarea();
       try {
-  if (pendingAttachment && pendingAttachment._objectUrl) {
-    URL.revokeObjectURL(pendingAttachment._objectUrl);
+        if (pendingAttachment && pendingAttachment._objectUrl) {
+          URL.revokeObjectURL(pendingAttachment._objectUrl);
+        }
+      } catch (e) {}
+
+      // persist to server
+      postMessageToServer(userMessage).catch(err => {
+        console.warn('postMessageToServer failed for attachment message', err);
+        scheduleSync();
+      });
+
+      // cleanup
+      clearPreview();
+      pendingAttachment = null;
+
+      // assistant reply
+      regenerateAssistantForParent(messages.length - 1);
+    }
+
+  } catch (e) {
+    console.error('sendAttachmentNow error', e);
+    toast('Send failed');
+  } finally {
+    try { if (pendingAttachment) pendingAttachment._sending = false; } catch (e) {}
   }
-} catch(e) {}
-
-
-// persist to server
-postMessageToServer(userMessage).catch(err => {
-  console.warn('postMessageToServer failed for attachment message', err);
-  scheduleSync();
-});
-
-// cleanup
-clearPreview();
-pendingAttachment = null;
-
-} catch (e) {
-  console.error('sendAttachmentNow error', e);
-  toast('Send failed');
-} finally {
-  try { if (pendingAttachment) pendingAttachment._sending = false; } catch(e){}
 }
       document.addEventListener('click', (e)=>{ if(attachPanel.classList.contains('open') && !attachPanel.contains(e.target) && !attachBtn.contains(e.target)) closeAttach(); }, true);
 
