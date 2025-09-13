@@ -2319,6 +2319,18 @@ async function analyzeImageWithPuter(imageUrl) {
     return null;
   }
 }
+      function appendAssistantText(text) {
+  if (!text) return;
+  const botMsg = {
+    id: genId(),
+    role: "assistant",
+    content: String(text).slice(0, 15000),
+    meta: {}
+  };
+  messages.push(botMsg);
+  appendMessage(botMsg, messages.length - 1);
+  try { saveSession(); } catch(_) {}
+}
 
 // ✅ دالة تحليل الملفات باستخدام Puter
 async function analyzeFileWithPuter(fileOrUrl) {
@@ -2355,6 +2367,19 @@ async function analyzeFileWithPuter(fileOrUrl) {
     return null;
   }
 }
+      function appendAssistantText(text) {
+  if (!text) return;
+  const botMsg = {
+    id: genId(),
+    role: "assistant",
+    content: String(text).slice(0, 15000),
+    meta: {}
+  };
+  messages.push(botMsg);
+  appendMessage(botMsg, messages.length - 1);
+  try { saveSession(); } catch(_) {}
+}
+
 
       function saveDraft(){ localStorage.setItem(DRAFT_KEY, composer.value || ''); }
       function loadDraft(){
