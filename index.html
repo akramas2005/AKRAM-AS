@@ -2073,24 +2073,28 @@ async function sendAttachmentNow() {
       composer.value = '';
       updateSendVisibility();
       autoGrowTextarea();
-      try { if (pendingAttachment && pendingAttachment._objectUrl) URL.revokeObjectURL(pendingAttachment._objectUrl); } catch(e){}
-
-      // persist to server
-      postMessageToServer(userMessage).catch(err => {
-        console.warn('postMessageToServer failed for attachment message', err);
-        scheduleSync();
-      });
-
-      // cleanup
-      clearPreview();
-      pendingAttachment = null;
-
-  } catch (e) {
-    console.error('sendAttachmentNow error', e);
-    toast('Send failed');
-  } finally {
-    try { if (pendingAttachment) pendingAttachment._sending = false; } catch(e){}
+      try {
+  if (pendingAttachment && pendingAttachment._objectUrl) {
+    URL.revokeObjectURL(pendingAttachment._objectUrl);
   }
+} catch(e) {}
+
+
+// persist to server
+postMessageToServer(userMessage).catch(err => {
+  console.warn('postMessageToServer failed for attachment message', err);
+  scheduleSync();
+});
+
+// cleanup
+clearPreview();
+pendingAttachment = null;
+
+} catch (e) {
+  console.error('sendAttachmentNow error', e);
+  toast('Send failed');
+} finally {
+  try { if (pendingAttachment) pendingAttachment._sending = false; } catch(e){}
 }
       document.addEventListener('click', (e)=>{ if(attachPanel.classList.contains('open') && !attachPanel.contains(e.target) && !attachBtn.contains(e.target)) closeAttach(); }, true);
 
