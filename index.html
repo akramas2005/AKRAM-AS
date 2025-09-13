@@ -2456,9 +2456,10 @@ async function analyzeImageWithPuter(imageUrl) {
 
       if (typingEl && typingEl.parentNode) typingEl.remove();
 
-      if (txt) return txt; // فقط ترجع النص للتحليل
-return null;
-
+      if (txt) {
+        return txt; // ✅ فقط ترجع النص
+      }
+    }
 
     if (typingEl && typingEl.parentNode) typingEl.remove();
     return null;
