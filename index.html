@@ -1929,13 +1929,13 @@ function showFilePreview(file){
   }
 }
 
-      // === sendAttachmentNow (fixed) ===
-async function sendAttachmentNow(){
-  try{
-    if(!pendingAttachment) return;
-    if(pendingAttachment._sending) return;
+      // === sendAttachmentNow (fixed clean) ===
+async function sendAttachmentNow() {
+  try {
+    if (!pendingAttachment) return;
+    if (pendingAttachment._sending) return;
 
-    // If upload already finished and we have remote URL -> send immediately
+    // ✅ إذا الملف مرفوع جاهز
     if (pendingAttachment.uploadState === 'done' && pendingAttachment.url) {
       const text = (composer.value || '').trim();
       const userMessage = {
@@ -1960,64 +1960,64 @@ async function sendAttachmentNow(){
       composer.value = '';
       updateSendVisibility();
       autoGrowTextarea();
-      try { if(pendingAttachment && pendingAttachment._objectUrl) URL.revokeObjectURL(pendingAttachment._objectUrl); } catch(e){}
+      try { if (pendingAttachment && pendingAttachment._objectUrl) URL.revokeObjectURL(pendingAttachment._objectUrl); } catch(e){}
 
-      // send to backend via existing function (postMessageToServer)
+      // send to backend
       postMessageToServer(userMessage).catch(err => {
         console.warn('postMessageToServer failed for attachment message', err);
         scheduleSync();
       });
 
-      // clear preview and pendingAttachment
+      // clear preview + reset
       clearPreview();
       pendingAttachment = null;
 
-      // === analyze attachment after send ===
-const attached = userMessage.attachment || null;
-const typingEl = (typeof showTyping === 'function') ? showTyping() : null;
-try {
-  if (attached && attached.mime_type && attached.mime_type.startsWith('image/')) {
-    await analyzeImageWithPuter(attached.url || attached.src || attached.filename);
-  } else if (attached) {
-    await analyzeFileWithPuter(attached.url || attached.src || attached.filename || attached.id);
-  } else {
-    regenerateAssistantForParent(messages.length - 1);
-  }
-} catch (err) {
-  console.warn('attachment analysis failed', err);
-  regenerateAssistantForParent(messages.length - 1);
-} finally {
-  if (typingEl && typingEl.parentNode) {
-    try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
-  }
-}
+      // === تحليل المرفق بعد الإرسال ===
+      const attached = userMessage.attachment || null;
+      const typingEl = (typeof showTyping === 'function') ? showTyping() : null;
+      try {
+        if (attached && attached.mime_type && attached.mime_type.startsWith('image/')) {
+          await analyzeImageWithPuter(attached.url || attached.src || attached.filename);
+        } else if (attached) {
+          await analyzeFileWithPuter(attached.url || attached.src || attached.filename || attached.id);
+        } else {
+          regenerateAssistantForParent(messages.length - 1);
+        }
+      } catch (err) {
+        console.warn('attachment analysis failed', err);
+        regenerateAssistantForParent(messages.length - 1);
+      } finally {
+        if (typingEl && typingEl.parentNode) {
+          try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
+        }
+      }
 
-    // If still uploading -> mark sendOnComplete and ask user to wait
+      return;
+    }
+
+    // ⏳ لو مازال يرفع الملف
     if (pendingAttachment.uploadState === 'uploading' || pendingAttachment.uploadState === 'pending') {
       pendingAttachment.sendOnComplete = true;
       toast('Waiting for upload to complete...');
       return;
     }
 
+    // ❌ لو فشل الرفع
     if (pendingAttachment.uploadState === 'failed') {
       toast('Upload failed — please retry or remove the attachment');
       return;
     }
 
-    // Otherwise — if we reach here and file object exists but not yet uploaded,
-    // perform the upload now (fallback).
+    // 🔄 رفع الملف إذا لم يرفع بعد
     pendingAttachment._sending = true;
     let uploadResult = null;
 
     if (pendingAttachment && pendingAttachment.file) {
       try {
         toast('Uploading file...');
-        // ensure any simulation is stopped
         try { if (pendingAttachment._uploadInterval) { clearInterval(pendingAttachment._uploadInterval); pendingAttachment._uploadInterval = null; } } catch(e){}
-
         const rectEl = pendingAttachment._rect || null;
         const outerEl = pendingAttachment._outer || null;
-
         if (outerEl) { outerEl.classList.remove('upload-failed','upload-complete'); outerEl.classList.add('uploading'); }
 
         uploadResult = await uploadFileToServer(pendingAttachment.file, (pct, loaded, total) => {
@@ -2040,10 +2040,9 @@ try {
       }
     }
 
-    // If we have uploadResult (or upload finished) -> build message and send
+    // ✅ بعد الرفع: بناء الرسالة + إرسالها
     if (uploadResult || (pendingAttachment.uploadState === 'done' && pendingAttachment.url)) {
       const res = uploadResult || pendingAttachment._uploadResult || {};
-      // ensure we have final fields
       pendingAttachment.uploadState = 'done';
       pendingAttachment.progress = 100;
       pendingAttachment.id = pendingAttachment.id || res.id;
@@ -2051,7 +2050,6 @@ try {
       pendingAttachment.filename = pendingAttachment.filename || res.filename || pendingAttachment.name;
       pendingAttachment.mime_type = pendingAttachment.mime_type || res.mime_type || pendingAttachment.type;
 
-      // build user message
       const text = (composer.value || '').trim();
       const userMessage = {
         id: genId(),
@@ -2075,7 +2073,7 @@ try {
       composer.value = '';
       updateSendVisibility();
       autoGrowTextarea();
-      try { if(pendingAttachment && pendingAttachment._objectUrl) URL.revokeObjectURL(pendingAttachment._objectUrl); } catch(e){}
+      try { if (pendingAttachment && pendingAttachment._objectUrl) URL.revokeObjectURL(pendingAttachment._objectUrl); } catch(e){}
 
       // persist to server
       postMessageToServer(userMessage).catch(err => {
@@ -2083,31 +2081,21 @@ try {
         scheduleSync();
       });
 
-      // === analyze attachment after send ===
-const attached = userMessage.attachment || null;
-const typingEl = (typeof showTyping === 'function') ? showTyping() : null;
-try {
-  if (attached && attached.mime_type && attached.mime_type.startsWith('image/')) {
-    await analyzeImageWithPuter(attached.url || attached.src || attached.filename);
-  } else if (attached) {
-    await analyzeFileWithPuter(attached.url || attached.src || attached.filename || attached.id);
-  } else {
-    regenerateAssistantForParent(messages.length - 1);
-  }
-} catch (err) {
-  console.warn('attachment analysis failed', err);
-  regenerateAssistantForParent(messages.length - 1);
-} finally {
-  if (typingEl && typingEl.parentNode) {
-    try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
+      // cleanup
+      clearPreview();
+      pendingAttachment = null;
+
+      // assistant reply
+      regenerateAssistantForParent(messages.length - 1);
+    }
+
+  } catch (e) {
+    console.error('sendAttachmentNow error', e);
+    toast('Send failed');
+  } finally {
+    try { if (pendingAttachment) pendingAttachment._sending = false; } catch(e){}
   }
 }
-
-} finally {
-  try { if(pendingAttachment) pendingAttachment._sending = false; } catch(e){}
-}
-}
-
       document.addEventListener('click', (e)=>{ if(attachPanel.classList.contains('open') && !attachPanel.contains(e.target) && !attachBtn.contains(e.target)) closeAttach(); }, true);
 
       const STORAGE_KEY = 'chat_study';
