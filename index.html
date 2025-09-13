@@ -2021,24 +2021,25 @@ async function analyzeFileWithPuter(fileOrUrl) {
   }
 }
 
-      // === sendAttachmentNow (fixed) ===
-async function sendAttachmentNow(){
-  try{
-    if(!pendingAttachment) return;
-    if(pendingAttachment._sending) return;
+      // === sendAttachmentNow (fixed clean) ===
+async function sendAttachmentNow() {
+  if (!pendingAttachment) return;
+  if (pendingAttachment._sending) return;
 
+  try {
     // If upload already finished and we have remote URL -> send immediately
-    if (pendingAttachment.uploadState === 'done' && pendingAttachment.url) {
-      const text = (composer.value || '').trim();
+    if (pendingAttachment.uploadState === "done" && pendingAttachment.url) {
+      const text = (composer.value || "").trim();
       const userMessage = {
         id: genId(),
-        role: 'user',
-        content: text || '',
+        role: "user",
+        content: text || "",
         attachment: {
           id: pendingAttachment.id,
           url: pendingAttachment.url,
           filename: pendingAttachment.filename || pendingAttachment.name,
-          mime_type: pendingAttachment.mime_type || pendingAttachment.type || ''
+          mime_type: pendingAttachment.mime_type || pendingAttachment.type || "",
+          type: pendingAttachment.type || ""
         },
         meta: {}
       };
@@ -2049,120 +2050,143 @@ async function sendAttachmentNow(){
       saveSession();
 
       // clear composer & preview
-      composer.value = '';
+      composer.value = "";
       updateSendVisibility();
       autoGrowTextarea();
-      try { if(pendingAttachment && pendingAttachment._objectUrl) URL.revokeObjectURL(pendingAttachment._objectUrl); } catch(e){}
+      try {
+        if (pendingAttachment && pendingAttachment._objectUrl) {
+          URL.revokeObjectURL(pendingAttachment._objectUrl);
+        }
+      } catch (_) {}
 
-      // send to backend via existing function (postMessageToServer)
+      // persist to server
       postMessageToServer(userMessage).catch(err => {
-        console.warn('postMessageToServer failed for attachment message', err);
+        console.warn("postMessageToServer failed for attachment message", err);
         scheduleSync();
       });
 
-      // cleanup preview (but keep userMessage in messages array)
-clearPreview();
+      // cleanup preview
+      clearPreview();
 
-// cache attachment info
-const attached = (userMessage && userMessage.attachment) ? userMessage.attachment : null;
+      // cache attachment info for analysis
+      const attached = userMessage.attachment || null;
 
-// clear pendingAttachment
-pendingAttachment = null;
+      // clear pendingAttachment
+      pendingAttachment = null;
 
-// show typing indicator
-const typingEl = (typeof showTyping === 'function') ? showTyping() : null;
+      // show typing indicator
+      const typingEl = (typeof showTyping === "function") ? showTyping() : null;
 
-try {
-  if (attached && attached._analyzeOnSend) {
-    if (attached.type === 'image' && typeof analyzeImageWithPuter === 'function') {
-      await analyzeImageWithPuter(attached.url || attached.src || attached.filename || attached.name);
-    } else if (typeof analyzeFileWithPuter === 'function') {
-      await analyzeFileWithPuter(attached.url || attached.src || attached.filename || attached.name);
-    } else {
-      regenerateAssistantForParent(messages.length - 1);
+      try {
+        if (attached && attached._analyzeOnSend) {
+          if (attached.type === "image" && typeof analyzeImageWithPuter === "function") {
+            await analyzeImageWithPuter(attached.url);
+          } else if (typeof analyzeFileWithPuter === "function") {
+            await analyzeFileWithPuter(attached.url);
+          } else {
+            regenerateAssistantForParent(messages.length - 1);
+          }
+        } else {
+          regenerateAssistantForParent(messages.length - 1);
+        }
+      } catch (analysisErr) {
+        console.warn("attachment analysis failed", analysisErr);
+        regenerateAssistantForParent(messages.length - 1);
+      } finally {
+        if (typingEl && typingEl.parentNode) {
+          try { typingEl.parentNode.removeChild(typingEl); } catch (_) {}
+        }
+      }
+
+      return; // ✅ stop here after sending immediately
     }
-  } else {
-    regenerateAssistantForParent(messages.length - 1);
-  }
-} catch (analysisErr) {
-  console.warn('attachment analysis failed', analysisErr);
-  regenerateAssistantForParent(messages.length - 1);
-} finally {
-  if (typingEl && typingEl.parentNode) {
-    try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
-  }
-}
 
-    // If still uploading -> mark sendOnComplete and ask user to wait
-    if (pendingAttachment.uploadState === 'uploading' || pendingAttachment.uploadState === 'pending') {
+    // If still uploading
+    if (
+      pendingAttachment.uploadState === "uploading" ||
+      pendingAttachment.uploadState === "pending"
+    ) {
       pendingAttachment.sendOnComplete = true;
-      toast('Waiting for upload to complete...');
+      toast("Waiting for upload to complete...");
       return;
     }
 
-    if (pendingAttachment.uploadState === 'failed') {
-      toast('Upload failed — please retry or remove the attachment');
+    // If failed
+    if (pendingAttachment.uploadState === "failed") {
+      toast("Upload failed — please retry or remove the attachment");
       return;
     }
 
-    // Otherwise — if we reach here and file object exists but not yet uploaded,
-    // perform the upload now (fallback).
+    // Otherwise — perform upload now (fallback)
     pendingAttachment._sending = true;
     let uploadResult = null;
 
-    if (pendingAttachment && pendingAttachment.file) {
+    if (pendingAttachment.file) {
       try {
-        toast('Uploading file...');
-        // ensure any simulation is stopped
-        try { if (pendingAttachment._uploadInterval) { clearInterval(pendingAttachment._uploadInterval); pendingAttachment._uploadInterval = null; } } catch(e){}
+        toast("Uploading file...");
+        if (pendingAttachment._uploadInterval) {
+          clearInterval(pendingAttachment._uploadInterval);
+          pendingAttachment._uploadInterval = null;
+        }
 
         const rectEl = pendingAttachment._rect || null;
         const outerEl = pendingAttachment._outer || null;
 
-        if (outerEl) { outerEl.classList.remove('upload-failed','upload-complete'); outerEl.classList.add('uploading'); }
+        if (outerEl) {
+          outerEl.classList.remove("upload-failed", "upload-complete");
+          outerEl.classList.add("uploading");
+        }
 
-        uploadResult = await uploadFileToServer(pendingAttachment.file, (pct, loaded, total) => {
-          try {
-            pendingAttachment.progress = pct;
-            pendingAttachment.uploadState = 'uploading';
-            if (rectEl && typeof rectEl.getTotalLength === 'function') {
-              const len = rectEl.getTotalLength();
-              const draw = Math.max(0, Math.round(len * (1 - (pct/100))));
-              rectEl.style.strokeDashoffset = draw;
-            }
-          } catch(e){}
-        });
+        uploadResult = await uploadFileToServer(
+          pendingAttachment.file,
+          (pct) => {
+            try {
+              pendingAttachment.progress = pct;
+              pendingAttachment.uploadState = "uploading";
+              if (rectEl && typeof rectEl.getTotalLength === "function") {
+                const len = rectEl.getTotalLength();
+                const draw = Math.max(0, Math.round(len * (1 - pct / 100)));
+                rectEl.style.strokeDashoffset = draw;
+              }
+            } catch (_) {}
+          }
+        );
       } catch (err) {
-        console.warn('uploadFileToServer failed', err);
-        pendingAttachment.uploadState = 'failed';
+        console.warn("uploadFileToServer failed", err);
+        pendingAttachment.uploadState = "failed";
         pendingAttachment.progress = 0;
-        try { if (pendingAttachment._outer) { pendingAttachment._outer.classList.remove('uploading'); pendingAttachment._outer.classList.add('upload-failed'); } } catch(e){}
-        toast('Upload failed — message will be queued locally and retried');
+        try {
+          if (pendingAttachment._outer) {
+            pendingAttachment._outer.classList.remove("uploading");
+            pendingAttachment._outer.classList.add("upload-failed");
+          }
+        } catch (_) {}
+        toast("Upload failed — message will be queued locally and retried");
       }
     }
 
-    // If we have uploadResult (or upload finished) -> build message and send
-    if (uploadResult || (pendingAttachment.uploadState === 'done' && pendingAttachment.url)) {
+    // If upload succeeded
+    if (uploadResult || (pendingAttachment.uploadState === "done" && pendingAttachment.url)) {
       const res = uploadResult || pendingAttachment._uploadResult || {};
-      // ensure we have final fields
-      pendingAttachment.uploadState = 'done';
+
+      pendingAttachment.uploadState = "done";
       pendingAttachment.progress = 100;
       pendingAttachment.id = pendingAttachment.id || res.id;
       pendingAttachment.url = pendingAttachment.url || res.url;
       pendingAttachment.filename = pendingAttachment.filename || res.filename || pendingAttachment.name;
       pendingAttachment.mime_type = pendingAttachment.mime_type || res.mime_type || pendingAttachment.type;
 
-      // build user message
-      const text = (composer.value || '').trim();
+      const text = (composer.value || "").trim();
       const userMessage = {
         id: genId(),
-        role: 'user',
-        content: text || '',
+        role: "user",
+        content: text || "",
         attachment: {
           id: pendingAttachment.id,
           url: pendingAttachment.url,
           filename: pendingAttachment.filename,
-          mime_type: pendingAttachment.mime_type
+          mime_type: pendingAttachment.mime_type,
+          type: pendingAttachment.type || ""
         },
         meta: {}
       };
@@ -2173,14 +2197,18 @@ try {
       saveSession();
 
       // clear composer & preview
-      composer.value = '';
+      composer.value = "";
       updateSendVisibility();
       autoGrowTextarea();
-      try { if(pendingAttachment && pendingAttachment._objectUrl) URL.revokeObjectURL(pendingAttachment._objectUrl); } catch(e){}
+      try {
+        if (pendingAttachment && pendingAttachment._objectUrl) {
+          URL.revokeObjectURL(pendingAttachment._objectUrl);
+        }
+      } catch (_) {}
 
-      // persist to server
+      // persist
       postMessageToServer(userMessage).catch(err => {
-        console.warn('postMessageToServer failed for attachment message', err);
+        console.warn("postMessageToServer failed for attachment message", err);
         scheduleSync();
       });
 
@@ -2191,12 +2219,11 @@ try {
       // assistant reply
       regenerateAssistantForParent(messages.length - 1);
     }
-
-  } catch (e){
-    console.error('sendAttachmentNow error', e);
-    toast('Send failed');
+  } catch (e) {
+    console.error("sendAttachmentNow error", e);
+    toast("Send failed");
   } finally {
-    try { if(pendingAttachment) pendingAttachment._sending = false; } catch(e){}
+    try { if (pendingAttachment) pendingAttachment._sending = false; } catch (_) {}
   }
 }
 
