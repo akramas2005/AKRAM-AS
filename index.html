@@ -2080,9 +2080,9 @@ async function sendAttachmentNow() {
       try {
         if (attached && attached._analyzeOnSend) {
           if (attached.type === "image" && typeof analyzeImageWithPuter === "function") {
-            await analyzeImageWithPuter(attached.url);
+            await analyzeImageWithPuter(attached.file || attached.url);
           } else if (typeof analyzeFileWithPuter === "function") {
-            await analyzeFileWithPuter(attached.url);
+            await analyzeFileWithPuter(attached.file || attached.url);
           } else {
             regenerateAssistantForParent(messages.length - 1);
           }
