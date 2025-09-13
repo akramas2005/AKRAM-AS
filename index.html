@@ -1666,7 +1666,17 @@ function showImagePreview(file){
 
         toast('Upload complete! Click send to post it.');
         updateSendVisibility();
-        
+
+        // optional: analyze image if function present
+        try {
+          if (typeof analyzeImageWithPuter === 'function') {
+            analyzeImageWithPuter(result.url).catch(()=>{});
+          } else if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.vision === 'function') {
+            // if puter has a vision API
+            (async ()=>{ try { await puter.ai.vision(result.url); } catch(e){} })();
+          }
+        } catch(e){}
+      }).catch(err => {
         console.error('upload failed', err);
         pendingAttachment.uploadState = 'failed';
         pendingAttachment.progress = 0;
@@ -1848,6 +1858,13 @@ function showFilePreview(file){
       toast('Upload complete! Click send to post it.');
       updateSendVisibility();
 
+      // optional: if it's an image-like file or you want to analyze general files
+      try {
+        if (typeof analyzeImageWithPuter === 'function') {
+          analyzeImageWithPuter(result.url).catch(()=>{});
+        }
+      } catch(e){}
+    }).catch(err => {
       console.error('retry upload failed', err);
       pendingAttachment.uploadState = 'failed';
       pendingAttachment.progress = 0;
@@ -1913,71 +1930,159 @@ function showFilePreview(file){
 }
 
       // === sendAttachmentNow (fixed) ===
-async function sendAttachmentNow() {
-  if (!pendingAttachment) return;
+async function sendAttachmentNow(){
+  try{
+    if(!pendingAttachment) return;
+    if(pendingAttachment._sending) return;
 
-  try {
-    pendingAttachment._sending = true;
+    // If upload already finished and we have remote URL -> send immediately
+    if (pendingAttachment.uploadState === 'done' && pendingAttachment.url) {
+      const text = (composer.value || '').trim();
+      const userMessage = {
+        id: genId(),
+        role: 'user',
+        content: text || '',
+        attachment: {
+          id: pendingAttachment.id,
+          url: pendingAttachment.url,
+          filename: pendingAttachment.filename || pendingAttachment.name,
+          mime_type: pendingAttachment.mime_type || pendingAttachment.type || ''
+        },
+        meta: {}
+      };
 
-    const userMessage = {
-      id: genId(),
-      role: "user",
-      content: "",
-      attachment: {
-        type: pendingAttachment.type,
-        name: pendingAttachment.name,
-        url: pendingAttachment.url
-      },
-      ts: Date.now()
-    };
+      // append locally
+      messages.push(userMessage);
+      appendMessage(userMessage, messages.length - 1);
+      saveSession();
 
-    // append locally
-    messages.push(userMessage);
-    appendMessage(userMessage, messages.length - 1);
-    saveSession();
+      // clear composer & preview
+      composer.value = '';
+      updateSendVisibility();
+      autoGrowTextarea();
+      try { if(pendingAttachment && pendingAttachment._objectUrl) URL.revokeObjectURL(pendingAttachment._objectUrl); } catch(e){}
 
-    // clear composer & preview
-    composer.value = "";
-    updateSendVisibility();
-    autoGrowTextarea();
-    try {
-      if (pendingAttachment && pendingAttachment._objectUrl) {
-        URL.revokeObjectURL(pendingAttachment._objectUrl);
-      }
-    } catch (e) {}
+      // send to backend via existing function (postMessageToServer)
+      postMessageToServer(userMessage).catch(err => {
+        console.warn('postMessageToServer failed for attachment message', err);
+        scheduleSync();
+      });
 
-    // persist to server
-    postMessageToServer(userMessage).catch(error => {
-      console.warn("postMessageToServer failed for attachment message", error);
-      scheduleSync();
-    });
+      // clear preview and pendingAttachment
+      clearPreview();
+      pendingAttachment = null;
 
-    // cleanup preview
-    clearPreview();
-    pendingAttachment = null;
-
-    // show typing animation
-    const typingEl = showTypingIndicator();
-
-    // run analysis (after send)
-    let r = null;
-    if (userMessage.attachment.type === "image") {
-      r = await analyzeImageWithPuter(userMessage.attachment.url);
-    } else {
-      r = await analyzeFileWithPuter(userMessage.attachment.url);
+      // trigger assistant reply
+      regenerateAssistantForParent(messages.length - 1);
+      return;
     }
 
-    // remove typing animation
-    if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl);
+    // If still uploading -> mark sendOnComplete and ask user to wait
+    if (pendingAttachment.uploadState === 'uploading' || pendingAttachment.uploadState === 'pending') {
+      pendingAttachment.sendOnComplete = true;
+      toast('Waiting for upload to complete...');
+      return;
+    }
 
-  } catch (e) {
-    console.error("sendAttachmentNow error", e);
-    toast("Send failed");
+    if (pendingAttachment.uploadState === 'failed') {
+      toast('Upload failed — please retry or remove the attachment');
+      return;
+    }
+
+    // Otherwise — if we reach here and file object exists but not yet uploaded,
+    // perform the upload now (fallback).
+    pendingAttachment._sending = true;
+    let uploadResult = null;
+
+    if (pendingAttachment && pendingAttachment.file) {
+      try {
+        toast('Uploading file...');
+        // ensure any simulation is stopped
+        try { if (pendingAttachment._uploadInterval) { clearInterval(pendingAttachment._uploadInterval); pendingAttachment._uploadInterval = null; } } catch(e){}
+
+        const rectEl = pendingAttachment._rect || null;
+        const outerEl = pendingAttachment._outer || null;
+
+        if (outerEl) { outerEl.classList.remove('upload-failed','upload-complete'); outerEl.classList.add('uploading'); }
+
+        uploadResult = await uploadFileToServer(pendingAttachment.file, (pct, loaded, total) => {
+          try {
+            pendingAttachment.progress = pct;
+            pendingAttachment.uploadState = 'uploading';
+            if (rectEl && typeof rectEl.getTotalLength === 'function') {
+              const len = rectEl.getTotalLength();
+              const draw = Math.max(0, Math.round(len * (1 - (pct/100))));
+              rectEl.style.strokeDashoffset = draw;
+            }
+          } catch(e){}
+        });
+      } catch (err) {
+        console.warn('uploadFileToServer failed', err);
+        pendingAttachment.uploadState = 'failed';
+        pendingAttachment.progress = 0;
+        try { if (pendingAttachment._outer) { pendingAttachment._outer.classList.remove('uploading'); pendingAttachment._outer.classList.add('upload-failed'); } } catch(e){}
+        toast('Upload failed — message will be queued locally and retried');
+      }
+    }
+
+    // If we have uploadResult (or upload finished) -> build message and send
+    if (uploadResult || (pendingAttachment.uploadState === 'done' && pendingAttachment.url)) {
+      const res = uploadResult || pendingAttachment._uploadResult || {};
+      // ensure we have final fields
+      pendingAttachment.uploadState = 'done';
+      pendingAttachment.progress = 100;
+      pendingAttachment.id = pendingAttachment.id || res.id;
+      pendingAttachment.url = pendingAttachment.url || res.url;
+      pendingAttachment.filename = pendingAttachment.filename || res.filename || pendingAttachment.name;
+      pendingAttachment.mime_type = pendingAttachment.mime_type || res.mime_type || pendingAttachment.type;
+
+      // build user message
+      const text = (composer.value || '').trim();
+      const userMessage = {
+        id: genId(),
+        role: 'user',
+        content: text || '',
+        attachment: {
+          id: pendingAttachment.id,
+          url: pendingAttachment.url,
+          filename: pendingAttachment.filename,
+          mime_type: pendingAttachment.mime_type
+        },
+        meta: {}
+      };
+
+      // append locally
+      messages.push(userMessage);
+      appendMessage(userMessage, messages.length - 1);
+      saveSession();
+
+      // clear composer & preview
+      composer.value = '';
+      updateSendVisibility();
+      autoGrowTextarea();
+      try { if(pendingAttachment && pendingAttachment._objectUrl) URL.revokeObjectURL(pendingAttachment._objectUrl); } catch(e){}
+
+      // persist to server
+      postMessageToServer(userMessage).catch(err => {
+        console.warn('postMessageToServer failed for attachment message', err);
+        scheduleSync();
+      });
+
+      // cleanup
+      clearPreview();
+      pendingAttachment = null;
+
+      // assistant reply
+      regenerateAssistantForParent(messages.length - 1);
+    }
+
+  } catch (e){
+    console.error('sendAttachmentNow error', e);
+    toast('Send failed');
   } finally {
-    try { if (pendingAttachment) pendingAttachment._sending = false; } catch (e) {}
+    try { if(pendingAttachment) pendingAttachment._sending = false; } catch(e){}
   }
 }
-    // ===== END: analyze attachment =====
 
       document.addEventListener('click', (e)=>{ if(attachPanel.classList.contains('open') && !attachPanel.contains(e.target) && !attachBtn.contains(e.target)) closeAttach(); }, true);
 
@@ -2176,61 +2281,41 @@ function uploadFileToServer(file, onProgress){
     }
   });
 }
-      // ===== helper: normalize/parse Puter result into readable text =====
-function parsePuterResult(res) {
-  try {
-    if (!res) return null;
-    if (typeof res === 'string') return res;
-    if (res.message && (res.message.content || res.message.text)) return res.message.content || res.message.text;
-    if (typeof res.text === 'string') return res.text;
-    if (typeof res.description === 'string') return res.description;
-    if (typeof res.summary === 'string') return res.summary;
-    if (Array.isArray(res.choices) && res.choices.length) {
-      const c = res.choices[0];
-      if (c.text) return c.text;
-      if (c.message && (c.message.content || c.message.text)) return c.message.content || c.message.text;
-    }
-    if (typeof res.output === 'string') return res.output;
-    if (res.output && typeof res.output === 'object') return JSON.stringify(res.output);
-    if (res.data && typeof res.data === 'string') return res.data;
-    const txt = JSON.stringify(res);
-    return txt.length > 14000 ? txt.slice(0,14000) + '…' : txt;
-  } catch (e) {
-    try { return String(res); } catch(_) { return null; }
-  }
-}
-  // helper to parse Puter AI results into clean text
-function parsePuterResult(r) {
-  if (!r) return "";
-  if (typeof r === "string") return r.trim();
-  if (r.message && r.message.content) return r.message.content.trim();
-  try {
-    return JSON.stringify(r, null, 2);
-  } catch {
-    return String(r);
-  }
-}
       // ✅ دالة تحليل الصور باستخدام Puter
-async function analyzeImageWithPuter(fileOrUrl) {
+async function analyzeImageWithPuter(imageUrl) {
   try {
-    const r = await puter.ai.chat("Analyze this image:", fileOrUrl, { model: "gpt-5-nano" });
+    if (!imageUrl) return null;
 
-    const parsed = parsePuterResult(r);
-    if (parsed) {
-      const botMsg = {
-        id: genId(),
-        role: "assistant",
-        content: parsed,
-        meta: {}
-      };
-      messages.push(botMsg);
-      appendMessage(botMsg, messages.length - 1);
-      try { saveSession(); } catch(_) {}
+    const typingEl = (typeof showTyping === 'function') ? showTyping() : null;
+
+    if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
+      try {
+        const prompt = `صف محتوى الصورة باختصار (عناصر رئيسية، ألوان/حالة)، وحاول استخراج أي نص ظاهر داخل الصورة.`;
+        const puterResp = await puter.ai.chat(prompt, imageUrl, { model: "gpt-5-nano" });
+
+        const analysisText = (typeof puterResp === 'string')
+          ? puterResp
+          : (puterResp && (puterResp.text || puterResp.description || JSON.stringify(puterResp)));
+
+        if (typingEl && typingEl.parentNode) typingEl.remove();
+
+        if (analysisText) {
+          const botMsg = { id: genId(), role: 'assistant', content: analysisText.slice(0,15000), meta: {} };
+          messages.push(botMsg);
+          appendMessage(botMsg, messages.length - 1);
+          saveSession?.();
+        }
+
+        return puterResp;
+      } catch (err) {
+        console.warn('analyzeImageWithPuter failed', err);
+      }
     }
 
-    return r;
+    if (typingEl && typingEl.parentNode) typingEl.remove();
+    return null;
   } catch (e) {
-    console.error("analyzeImageWithPuter error", e);
+    console.error('analyzeImageWithPuter error', e);
     return null;
   }
 }
