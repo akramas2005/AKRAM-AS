@@ -1667,15 +1667,10 @@ function showImagePreview(file){
         toast('Upload complete! Click send to post it.');
         updateSendVisibility();
 
-        // optional: analyze image if function present
-        try {
-          if (typeof analyzeImageWithPuter === 'function') {
-            analyzeImageWithPuter(result.url).catch(()=>{});
-          } else if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.vision === 'function') {
-            // if puter has a vision API
-            (async ()=>{ try { await puter.ai.vision(result.url); } catch(e){} })();
-          }
-        } catch(e){}
+       // defer analysis until user actually sends the message
+try {
+  if (pendingAttachment) pendingAttachment._analyzeOnSend = true;
+} catch (e) { console.warn('mark analyzeOnSend failed', e); }
       }).catch(err => {
         console.error('upload failed', err);
         pendingAttachment.uploadState = 'failed';
@@ -1858,12 +1853,10 @@ function showFilePreview(file){
       toast('Upload complete! Click send to post it.');
       updateSendVisibility();
 
-      // optional: if it's an image-like file or you want to analyze general files
-      try {
-        if (typeof analyzeImageWithPuter === 'function') {
-          analyzeImageWithPuter(result.url).catch(()=>{});
-        }
-      } catch(e){}
+      // defer analysis until user actually sends the message
+try {
+  if (pendingAttachment) pendingAttachment._analyzeOnSend = true;
+} catch (e) { console.warn('mark analyzeOnSend failed', e); }
     }).catch(err => {
       console.error('retry upload failed', err);
       pendingAttachment.uploadState = 'failed';
@@ -1928,6 +1921,105 @@ function showFilePreview(file){
     console.error('preview file error', e);
   }
 }
+      // ===== helper: normalize/parse Puter result into readable text =====
+function parsePuterResult(res) {
+  try {
+    if (!res) return null;
+    if (typeof res === 'string') return res;
+    if (res.message && (res.message.content || res.message.text)) return res.message.content || res.message.text;
+    if (typeof res.text === 'string') return res.text;
+    if (typeof res.description === 'string') return res.description;
+    if (typeof res.summary === 'string') return res.summary;
+    if (Array.isArray(res.choices) && res.choices.length) {
+      const c = res.choices[0];
+      if (c.text) return c.text;
+      if (c.message && (c.message.content || c.message.text)) return c.message.content || c.message.text;
+    }
+    if (typeof res.output === 'string') return res.output;
+    if (res.output && typeof res.output === 'object') try { return JSON.stringify(res.output); } catch(_) {}
+    if (res.data && typeof res.data === 'string') return res.data;
+    const txt = JSON.stringify(res);
+    return txt.length > 14000 ? txt.slice(0,14000) + '…' : txt;
+  } catch (e) { try { return String(res); } catch(_) { return null; } }
+}
+
+// ===== analyze image =====
+async function analyzeImageWithPuter(imageUrl) {
+  try {
+    if (!imageUrl) return null;
+    const typingEl = (typeof showTyping === 'function') ? showTyping() : null;
+    if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
+      const prompt = `صف محتوى الصورة باختصار (عناصر رئيسية، ألوان / حالة)، وحاول استخراج أي نص ظاهر داخل الصورة إن وُجد.`;
+      const puterResp = await puter.ai.chat(prompt, imageUrl, { model: 'gpt-5-nano' });
+      const text = parsePuterResult(puterResp);
+      if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
+      if (text) {
+        const botMsg = { id: genId(), role: 'assistant', content: String(text).trim(), meta: {} };
+        messages.push(botMsg);
+        appendMessage(botMsg, messages.length - 1);
+        try { saveSession(); } catch(_) {}
+      }
+      return puterResp;
+    } else {
+      if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
+      return null;
+    }
+  } catch (e) {
+    console.error('analyzeImageWithPuter error', e);
+    return null;
+  }
+}
+
+// ===== analyze general file =====
+async function analyzeFileWithPuter(fileOrUrl) {
+  try {
+    const appendAssistantText = (text) => {
+      if (!text) return;
+      const botMsg = { id: genId(), role: 'assistant', content: String(text).trim(), meta: {} };
+      messages.push(botMsg);
+      appendMessage(botMsg, messages.length - 1);
+      try { saveSession(); } catch(_) {}
+    };
+
+    if (typeof fileOrUrl === 'string') {
+      const lower = fileOrUrl.toLowerCase();
+      if (lower.startsWith('data:image/') || /\.(png|jpe?g|webp|gif|bmp)(?:[?#].*)?$/.test(lower)) {
+        return analyzeImageWithPuter(fileOrUrl);
+      } else {
+        if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
+          const prompt = `Please analyze the file at this URL: ${fileOrUrl}`;
+          const r = await puter.ai.chat(prompt, null, { model: 'gpt-5-nano' });
+          const txt = parsePuterResult(r);
+          appendAssistantText(txt);
+          return r;
+        }
+        return null;
+      }
+    }
+
+    if (fileOrUrl instanceof File) {
+      const ext = (fileOrUrl.name || '').split('.').pop().toLowerCase();
+      const textLike = ['txt','json','js','html','htm','css','py','md','xml','csv'];
+      if (textLike.includes(ext)) {
+        const txtContent = await fileOrUrl.text();
+        if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
+          const prompt = `حلل هذا الملف (${ext}). أعطِ ملخصاً ونقاطاً مهمة:\n\n${txtContent.slice(0,8000)}`;
+          const r = await puter.ai.chat(prompt, null, { model: 'gpt-5-nano' });
+          const parsed = parsePuterResult(r);
+          appendAssistantText(parsed);
+          return r;
+        }
+      }
+      toast('File analysis for PDF/binary files requires a server-side extractor.');
+      return null;
+    }
+
+    return null;
+  } catch (e) {
+    console.error('analyzeFileWithPuter error', e);
+    return null;
+  }
+}
 
       // === sendAttachmentNow (fixed) ===
 async function sendAttachmentNow(){
@@ -1968,14 +2060,38 @@ async function sendAttachmentNow(){
         scheduleSync();
       });
 
-      // clear preview and pendingAttachment
-      clearPreview();
-      pendingAttachment = null;
+      // cleanup preview (but keep userMessage in messages array)
+clearPreview();
 
-      // trigger assistant reply
+// cache attachment info
+const attached = (userMessage && userMessage.attachment) ? userMessage.attachment : null;
+
+// clear pendingAttachment
+pendingAttachment = null;
+
+// show typing indicator
+const typingEl = (typeof showTyping === 'function') ? showTyping() : null;
+
+try {
+  if (attached && attached._analyzeOnSend) {
+    if (attached.type === 'image' && typeof analyzeImageWithPuter === 'function') {
+      await analyzeImageWithPuter(attached.url || attached.src || attached.filename || attached.name);
+    } else if (typeof analyzeFileWithPuter === 'function') {
+      await analyzeFileWithPuter(attached.url || attached.src || attached.filename || attached.name);
+    } else {
       regenerateAssistantForParent(messages.length - 1);
-      return;
     }
+  } else {
+    regenerateAssistantForParent(messages.length - 1);
+  }
+} catch (analysisErr) {
+  console.warn('attachment analysis failed', analysisErr);
+  regenerateAssistantForParent(messages.length - 1);
+} finally {
+  if (typingEl && typingEl.parentNode) {
+    try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
+  }
+}
 
     // If still uploading -> mark sendOnComplete and ask user to wait
     if (pendingAttachment.uploadState === 'uploading' || pendingAttachment.uploadState === 'pending') {
@@ -4184,7 +4300,6 @@ async function analyzeFileWithPuter(fileOrUrl) {
     return null;
   }
 }
-      puter.ai.chat(prompt, imageUrl, { model: 'gpt-5-nano' })
 
 
       // ensure history and savedConvos are up-to-date on load
