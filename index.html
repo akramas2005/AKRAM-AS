@@ -2315,35 +2315,31 @@ function uploadFileToServer(file, onProgress){
     }
   });
 }
-      // ✅ دالة تحليل الصور باستخدام Puter (منظفة)
+      // 🟢 دالة تنظيف نتائج Puter
+function parsePuterResult(r) {
+  if (!r) return '';
+  if (typeof r === 'string') return r;
+  if (r.text) return r.text;
+  if (r.description) return r.description;
+  if (r.summary) return r.summary;
+  return JSON.stringify(r, null, 2); // fallback مرتب بدل JSON خام
+}
+
+// 🟢 تحليل الصور
 async function analyzeImageWithPuter(imageUrl) {
   try {
     if (!imageUrl) return null;
-
     const typingEl = (typeof showTyping === 'function') ? showTyping() : null;
 
     if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
-      try {
-        const prompt = `صف محتوى الصورة باختصار (عناصر رئيسية، ألوان/حالة)، وحاول استخراج أي نص ظاهر داخل الصورة.`;
-        const puterResp = await puter.ai.chat(prompt, imageUrl, { model: "gpt-5-nano" });
+      const prompt = `صف محتوى الصورة باختصار (عناصر رئيسية، ألوان، نص ظاهر إن وجد).`;
+      const r = await puter.ai.chat(prompt, imageUrl, { model: "gpt-5-nano" });
+      const txt = parsePuterResult(r);
 
-        const analysisText = (typeof puterResp === 'string')
-          ? puterResp
-          : (puterResp?.text || puterResp?.description || puterResp?.summary || '⚠️ لم أستطع استخراج وصف مناسب.');
+      if (typingEl && typingEl.parentNode) typingEl.remove();
 
-        if (typingEl && typingEl.parentNode) typingEl.remove();
-
-        if (analysisText) {
-          const botMsg = { id: genId(), role: 'assistant', content: analysisText.slice(0,15000), meta: {} };
-          messages.push(botMsg);
-          appendMessage(botMsg, messages.length - 1);
-          saveSession?.();
-        }
-
-        return puterResp;
-      } catch (err) {
-        console.warn('analyzeImageWithPuter failed', err);
-      }
+      if (txt) appendAssistantText(txt);
+      return r;
     }
 
     if (typingEl && typingEl.parentNode) typingEl.remove();
@@ -2353,52 +2349,32 @@ async function analyzeImageWithPuter(imageUrl) {
     return null;
   }
 }
-      function appendAssistantText(text) {
-  if (!text) return;
-  const botMsg = {
-    id: genId(),
-    role: "assistant",
-    content: String(text).slice(0, 15000),
-    meta: {}
-  };
-  messages.push(botMsg);
-  appendMessage(botMsg, messages.length - 1);
-  try { saveSession(); } catch(_) {}
-}
 
-// ✅ دالة تحليل الملفات باستخدام Puter (منظفة)
+// 🟢 تحليل الملفات
 async function analyzeFileWithPuter(fileOrUrl) {
   try {
-    const appendAssistantText = (text) => {
-      if (!text) return;
-      const botMsg = { id: genId(), role: 'assistant', content: text.slice(0,15000), meta: {} };
-      messages.push(botMsg);
-      appendMessage(botMsg, messages.length - 1);
-      saveSession?.();
-    };
+    if (!fileOrUrl) return null;
+    const typingEl = (typeof showTyping === 'function') ? showTyping() : null;
 
     if (typeof fileOrUrl === 'string') {
       const lower = fileOrUrl.toLowerCase();
       if (lower.match(/\.(png|jpe?g|webp|gif|bmp)(?:[?#].*)?$/)) {
         return analyzeImageWithPuter(fileOrUrl);
-      } else {
-        if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
-          try {
-            const prompt = `حلل هذا الملف (ملخص، أي نص داخله، نوع الملف): ${fileOrUrl}`;
-            const r = await puter.ai.chat(prompt, null, { model: "gpt-5-nano" });
-
-            const txt = (typeof r === 'string')
-              ? r
-              : (r?.text || r?.summary || r?.description || '⚠️ لم أستطع استخراج نص من الملف.');
-
-            appendAssistantText(txt);
-            return r;
-          } catch (e) {
-            console.warn('analyzeFileWithPuter via URL failed', e);
-          }
-        }
       }
     }
+
+    if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
+      const prompt = `حلل هذا الملف (ملخص، نوعه، أي نص داخلي مهم): ${fileOrUrl}`;
+      const r = await puter.ai.chat(prompt, null, { model: "gpt-5-nano" });
+      const txt = parsePuterResult(r);
+
+      if (typingEl && typingEl.parentNode) typingEl.remove();
+
+      if (txt) appendAssistantText(txt);
+      return r;
+    }
+
+    if (typingEl && typingEl.parentNode) typingEl.remove();
     return null;
   } catch (e) {
     console.error('analyzeFileWithPuter error', e);
@@ -4247,7 +4223,6 @@ async function analyzeFileWithPuter(fileOrUrl) {
     return null;
   }
 }
-      puter.ai.chat(prompt, imageUrl, { model: 'gpt-5-nano' })
 
 
       // ensure history and savedConvos are up-to-date on load
