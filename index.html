@@ -2085,10 +2085,6 @@ async function sendAttachmentNow() {
       clearPreview();
       pendingAttachment = null;
 
-      // assistant reply
-      regenerateAssistantForParent(messages.length - 1);
-    }
-
   } catch (e) {
     console.error('sendAttachmentNow error', e);
     toast('Send failed');
@@ -2293,7 +2289,7 @@ function uploadFileToServer(file, onProgress){
     }
   });
 }
-      // ✅ دالة تحليل الصور باستخدام Puter
+      // ✅ دالة تحليل الصور باستخدام Puter (منظفة)
 async function analyzeImageWithPuter(imageUrl) {
   try {
     if (!imageUrl) return null;
@@ -2307,7 +2303,7 @@ async function analyzeImageWithPuter(imageUrl) {
 
         const analysisText = (typeof puterResp === 'string')
           ? puterResp
-          : (puterResp && (puterResp.text || puterResp.description || JSON.stringify(puterResp)));
+          : (puterResp?.text || puterResp?.description || puterResp?.summary || '⚠️ لم أستطع استخراج وصف مناسب.');
 
         if (typingEl && typingEl.parentNode) typingEl.remove();
 
@@ -2344,7 +2340,7 @@ async function analyzeImageWithPuter(imageUrl) {
   try { saveSession(); } catch(_) {}
 }
 
-// ✅ دالة تحليل الملفات باستخدام Puter
+// ✅ دالة تحليل الملفات باستخدام Puter (منظفة)
 async function analyzeFileWithPuter(fileOrUrl) {
   try {
     const appendAssistantText = (text) => {
@@ -2364,7 +2360,11 @@ async function analyzeFileWithPuter(fileOrUrl) {
           try {
             const prompt = `حلل هذا الملف (ملخص، أي نص داخله، نوع الملف): ${fileOrUrl}`;
             const r = await puter.ai.chat(prompt, null, { model: "gpt-5-nano" });
-            const txt = (typeof r === 'string') ? r : (r?.text || r?.summary || JSON.stringify(r));
+
+            const txt = (typeof r === 'string')
+              ? r
+              : (r?.text || r?.summary || r?.description || '⚠️ لم أستطع استخراج نص من الملف.');
+
             appendAssistantText(txt);
             return r;
           } catch (e) {
