@@ -1983,69 +1983,7 @@ function parsePuterResult(res) {
     return null;
   }
 }
-
-// ===== analyze image (returns plain text or null) =====
-async function analyzeImageWithPuter(imageUrl) {
-  try {
-    if (!imageUrl) return null;
-
-    if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
-      const prompt = `صف محتوى هذه الصورة باختصار (عناصر رئيسية، ألوان/حالة)، وحاول استخراج أي نص ظاهر داخلها.`;
-      const r = await puter.ai.chat(prompt, imageUrl, { model: "gpt-5-nano" });
-      return parsePuterResult(r); // ✅ فقط نرجع النص
-    }
-
-    return null;
-  } catch (e) {
-    console.error('analyzeImageWithPuter error', e);
-    return null;
-  }
-}
-
-// ===== analyze general file (returns plain text or null) =====
-async function analyzeFileWithPuter(fileOrUrl) {
-  try {
-    if (!fileOrUrl) return null;
-
-    if (typeof fileOrUrl === 'string') {
-      const lower = fileOrUrl.toLowerCase();
-      if (lower.match(/\.(png|jpe?g|webp|gif|bmp)(?:[?#].*)?$/)) {
-        return analyzeImageWithPuter(fileOrUrl);
-      }
-      if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
-        const prompt = `حلّل الملف الموجود على هذا الرابط بشكل مختصر (ملخص، أي نص داخلي): ${fileOrUrl}`;
-        const r = await puter.ai.chat(prompt, null, { model: "gpt-5-nano" });
-        return parsePuterResult(r); // ✅ نرجع النص فقط
-      }
-      return null;
-    }
-
-    if (fileOrUrl instanceof File) {
-      const ext = (fileOrUrl.name || '').split('.').pop().toLowerCase();
-      const textLike = ['txt','json','js','html','htm','css','py','md','xml','csv'];
-      if (textLike.includes(ext)) {
-        try {
-          const txtContent = await fileOrUrl.text();
-          if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
-            const prompt = `حلل هذا الملف (${ext}) وقدم ملخصاً ونقاطاً مهمة:\n\n${txtContent.slice(0,8000)}`;
-            const r = await puter.ai.chat(prompt, null, { model: "gpt-5-nano" });
-            return parsePuterResult(r); // ✅ نرجع النص فقط
-          }
-        } catch (e) {
-          console.warn('analyzeFileWithPuter read text failed', e);
-          return null;
-        }
-      }
-      return null;
-    }
-
-    return null;
-  } catch (e) {
-    console.error('analyzeFileWithPuter error', e);
-    return null;
-  }
-}
-
+      
       // === sendAttachmentNow (fixed clean) ===
 async function sendAttachmentNow() {
   try {
