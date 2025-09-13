@@ -1972,10 +1972,25 @@ async function sendAttachmentNow(){
       clearPreview();
       pendingAttachment = null;
 
-      // trigger assistant reply
-      regenerateAssistantForParent(messages.length - 1);
-      return;
-    }
+      // === analyze attachment after send ===
+const attached = userMessage.attachment || null;
+const typingEl = (typeof showTyping === 'function') ? showTyping() : null;
+try {
+  if (attached && attached.mime_type && attached.mime_type.startsWith('image/')) {
+    await analyzeImageWithPuter(attached.url || attached.src || attached.filename);
+  } else if (attached) {
+    await analyzeFileWithPuter(attached.url || attached.src || attached.filename || attached.id);
+  } else {
+    regenerateAssistantForParent(messages.length - 1);
+  }
+} catch (err) {
+  console.warn('attachment analysis failed', err);
+  regenerateAssistantForParent(messages.length - 1);
+} finally {
+  if (typingEl && typingEl.parentNode) {
+    try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
+  }
+}
 
     // If still uploading -> mark sendOnComplete and ask user to wait
     if (pendingAttachment.uploadState === 'uploading' || pendingAttachment.uploadState === 'pending') {
@@ -2068,13 +2083,25 @@ async function sendAttachmentNow(){
         scheduleSync();
       });
 
-      // cleanup
-      clearPreview();
-      pendingAttachment = null;
-
-      // assistant reply
-      regenerateAssistantForParent(messages.length - 1);
-    }
+      // === analyze attachment after send ===
+const attached = userMessage.attachment || null;
+const typingEl = (typeof showTyping === 'function') ? showTyping() : null;
+try {
+  if (attached && attached.mime_type && attached.mime_type.startsWith('image/')) {
+    await analyzeImageWithPuter(attached.url || attached.src || attached.filename);
+  } else if (attached) {
+    await analyzeFileWithPuter(attached.url || attached.src || attached.filename || attached.id);
+  } else {
+    regenerateAssistantForParent(messages.length - 1);
+  }
+} catch (err) {
+  console.warn('attachment analysis failed', err);
+  regenerateAssistantForParent(messages.length - 1);
+} finally {
+  if (typingEl && typingEl.parentNode) {
+    try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
+  }
+}
 
   } catch (e){
     console.error('sendAttachmentNow error', e);
