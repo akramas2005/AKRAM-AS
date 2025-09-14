@@ -1990,7 +1990,7 @@ async function sendAttachmentNow() {
     if (!pendingAttachment) return;
     if (pendingAttachment._sending) return;
 
-    // ✅ إذا الملف مرفوع جاهز
+    // If upload already finished and we have remote URL -> send immediately
     if (pendingAttachment.uploadState === 'done' && pendingAttachment.url) {
       const text = (composer.value || '').trim();
       const userMessage = {
@@ -2015,11 +2015,7 @@ async function sendAttachmentNow() {
       composer.value = '';
       updateSendVisibility();
       autoGrowTextarea();
-      try {
-        if (pendingAttachment && pendingAttachment._objectUrl) {
-          URL.revokeObjectURL(pendingAttachment._objectUrl);
-        }
-      } catch (e) {}
+      try { if (pendingAttachment && pendingAttachment._objectUrl) URL.revokeObjectURL(pendingAttachment._objectUrl); } catch(e){}
 
       // send to backend
       postMessageToServer(userMessage).catch(err => {
@@ -2033,70 +2029,57 @@ async function sendAttachmentNow() {
 
       // === تحليل المرفق بعد الإرسال ===
       const attached = userMessage.attachment || null;
-const typingEl = (typeof showTyping === 'function') ? showTyping() : null;
-try {
-  let analysisText = null;
+      try {
+        const userText = (userMessage.content && String(userMessage.content).trim()) ? String(userMessage.content).trim() : null;
+        let analysisText = null;
 
-  if (attached && attached.mime_type && attached.mime_type.startsWith('image/')) {
-    analysisText = await analyzeImageWithPuter(attached.url || attached.src || attached.filename || attached.id);
-  } else if (attached) {
-    analysisText = await analyzeFileWithPuter(attached.url || attached.src || attached.filename || attached.id);
-  }
+        if (attached && attached.mime_type && attached.mime_type.startsWith('image/')) {
+          analysisText = await analyzeImageWithPuter(attached.url || attached.src || attached.filename || attached.id, userText);
+        } else if (attached) {
+          analysisText = await analyzeFileWithPuter(attached.url || attached.src || attached.filename || attached.id, userText);
+        }
 
-  if (analysisText) {
-    // append assistant message once, مع نص نظيف
-    const botMsg = { id: genId(), role: 'assistant', content: String(analysisText).trim().slice(0,15000), meta: {} };
-    messages.push(botMsg);
-    appendMessage(botMsg, messages.length - 1);
-    try { saveSession(); } catch(_) {}
-  } else {
-    // fallback: استخدم مولد الرد الاعتيادي إن أردت
-    regenerateAssistantForParent(messages.length - 1);
-  }
-} catch (err) {
-  console.warn('attachment analysis failed', err);
-  regenerateAssistantForParent(messages.length - 1);
-} finally {
-  if (typingEl && typingEl.parentNode) {
-    try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
-  }
-}
+        if (analysisText) {
+          // append assistant message once، نص نظيف
+          const botMsg = { id: genId(), role: 'assistant', content: String(analysisText).slice(0,15000), meta: {} };
+          messages.push(botMsg);
+          appendMessage(botMsg, messages.length - 1);
+          try { saveSession(); } catch(_) {}
+        } else {
+          // لا توجد نتيجة من المحلل — استعمل مولد الرد الافتراضي
+          regenerateAssistantForParent(messages.length - 1);
+        }
+      } catch (err) {
+        console.warn('attachment analysis failed', err);
+        regenerateAssistantForParent(messages.length - 1);
+      }
+
       return;
     }
 
-    // ⏳ لو مازال يرفع الملف
+    // If still uploading -> mark sendOnComplete and ask user to wait
     if (pendingAttachment.uploadState === 'uploading' || pendingAttachment.uploadState === 'pending') {
       pendingAttachment.sendOnComplete = true;
       toast('Waiting for upload to complete...');
       return;
     }
 
-    // ❌ لو فشل الرفع
     if (pendingAttachment.uploadState === 'failed') {
       toast('Upload failed — please retry or remove the attachment');
       return;
     }
 
-    // 🔄 رفع الملف إذا لم يرفع بعد
+    // Otherwise — perform the upload now (fallback).
     pendingAttachment._sending = true;
     let uploadResult = null;
 
     if (pendingAttachment && pendingAttachment.file) {
       try {
         toast('Uploading file...');
-        try {
-          if (pendingAttachment._uploadInterval) {
-            clearInterval(pendingAttachment._uploadInterval);
-            pendingAttachment._uploadInterval = null;
-          }
-        } catch (e) {}
-
+        try { if (pendingAttachment._uploadInterval) { clearInterval(pendingAttachment._uploadInterval); pendingAttachment._uploadInterval = null; } } catch(e){}
         const rectEl = pendingAttachment._rect || null;
         const outerEl = pendingAttachment._outer || null;
-        if (outerEl) {
-          outerEl.classList.remove('upload-failed', 'upload-complete');
-          outerEl.classList.add('uploading');
-        }
+        if (outerEl) { outerEl.classList.remove('upload-failed','upload-complete'); outerEl.classList.add('uploading'); }
 
         uploadResult = await uploadFileToServer(pendingAttachment.file, (pct, loaded, total) => {
           try {
@@ -2104,26 +2087,21 @@ try {
             pendingAttachment.uploadState = 'uploading';
             if (rectEl && typeof rectEl.getTotalLength === 'function') {
               const len = rectEl.getTotalLength();
-              const draw = Math.max(0, Math.round(len * (1 - (pct / 100))));
+              const draw = Math.max(0, Math.round(len * (1 - (pct/100))));
               rectEl.style.strokeDashoffset = draw;
             }
-          } catch (e) {}
+          } catch(e){}
         });
       } catch (err) {
         console.warn('uploadFileToServer failed', err);
         pendingAttachment.uploadState = 'failed';
         pendingAttachment.progress = 0;
-        try {
-          if (pendingAttachment._outer) {
-            pendingAttachment._outer.classList.remove('uploading');
-            pendingAttachment._outer.classList.add('upload-failed');
-          }
-        } catch (e) {}
+        try { if (pendingAttachment._outer) { pendingAttachment._outer.classList.remove('uploading'); pendingAttachment._outer.classList.add('upload-failed'); } } catch(e){}
         toast('Upload failed — message will be queued locally and retried');
       }
     }
 
-    // ✅ بعد الرفع: بناء الرسالة + إرسالها
+    // After upload: build message + send
     if (uploadResult || (pendingAttachment.uploadState === 'done' && pendingAttachment.url)) {
       const res = uploadResult || pendingAttachment._uploadResult || {};
       pendingAttachment.uploadState = 'done';
@@ -2156,11 +2134,7 @@ try {
       composer.value = '';
       updateSendVisibility();
       autoGrowTextarea();
-      try {
-        if (pendingAttachment && pendingAttachment._objectUrl) {
-          URL.revokeObjectURL(pendingAttachment._objectUrl);
-        }
-      } catch (e) {}
+      try { if(pendingAttachment && pendingAttachment._objectUrl) URL.revokeObjectURL(pendingAttachment._objectUrl); } catch(e){}
 
       // persist to server
       postMessageToServer(userMessage).catch(err => {
@@ -2172,15 +2146,37 @@ try {
       clearPreview();
       pendingAttachment = null;
 
-      // assistant reply
-      regenerateAssistantForParent(messages.length - 1);
+      // assistant reply (same logic as above) - pass user text
+      try {
+        const userText = (userMessage.content && String(userMessage.content).trim()) ? String(userMessage.content).trim() : null;
+        let analysisText = null;
+        const attached = userMessage.attachment || null;
+
+        if (attached && attached.mime_type && attached.mime_type.startsWith('image/')) {
+          analysisText = await analyzeImageWithPuter(attached.url || attached.src || attached.filename || attached.id, userText);
+        } else if (attached) {
+          analysisText = await analyzeFileWithPuter(attached.url || attached.src || attached.filename || attached.id, userText);
+        }
+
+        if (analysisText) {
+          const botMsg = { id: genId(), role: 'assistant', content: String(analysisText).slice(0,15000), meta: {} };
+          messages.push(botMsg);
+          appendMessage(botMsg, messages.length - 1);
+          try { saveSession(); } catch(_) {}
+        } else {
+          regenerateAssistantForParent(messages.length - 1);
+        }
+      } catch (err) {
+        console.warn('attachment analysis failed', err);
+        regenerateAssistantForParent(messages.length - 1);
+      }
     }
 
   } catch (e) {
     console.error('sendAttachmentNow error', e);
     toast('Send failed');
   } finally {
-    try { if (pendingAttachment) pendingAttachment._sending = false; } catch (e) {}
+    try { if (pendingAttachment) pendingAttachment._sending = false; } catch(e){}
   }
 }
       document.addEventListener('click', (e)=>{ if(attachPanel.classList.contains('open') && !attachPanel.contains(e.target) && !attachBtn.contains(e.target)) closeAttach(); }, true);
@@ -2382,24 +2378,32 @@ function uploadFileToServer(file, onProgress){
 }
 
 // 🟢 تحليل الصور
-async function analyzeImageWithPuter(imageUrl) {
+async function analyzeImageWithPuter(imageUrl, userPrompt = null) {
   try {
     if (!imageUrl) return null;
+    // دالة showTyping داخل التحليل تمنع تكرار الانيميشِن إذا لم تُستدعى في sendAttachmentNow
     const typingEl = (typeof showTyping === 'function') ? showTyping() : null;
 
     if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
-      const prompt = `صف محتوى الصورة باختصار (عناصر رئيسية، ألوان، نص ظاهر إن وجد).`;
-      const r = await puter.ai.chat(prompt, imageUrl, { model: "gpt-5-nano" });
-      const txt = parsePuterResult(r);
+      try {
+        // إذا أرسل المستخدم نصًا، اجمعه مع الطلب التحليلي للصورة
+        const basePrompt = (userPrompt && String(userPrompt).trim())
+          ? `${String(userPrompt).trim()}\n\nالآن قم بتحليل الصورة التالية وابدأ برد واضح وعملي بناءً على ما طلبه المستخدم:`
+          : `صف محتوى الصورة باختصار (عناصر رئيسية، ألوان/حالة)، وحاول استخراج أي نص ظاهر إن وجد. قدم ملخصًا ونقاطًا قصيرة.`;
 
-      if (typingEl && typingEl.parentNode) typingEl.remove();
+        const puterResp = await puter.ai.chat(basePrompt, imageUrl, { model: 'gpt-5-nano' });
+        const txt = parsePuterResult(puterResp);
 
-      if (txt) {
-        return txt; // ✅ فقط ترجع النص
+        if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
+        return txt ? String(txt).trim() : null;
+      } catch (err) {
+        console.warn('analyzeImageWithPuter (puter.ai.chat) failed', err);
+        if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
+        return null;
       }
     }
 
-    if (typingEl && typingEl.parentNode) typingEl.remove();
+    if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
     return null;
   } catch (e) {
     console.error('analyzeImageWithPuter error', e);
@@ -2408,34 +2412,92 @@ async function analyzeImageWithPuter(imageUrl) {
 }
 
 // 🟢 تحليل الملفات
-async function analyzeFileWithPuter(fileOrUrl) {
+async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
+  const typingEl = (typeof showTyping === 'function') ? showTyping() : null;
   try {
-    if (!fileOrUrl) return null;
-    const typingEl = (typeof showTyping === 'function') ? showTyping() : null;
+    if (!fileOrUrl) {
+      if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
+      return null;
+    }
 
+    // إذا كانت سلسلة نصية (رابط)
     if (typeof fileOrUrl === 'string') {
       const lower = fileOrUrl.toLowerCase();
+      // صورة عبر رابط -> راجع analyzeImageWithPuter مع forward للمطالَب
       if (lower.match(/\.(png|jpe?g|webp|gif|bmp)(?:[?#].*)?$/)) {
-        return analyzeImageWithPuter(fileOrUrl);
+        const res = await analyzeImageWithPuter(fileOrUrl, userPrompt);
+        if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
+        return res;
+      }
+
+      if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
+        try {
+          const basePrompt = (userPrompt && String(userPrompt).trim())
+            ? `${String(userPrompt).trim()}\n\nقم بتحليل الملف على الرابط التالي وقدم ملخصاً واضحاً أو نفّذ المطلوب: ${fileOrUrl}`
+            : `حلل هذا الملف (ملخص، نوعه، أي نص داخلي مهم): ${fileOrUrl}`;
+
+          const r = await puter.ai.chat(basePrompt, null, { model: 'gpt-5-nano' });
+          const txt = parsePuterResult(r);
+          if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
+          return txt ? String(txt).trim() : null;
+        } catch (e) {
+          console.warn('analyzeFileWithPuter via URL failed', e);
+          if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
+          return null;
+        }
+      }
+
+      if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
+      return null;
+    }
+
+    // إذا كان كائن File محلي
+    if (fileOrUrl instanceof File) {
+      try {
+        // لو كان ملف صورة -> حوّله إلى data URL ثم حلله مع userPrompt
+        if (fileOrUrl.type && fileOrUrl.type.startsWith('image/')) {
+          const dataUrl = await new Promise((res, rej) => {
+            const fr = new FileReader();
+            fr.onload = () => res(fr.result);
+            fr.onerror = rej;
+            fr.readAsDataURL(fileOrUrl);
+          });
+          const r = await analyzeImageWithPuter(dataUrl, userPrompt);
+          if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
+          return r;
+        }
+
+        // لو ملف نصّي معروف: اقرأ المحتوى وأرسله ضمن المطالَب (مع اقتصاص)
+        const ext = (fileOrUrl.name || '').split('.').pop().toLowerCase();
+        const textLike = ['txt','json','js','html','htm','css','py','md','xml','csv'];
+        if (textLike.includes(ext)) {
+          const txtContent = await fileOrUrl.text();
+          if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
+            const basePrompt = (userPrompt && String(userPrompt).trim())
+              ? `${String(userPrompt).trim()}\n\nهذا محتوى الملف (${ext}). نفّذ المطلوب أو قدّم ملخصًا/ملاحظات:\n\n${txtContent.slice(0, 8000)}`
+              : `حلل هذا الملف (${ext}) وقدم ملخصاً ونقاطاً مهمة:\n\n${txtContent.slice(0, 8000)}`;
+
+            const r = await puter.ai.chat(basePrompt, null, { model: 'gpt-5-nano' });
+            const parsed = parsePuterResult(r);
+            if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
+            return parsed ? String(parsed).trim() : null;
+          }
+        }
+
+        if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
+        return null;
+      } catch (e) {
+        console.warn('analyzeFileWithPuter read text failed', e);
+        if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
+        return null;
       }
     }
 
-    if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
-      const prompt = `حلل هذا الملف (ملخص، نوعه، أي نص داخلي مهم): ${fileOrUrl}`;
-      const r = await puter.ai.chat(prompt, null, { model: "gpt-5-nano" });
-      const txt = parsePuterResult(r);
-
-      if (typingEl && typingEl.parentNode) typingEl.remove();
-
-      if (txt) {
-        return txt; // ✅ فقط ترجع النص
-      }
-    }
-
-    if (typingEl && typingEl.parentNode) typingEl.remove();
+    if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
     return null;
   } catch (e) {
     console.error('analyzeFileWithPuter error', e);
+    if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
     return null;
   }
 }
