@@ -2043,13 +2043,18 @@ function parsePuterResult(res) {
         }
 
         if (analysisText) {
-          // append assistant message once, مع نص نظيف
-          const botMsg = { id: genId(), role: 'assistant', content: String(analysisText).trim().slice(0, 15000), meta: {} };
-          messages.push(botMsg);
-          appendMessage(botMsg, messages.length - 1);
-          try {
-            saveSession();
-          } catch (_) {}
+          // فرض استخراج النص النظيف من الرد
+          const cleanText = parsePuterResult(analysisText);
+          
+          if (cleanText) {
+              const botMsg = { id: genId(), role: 'assistant', content: String(cleanText).trim().slice(0, 15000), meta: {} };
+              messages.push(botMsg);
+              appendMessage(botMsg, messages.length - 1);
+              try {
+                saveSession();
+              } catch (_) {}
+          }
+      }
         } else {
           // لا يوجد رد إذا فشل التحليل.
         }
@@ -2389,24 +2394,18 @@ function uploadFileToServer(file, onProgress){
 async function analyzeImageWithPuter(imageUrl) {
   try {
     if (!imageUrl) return null;
-
-    // show typing indicator (if available) so UX feels like assistant is thinking
     const typingEl = (typeof showTyping === 'function') ? showTyping() : null;
 
-    // 1) Prefer Puter client SDK if loaded and supports .chat
     if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
       try {
-        // Prompt instructs model to describe + extract visible text
-        const prompt = `صف محتوى الصورة باختصار (عناصر رئيسية، ألوان/حالة)، وحاول استخراج أي نص ظاهر داخل الصورة إن وُجد. أعطِ ملخصاً قصيراً ونقاطاً.`;
+        const prompt = `...`;
         const puterResp = await puter.ai.chat(prompt, imageUrl, { model: 'gpt-5-nano' });
         const analysisText = (typeof puterResp === 'string')
           ? puterResp
           : (puterResp && (puterResp.text || puterResp.description || JSON.stringify(puterResp)));
 
-        // remove typing indicator
         if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
 
-        // لا تقم بإضافة الرسالة هنا، فقط أرجع النص النظيف
         if (analysisText) {
           return analysisText;
         }
@@ -2415,8 +2414,8 @@ async function analyzeImageWithPuter(imageUrl) {
         console.warn('analyzeImageWithPuter (puter.ai.chat) failed', err);
       }
     }
-
-    // 2) Fallback to your backend vision endpoint (POST /api/vision expecting { image_url })
+    
+    // الجزء الخاص بالـ Fallback
     if (typeof API_BASE === 'string' && API_BASE) {
       try {
         const resp = await fetch(API_BASE + '/api/vision', {
@@ -2428,10 +2427,8 @@ async function analyzeImageWithPuter(imageUrl) {
         const data = await resp.json();
         const analysisText = data && (data.description || data.text || data.summary || JSON.stringify(data));
 
-        // remove typing indicator
         if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
         
-        // لا تقم بإضافة الرسالة هنا، فقط أرجع النص النظيف
         if (analysisText) {
           return analysisText;
         }
@@ -2439,6 +2436,14 @@ async function analyzeImageWithPuter(imageUrl) {
         console.warn('analyzeImageWithPuter fallback failed', e);
       }
     }
+    
+    if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
+    return null;
+  } catch (e) {
+    console.error('analyzeImageWithPuter error', e);
+    return null;
+  }
+}
 
     // cleanup typing if still present
     if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
