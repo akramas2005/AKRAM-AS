@@ -1984,204 +1984,204 @@ function parsePuterResult(res) {
   }
 }
       
-      async function sendAttachmentNow() {
-    try {
-        if (!pendingAttachment) return;
-        if (pendingAttachment._sending) return;
+      // === sendAttachmentNow (fixed clean) ===
+async function sendAttachmentNow() {
+  try {
+    if (!pendingAttachment) return;
+    if (pendingAttachment._sending) return;
 
-        // ✅ إذا الملف مرفوع جاهز
-        if (pendingAttachment.uploadState === 'done' && pendingAttachment.url) {
-            const text = (composer.value || '').trim();
-            const userMessage = {
-                id: genId(),
-                role: 'user',
-                content: text || '',
-                attachment: {
-                    id: pendingAttachment.id,
-                    url: pendingAttachment.url,
-                    filename: pendingAttachment.filename || pendingAttachment.name,
-                    mime_type: pendingAttachment.mime_type || pendingAttachment.type || ''
-                },
-                meta: {}
-            };
+    // ✅ إذا الملف مرفوع جاهز
+    if (pendingAttachment.uploadState === 'done' && pendingAttachment.url) {
+      const text = (composer.value || '').trim();
+      const userMessage = {
+        id: genId(),
+        role: 'user',
+        content: text || '',
+        attachment: {
+          id: pendingAttachment.id,
+          url: pendingAttachment.url,
+          filename: pendingAttachment.filename || pendingAttachment.name,
+          mime_type: pendingAttachment.mime_type || pendingAttachment.type || ''
+        },
+        meta: {}
+      };
 
-            // append locally
-            messages.push(userMessage);
-            appendMessage(userMessage, messages.length - 1);
-            saveSession();
+      // append locally
+      messages.push(userMessage);
+      appendMessage(userMessage, messages.length - 1);
+      saveSession();
 
-            // clear composer & preview
-            composer.value = '';
-            updateSendVisibility();
-            autoGrowTextarea();
-            try {
-                if (pendingAttachment && pendingAttachment._objectUrl) {
-                    URL.revokeObjectURL(pendingAttachment._objectUrl);
-                }
-            } catch (e) {}
-
-            // send to backend
-            postMessageToServer(userMessage).catch(err => {
-                console.warn('postMessageToServer failed for attachment message', err);
-                scheduleSync();
-            });
-
-            // clear preview + reset
-            clearPreview();
-            pendingAttachment = null;
-
-            // === تحليل المرفق بعد الإرسال ===
-            const attached = userMessage.attachment || null;
-            const typingEl = (typeof showTyping === 'function') ? showTyping() : null;
-            try {
-                let analysisResult = null;
-
-                if (attached && attached.mime_type && attached.mime_type.startsWith('image/')) {
-                    analysisResult = await analyzeImageWithPuter(attached.url || attached.src || attached.filename || attached.id);
-                } else if (attached) {
-                    analysisResult = await analyzeFileWithPuter(attached.url || attached.src || attached.filename || attached.id);
-                }
-
-                // فرض استخراج النص النظيف من الرد
-                const cleanText = parsePuterResult(analysisResult);
-
-                if (cleanText) {
-                    const botMsg = { id: genId(), role: 'assistant', content: String(cleanText).trim().slice(0, 15000), meta: {} };
-                    messages.push(botMsg);
-                    appendMessage(botMsg, messages.length - 1);
-                    try {
-                        saveSession();
-                    } catch (_) {}
-                }
-            } catch (err) {
-                console.warn('attachment analysis failed', err);
-            } finally {
-                if (typingEl && typingEl.parentNode) {
-                    try {
-                        typingEl.parentNode.removeChild(typingEl);
-                    } catch (_) {}
-                }
-            }
-            return;
+      // clear composer & preview
+      composer.value = '';
+      updateSendVisibility();
+      autoGrowTextarea();
+      try {
+        if (pendingAttachment && pendingAttachment._objectUrl) {
+          URL.revokeObjectURL(pendingAttachment._objectUrl);
         }
+      } catch (e) {}
 
-        // ⏳ لو مازال يرفع الملف
-        if (pendingAttachment.uploadState === 'uploading' || pendingAttachment.uploadState === 'pending') {
-            pendingAttachment.sendOnComplete = true;
-            toast('Waiting for upload to complete...');
-            return;
-        }
+      // send to backend
+      postMessageToServer(userMessage).catch(err => {
+        console.warn('postMessageToServer failed for attachment message', err);
+        scheduleSync();
+      });
 
-        // ❌ لو فشل الرفع
-        if (pendingAttachment.uploadState === 'failed') {
-            toast('Upload failed — please retry or remove the attachment');
-            return;
-        }
+      // clear preview + reset
+      clearPreview();
+      pendingAttachment = null;
 
-        // 🔄 رفع الملف إذا لم يرفع بعد
-        pendingAttachment._sending = true;
-        let uploadResult = null;
+      // === تحليل المرفق بعد الإرسال ===
+      const attached = userMessage.attachment || null;
+const typingEl = (typeof showTyping === 'function') ? showTyping() : null;
+try {
+  let analysisText = null;
 
-        if (pendingAttachment && pendingAttachment.file) {
-            try {
-                toast('Uploading file...');
-                try {
-                    if (pendingAttachment._uploadInterval) {
-                        clearInterval(pendingAttachment._uploadInterval);
-                        pendingAttachment._uploadInterval = null;
-                    }
-                } catch (e) {}
+  if (attached && attached.mime_type && attached.mime_type.startsWith('image/')) {
+    analysisText = await analyzeImageWithPuter(attached.url || attached.src || attached.filename || attached.id);
+  } else if (attached) {
+    analysisText = await analyzeFileWithPuter(attached.url || attached.src || attached.filename || attached.id);
+  }
 
-                const rectEl = pendingAttachment._rect || null;
-                const outerEl = pendingAttachment._outer || null;
-                if (outerEl) {
-                    outerEl.classList.remove('upload-failed', 'upload-complete');
-                    outerEl.classList.add('uploading');
-                }
-
-                uploadResult = await uploadFileToServer(pendingAttachment.file, (pct, loaded, total) => {
-                    try {
-                        pendingAttachment.progress = pct;
-                        pendingAttachment.uploadState = 'uploading';
-                        if (rectEl && typeof rectEl.getTotalLength === 'function') {
-                            const len = rectEl.getTotalLength();
-                            const draw = Math.max(0, Math.round(len * (1 - (pct / 100))));
-                            rectEl.style.strokeDashoffset = draw;
-                        }
-                    } catch (e) {}
-                });
-            } catch (err) {
-                console.warn('uploadFileToServer failed', err);
-                pendingAttachment.uploadState = 'failed';
-                pendingAttachment.progress = 0;
-                try {
-                    if (pendingAttachment._outer) {
-                        pendingAttachment._outer.classList.remove('uploading');
-                        pendingAttachment._outer.classList.add('upload-failed');
-                    }
-                } catch (e) {}
-                toast('Upload failed — message will be queued locally and retried');
-            }
-        }
-
-        // ✅ بعد الرفع: بناء الرسالة + إرسالها
-        if (uploadResult || (pendingAttachment.uploadState === 'done' && pendingAttachment.url)) {
-            const res = uploadResult || pendingAttachment._uploadResult || {};
-            pendingAttachment.uploadState = 'done';
-            pendingAttachment.progress = 100;
-            pendingAttachment.id = pendingAttachment.id || res.id;
-            pendingAttachment.url = pendingAttachment.url || res.url;
-            pendingAttachment.filename = pendingAttachment.filename || res.filename || pendingAttachment.name;
-            pendingAttachment.mime_type = pendingAttachment.mime_type || res.mime_type || pendingAttachment.type;
-
-            const text = (composer.value || '').trim();
-            const userMessage = {
-                id: genId(),
-                role: 'user',
-                content: text || '',
-                attachment: {
-                    id: pendingAttachment.id,
-                    url: pendingAttachment.url,
-                    filename: pendingAttachment.filename,
-                    mime_type: pendingAttachment.mime_type
-                },
-                meta: {}
-            };
-
-            // append locally
-            messages.push(userMessage);
-            appendMessage(userMessage, messages.length - 1);
-            saveSession();
-
-            // clear composer & preview
-            composer.value = '';
-            updateSendVisibility();
-            autoGrowTextarea();
-            try {
-                if (pendingAttachment && pendingAttachment._objectUrl) {
-                    URL.revokeObjectURL(pendingAttachment._objectUrl);
-                }
-            } catch (e) {}
-
-            // persist to server
-            postMessageToServer(userMessage).catch(err => {
-                console.warn('postMessageToServer failed for attachment message', err);
-                scheduleSync();
-            });
-
-            // cleanup
-            clearPreview();
-            pendingAttachment = null;
-        }
-
-    } catch (e) {
-        console.error('sendAttachmentNow error', e);
-        toast('Send failed');
-    } finally {
-        try {
-            if (pendingAttachment) pendingAttachment._sending = false;
-        } catch (e) {}
+  if (analysisText) {
+    // append assistant message once, مع نص نظيف
+    const botMsg = { id: genId(), role: 'assistant', content: String(analysisText).trim().slice(0,15000), meta: {} };
+    messages.push(botMsg);
+    appendMessage(botMsg, messages.length - 1);
+    try { saveSession(); } catch(_) {}
+  } else {
+    // fallback: استخدم مولد الرد الاعتيادي إن أردت
+    regenerateAssistantForParent(messages.length - 1);
+  }
+} catch (err) {
+  console.warn('attachment analysis failed', err);
+  regenerateAssistantForParent(messages.length - 1);
+} finally {
+  if (typingEl && typingEl.parentNode) {
+    try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
+  }
+}
+      return;
     }
+
+    // ⏳ لو مازال يرفع الملف
+    if (pendingAttachment.uploadState === 'uploading' || pendingAttachment.uploadState === 'pending') {
+      pendingAttachment.sendOnComplete = true;
+      toast('Waiting for upload to complete...');
+      return;
+    }
+
+    // ❌ لو فشل الرفع
+    if (pendingAttachment.uploadState === 'failed') {
+      toast('Upload failed — please retry or remove the attachment');
+      return;
+    }
+
+    // 🔄 رفع الملف إذا لم يرفع بعد
+    pendingAttachment._sending = true;
+    let uploadResult = null;
+
+    if (pendingAttachment && pendingAttachment.file) {
+      try {
+        toast('Uploading file...');
+        try {
+          if (pendingAttachment._uploadInterval) {
+            clearInterval(pendingAttachment._uploadInterval);
+            pendingAttachment._uploadInterval = null;
+          }
+        } catch (e) {}
+
+        const rectEl = pendingAttachment._rect || null;
+        const outerEl = pendingAttachment._outer || null;
+        if (outerEl) {
+          outerEl.classList.remove('upload-failed', 'upload-complete');
+          outerEl.classList.add('uploading');
+        }
+
+        uploadResult = await uploadFileToServer(pendingAttachment.file, (pct, loaded, total) => {
+          try {
+            pendingAttachment.progress = pct;
+            pendingAttachment.uploadState = 'uploading';
+            if (rectEl && typeof rectEl.getTotalLength === 'function') {
+              const len = rectEl.getTotalLength();
+              const draw = Math.max(0, Math.round(len * (1 - (pct / 100))));
+              rectEl.style.strokeDashoffset = draw;
+            }
+          } catch (e) {}
+        });
+      } catch (err) {
+        console.warn('uploadFileToServer failed', err);
+        pendingAttachment.uploadState = 'failed';
+        pendingAttachment.progress = 0;
+        try {
+          if (pendingAttachment._outer) {
+            pendingAttachment._outer.classList.remove('uploading');
+            pendingAttachment._outer.classList.add('upload-failed');
+          }
+        } catch (e) {}
+        toast('Upload failed — message will be queued locally and retried');
+      }
+    }
+
+    // ✅ بعد الرفع: بناء الرسالة + إرسالها
+    if (uploadResult || (pendingAttachment.uploadState === 'done' && pendingAttachment.url)) {
+      const res = uploadResult || pendingAttachment._uploadResult || {};
+      pendingAttachment.uploadState = 'done';
+      pendingAttachment.progress = 100;
+      pendingAttachment.id = pendingAttachment.id || res.id;
+      pendingAttachment.url = pendingAttachment.url || res.url;
+      pendingAttachment.filename = pendingAttachment.filename || res.filename || pendingAttachment.name;
+      pendingAttachment.mime_type = pendingAttachment.mime_type || res.mime_type || pendingAttachment.type;
+
+      const text = (composer.value || '').trim();
+      const userMessage = {
+        id: genId(),
+        role: 'user',
+        content: text || '',
+        attachment: {
+          id: pendingAttachment.id,
+          url: pendingAttachment.url,
+          filename: pendingAttachment.filename,
+          mime_type: pendingAttachment.mime_type
+        },
+        meta: {}
+      };
+
+      // append locally
+      messages.push(userMessage);
+      appendMessage(userMessage, messages.length - 1);
+      saveSession();
+
+      // clear composer & preview
+      composer.value = '';
+      updateSendVisibility();
+      autoGrowTextarea();
+      try {
+        if (pendingAttachment && pendingAttachment._objectUrl) {
+          URL.revokeObjectURL(pendingAttachment._objectUrl);
+        }
+      } catch (e) {}
+
+      // persist to server
+      postMessageToServer(userMessage).catch(err => {
+        console.warn('postMessageToServer failed for attachment message', err);
+        scheduleSync();
+      });
+
+      // cleanup
+      clearPreview();
+      pendingAttachment = null;
+
+      // assistant reply
+      regenerateAssistantForParent(messages.length - 1);
+    }
+
+  } catch (e) {
+    console.error('sendAttachmentNow error', e);
+    toast('Send failed');
+  } finally {
+    try { if (pendingAttachment) pendingAttachment._sending = false; } catch (e) {}
+  }
 }
       document.addEventListener('click', (e)=>{ if(attachPanel.classList.contains('open') && !attachPanel.contains(e.target) && !attachBtn.contains(e.target)) closeAttach(); }, true);
 
@@ -2381,66 +2381,30 @@ function uploadFileToServer(file, onProgress){
   });
 }
 
-// ✅ دالة تحليل الصور والملفات باستخدام Puter
+// 🟢 تحليل الصور
 async function analyzeImageWithPuter(imageUrl) {
-    try {
-        if (!imageUrl) return null;
-        const typingEl = (typeof showTyping === 'function') ? showTyping() : null;
+  try {
+    if (!imageUrl) return null;
+    const typingEl = (typeof showTyping === 'function') ? showTyping() : null;
 
-        if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
-            try {
-                const prompt = `صف محتوى الصورة باختصار (عناصر رئيسية، ألوان/حالة)، وحاول استخراج أي نص ظاهر داخل الصورة إن وُجد. أعطِ ملخصاً قصيراً ونقاطاً.`;
-                const puterResp = await puter.ai.chat(prompt, imageUrl, { model: 'gpt-5-nano' });
-                const analysisText = (typeof puterResp === 'string')
-                    ? puterResp
-                    : (puterResp && (puterResp.text || puterResp.description || JSON.stringify(puterResp)));
+    if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
+      const prompt = `صف محتوى الصورة باختصار (عناصر رئيسية، ألوان، نص ظاهر إن وجد).`;
+      const r = await puter.ai.chat(prompt, imageUrl, { model: "gpt-5-nano" });
+      const txt = parsePuterResult(r);
 
-                if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch (_) {}
+      if (typingEl && typingEl.parentNode) typingEl.remove();
 
-                if (analysisText) {
-                    return analysisText;
-                }
-            } catch (err) {
-                console.warn('analyzeImageWithPuter (puter.ai.chat) failed', err);
-            }
-        }
-        
-        if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch (_) {}
-        return null;
-    } catch (e) {
-        console.error('analyzeImageWithPuter error', e);
-        return null;
+      if (txt) {
+        return txt; // ✅ فقط ترجع النص
+      }
     }
-}
 
-        // الجزء الخاص بالـ Fallback
-        if (typeof API_BASE === 'string' && API_BASE) {
-            try {
-                const resp = await fetch(API_BASE + '/api/vision', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ image_url: imageUrl })
-                });
-                if (!resp.ok) throw new Error('vision api failed: ' + resp.status);
-                const data = await resp.json();
-                const analysisText = data && (data.description || data.text || data.summary || JSON.stringify(data));
-
-                if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch (_) {}
-
-                if (analysisText) {
-                    return analysisText;
-                }
-            } catch (e) {
-                console.warn('analyzeImageWithPuter fallback failed', e);
-            }
-        }
-
-        if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch (_) {}
-        return null;
-    } catch (e) {
-        console.error('analyzeImageWithPuter error', e);
-        return null;
-    }
+    if (typingEl && typingEl.parentNode) typingEl.remove();
+    return null;
+  } catch (e) {
+    console.error('analyzeImageWithPuter error', e);
+    return null;
+  }
 }
 
 // 🟢 تحليل الملفات
@@ -2452,9 +2416,7 @@ async function analyzeFileWithPuter(fileOrUrl) {
     if (typeof fileOrUrl === 'string') {
       const lower = fileOrUrl.toLowerCase();
       if (lower.match(/\.(png|jpe?g|webp|gif|bmp)(?:[?#].*)?$/)) {
-        const result = await analyzeImageWithPuter(fileOrUrl);
-        if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch (_) {}
-        return result;
+        return analyzeImageWithPuter(fileOrUrl);
       }
     }
 
@@ -2466,7 +2428,7 @@ async function analyzeFileWithPuter(fileOrUrl) {
       if (typingEl && typingEl.parentNode) typingEl.remove();
 
       if (txt) {
-        return txt;
+        return txt; // ✅ فقط ترجع النص
       }
     }
 
@@ -3105,8 +3067,14 @@ if (editIndex !== null && editIndex >= 0) {
   updateSendVisibility();
   autoGrowTextarea();
 
+  // 7) إظهار نقاط الكتابة ثم إضافة رد المساعد الجديد بسلاسة (appendMessage إن وُجد)
+    // regenerate reply for edited message
+  regenerateAssistantForParent(oldIndex);
+  if (typeof reindexDom === 'function') reindexDom();
+  return;
+}
 // ====== END: edit branch replacement ======
- } else {
+ else {
   if (pendingAttachment) {
     sendAttachmentNow();
   } else {
@@ -3267,6 +3235,11 @@ startRotatorIfNeeded();
 
   reindexDom(); // مهم: إعادة ترقيم data-index بعد الحذف
   saveSession();
+
+  // 3) نقاط الكتابة
+  const typingEl = showTyping();
+
+  regenerateAssistantForParent(parentIdx);
 
 
   // 4) استعادة وضع التمرير النسبي
