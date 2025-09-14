@@ -2423,28 +2423,35 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
     // إذا كانت سلسلة نصية (رابط)
     if (typeof fileOrUrl === 'string') {
       const lower = fileOrUrl.toLowerCase();
-      // صورة عبر رابط -> راجع analyzeImageWithPuter مع forward للمطالَب
+
+      // صورة عبر رابط
       if (lower.match(/\.(png|jpe?g|webp|gif|bmp)(?:[?#].*)?$/)) {
         const res = await analyzeImageWithPuter(fileOrUrl, userPrompt);
         if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
         return res;
       }
 
-      if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
-        try {
-          const basePrompt = (userPrompt && String(userPrompt).trim())
-            ? `${String(userPrompt).trim()}\n\nقم بتحليل الملف على الرابط التالي وقدم ملخصاً واضحاً أو نفّذ المطلوب: ${fileOrUrl}`
-            : `حلل هذا الملف (ملخص، نوعه، أي نص داخلي مهم): ${fileOrUrl}`;
+      // ✅ محاولة جلب محتوى الملف النصي من الرابط
+      try {
+        const resp = await fetch(fileOrUrl);
+        if (resp.ok) {
+          const mime = resp.headers.get("content-type") || "";
+          if (mime.startsWith("text/") || mime.includes("json") || mime.includes("xml") || mime.includes("csv")) {
+            const content = await resp.text();
+            if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
+              const basePrompt = (userPrompt && String(userPrompt).trim())
+                ? `${String(userPrompt).trim()}\n\nهذا محتوى الملف:\n\n${content.slice(0, 8000)}`
+                : `حلل هذا الملف (ملخص، نوعه، أي نص داخلي مهم):\n\n${content.slice(0, 8000)}`;
 
-          const r = await puter.ai.chat(basePrompt, null, { model: 'gpt-5-nano' });
-          const txt = parsePuterResult(r);
-          if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
-          return txt ? String(txt).trim() : null;
-        } catch (e) {
-          console.warn('analyzeFileWithPuter via URL failed', e);
-          if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
-          return null;
+              const r = await puter.ai.chat(basePrompt, null, { model: "gpt-5-nano" });
+              const txt = parsePuterResult(r);
+              if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
+              return txt ? String(txt).trim() : null;
+            }
+          }
         }
+      } catch (err) {
+        console.warn("fetch file for analysis failed", err);
       }
 
       if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
@@ -2454,7 +2461,7 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
     // إذا كان كائن File محلي
     if (fileOrUrl instanceof File) {
       try {
-        // لو كان ملف صورة -> حوّله إلى data URL ثم حلله مع userPrompt
+        // صورة محلية
         if (fileOrUrl.type && fileOrUrl.type.startsWith('image/')) {
           const dataUrl = await new Promise((res, rej) => {
             const fr = new FileReader();
@@ -2467,15 +2474,15 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
           return r;
         }
 
-        // لو ملف نصّي معروف: اقرأ المحتوى وأرسله ضمن المطالَب (مع اقتصاص)
+        // ملفات نصية معروفة
         const ext = (fileOrUrl.name || '').split('.').pop().toLowerCase();
         const textLike = ['txt','json','js','html','htm','css','py','md','xml','csv'];
         if (textLike.includes(ext)) {
           const txtContent = await fileOrUrl.text();
           if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
             const basePrompt = (userPrompt && String(userPrompt).trim())
-              ? `${String(userPrompt).trim()}\n\nهذا محتوى الملف (${ext}). نفّذ المطلوب أو قدّم ملخصًا/ملاحظات:\n\n${txtContent.slice(0, 8000)}`
-              : `حلل هذا الملف (${ext}) وقدم ملخصاً ونقاطاً مهمة:\n\n${txtContent.slice(0, 8000)}`;
+              ? `${String(userPrompt).trim()}\n\nهذا محتوى الملف (${ext}):\n\n${txtContent.slice(0, 8000)}`
+              : `حلل هذا الملف (${ext}) وقدم ملخصاً:\n\n${txtContent.slice(0, 8000)}`;
 
             const r = await puter.ai.chat(basePrompt, null, { model: 'gpt-5-nano' });
             const parsed = parsePuterResult(r);
