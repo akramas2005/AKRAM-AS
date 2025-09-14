@@ -2433,12 +2433,16 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
           if (mime.startsWith("text/") || mime.includes("json") || mime.includes("xml") || mime.includes("csv")) {
             const content = await resp.text();
             if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
+              const typingEl = (typeof showTyping === 'function') ? showTyping() : null; // ✅ الأنيميشن بعد الإرسال فقط
               const basePrompt = (userPrompt && String(userPrompt).trim())
                 ? `${String(userPrompt).trim()}\n\nهذا محتوى الملف:\n\n${content.slice(0, 8000)}`
                 : `حلل هذا الملف (ملخص، نوعه، أي نص داخلي مهم):\n\n${content.slice(0, 8000)}`;
 
               const r = await puter.ai.chat(basePrompt, null, { model: "gpt-5-nano" });
               const txt = parsePuterResult(r);
+
+              if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
+
               return txt ? String(txt).trim() : null;
             }
           }
@@ -2470,12 +2474,16 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
         if (textLike.includes(ext)) {
           const txtContent = await fileOrUrl.text();
           if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
+            const typingEl = (typeof showTyping === 'function') ? showTyping() : null; // ✅ الأنيميشن بعد الإرسال فقط
             const basePrompt = (userPrompt && String(userPrompt).trim())
               ? `${String(userPrompt).trim()}\n\nهذا محتوى الملف (${ext}):\n\n${txtContent.slice(0, 8000)}`
               : `حلل هذا الملف (${ext}) وقدم ملخصاً:\n\n${txtContent.slice(0, 8000)}`;
 
             const r = await puter.ai.chat(basePrompt, null, { model: 'gpt-5-nano' });
             const parsed = parsePuterResult(r);
+
+            if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
+
             return parsed ? String(parsed).trim() : null;
           }
         }
