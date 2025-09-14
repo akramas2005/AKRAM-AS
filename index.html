@@ -3109,12 +3109,6 @@ if (editIndex !== null && editIndex >= 0) {
   updateSendVisibility();
   autoGrowTextarea();
 
-  // 7) إظهار نقاط الكتابة ثم إضافة رد المساعد الجديد بسلاسة (appendMessage إن وُجد)
-    // regenerate reply for edited message
-  regenerateAssistantForParent(oldIndex);
-  if (typeof reindexDom === 'function') reindexDom();
-  return;
-}
 // ====== END: edit branch replacement ======
  else {
   if (pendingAttachment) {
@@ -3277,11 +3271,6 @@ startRotatorIfNeeded();
 
   reindexDom(); // مهم: إعادة ترقيم data-index بعد الحذف
   saveSession();
-
-  // 3) نقاط الكتابة
-  const typingEl = showTyping();
-
-  regenerateAssistantForParent(parentIdx);
 
 
   // 4) استعادة وضع التمرير النسبي
