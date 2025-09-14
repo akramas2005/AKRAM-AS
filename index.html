@@ -1984,8 +1984,7 @@ function parsePuterResult(res) {
   }
 }
       
-      // === sendAttachmentNow (fixed clean) ===
-async function sendAttachmentNow() {
+      async function sendAttachmentNow() {
   try {
     if (!pendingAttachment) return;
     if (pendingAttachment._sending) return;
@@ -2033,33 +2032,37 @@ async function sendAttachmentNow() {
 
       // === تحليل المرفق بعد الإرسال ===
       const attached = userMessage.attachment || null;
-const typingEl = (typeof showTyping === 'function') ? showTyping() : null;
-try {
-  let analysisText = null;
+      const typingEl = (typeof showTyping === 'function') ? showTyping() : null;
+      try {
+        let analysisText = null;
 
-  if (attached && attached.mime_type && attached.mime_type.startsWith('image/')) {
-    analysisText = await analyzeImageWithPuter(attached.url || attached.src || attached.filename || attached.id);
-  } else if (attached) {
-    analysisText = await analyzeFileWithPuter(attached.url || attached.src || attached.filename || attached.id);
-  }
+        if (attached && attached.mime_type && attached.mime_type.startsWith('image/')) {
+          analysisText = await analyzeImageWithPuter(attached.url || attached.src || attached.filename || attached.id);
+        } else if (attached) {
+          analysisText = await analyzeFileWithPuter(attached.url || attached.src || attached.filename || attached.id);
+        }
 
-  if (analysisText) {
-    // append assistant message once, مع نص نظيف
-    const botMsg = { id: genId(), role: 'assistant', content: String(analysisText).trim().slice(0,15000), meta: {} };
-    messages.push(botMsg);
-    appendMessage(botMsg, messages.length - 1);
-    try { saveSession(); } catch(_) {}
-  } else {
-    // fallback: لا شيء. لا يوجد رد إذا فشل التحليل.
-  }
-} catch (err) {
-  console.warn('attachment analysis failed', err);
-  // لا يوجد fallback. يمكن إضافة رسالة خطأ بسيطة هنا إن أردت.
-} finally {
-  if (typingEl && typingEl.parentNode) {
-    try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
-  }
-}
+        if (analysisText) {
+          // append assistant message once, مع نص نظيف
+          const botMsg = { id: genId(), role: 'assistant', content: String(analysisText).trim().slice(0, 15000), meta: {} };
+          messages.push(botMsg);
+          appendMessage(botMsg, messages.length - 1);
+          try {
+            saveSession();
+          } catch (_) {}
+        } else {
+          // لا يوجد رد إذا فشل التحليل.
+        }
+      } catch (err) {
+        console.warn('attachment analysis failed', err);
+        // لا يوجد رد احتياطي
+      } finally {
+        if (typingEl && typingEl.parentNode) {
+          try {
+            typingEl.parentNode.removeChild(typingEl);
+          } catch (_) {}
+        }
+      }
       return;
     }
 
@@ -2169,14 +2172,20 @@ try {
 
       // cleanup
       clearPreview();
-      pendingAttachment = null;
+      pendingAttachment = null;
 
-  } catch (e) { // هذا الـ `}` يخص الـ `if` التي تم حذفها
-    console.error('sendAttachmentNow error', e);
-    toast('Send failed');
-  } finally {
-    try { if (pendingAttachment) pendingAttachment._sending = false; } catch (e) {}
-  }
+      // assistant reply
+      //regenerateAssistantForParent(messages.length - 1); // لا تستخدم هذا السطر
+    }
+
+  } catch (e) {
+    console.error('sendAttachmentNow error', e);
+    toast('Send failed');
+  } finally {
+    try {
+      if (pendingAttachment) pendingAttachment._sending = false;
+    } catch (e) {}
+  }
 }
       document.addEventListener('click', (e)=>{ if(attachPanel.classList.contains('open') && !attachPanel.contains(e.target) && !attachBtn.contains(e.target)) closeAttach(); }, true);
 
