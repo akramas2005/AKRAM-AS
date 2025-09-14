@@ -2376,7 +2376,7 @@ async function analyzeImageWithPuter(imageUrl, userPrompt = null) {
   try {
     if (!imageUrl) return null;
     // دالة showTyping داخل التحليل تمنع تكرار الانيميشِن إذا لم تُستدعى في sendAttachmentNow
-    const typingEl = (typeof showTyping === 'function') ? showTyping() : null;
+    const typingEl = (typeof showTyping === 'function') ? showTyping("image") : null;
 
     if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
       try {
@@ -2427,7 +2427,7 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
           if (mime.startsWith("text/") || mime.includes("json") || mime.includes("xml") || mime.includes("csv")) {
             const content = await resp.text();
             if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
-              const typingEl = (typeof showTyping === 'function') ? showTyping() : null; // ✅ الأنيميشن بعد الإرسال فقط
+              const typingEl = (typeof showTyping === 'function') ? showTyping("file") : null; // ✅ الأنيميشن بعد الإرسال فقط
               const basePrompt = (userPrompt && String(userPrompt).trim())
                 ? `${String(userPrompt).trim()}\n\nهذا محتوى الملف:\n\n${content.slice(0, 8000)}`
                 : `حلل هذا الملف (ملخص، نوعه، أي نص داخلي مهم):\n\n${content.slice(0, 8000)}`;
@@ -2468,7 +2468,7 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
         if (textLike.includes(ext)) {
           const txtContent = await fileOrUrl.text();
           if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
-            const typingEl = (typeof showTyping === 'function') ? showTyping() : null; // ✅ الأنيميشن بعد الإرسال فقط
+            const typingEl = (typeof showTyping === 'function') ? showTyping("file") : null;
             const basePrompt = (userPrompt && String(userPrompt).trim())
               ? `${String(userPrompt).trim()}\n\nهذا محتوى الملف (${ext}):\n\n${txtContent.slice(0, 8000)}`
               : `حلل هذا الملف (${ext}) وقدم ملخصاً:\n\n${txtContent.slice(0, 8000)}`;
@@ -2674,8 +2674,8 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
         messagesEl.scrollTop = messagesEl.scrollHeight;
       }
 
-      // Typing indicator — do not force scroll if user is scrolled up (autoScrollEnabled will control)
-      function showTyping(){
+      // Typing indicator (supports text like "Analyzing file..." or "Analyzing image...")
+function showTyping(type = "default"){
   // 🔹 احذف أي مؤشر كتابة قديم
   const oldTyping = messagesEl.querySelector('.typing');
   if (oldTyping && oldTyping.parentNode) {
@@ -2684,6 +2684,9 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
 
   const typing = document.createElement('div');
   typing.className = 'typing msg assistant show';
+  typing.setAttribute("dir","auto"); // ✅ يخلي النصوص المختلطة عربية+إنجليزية منظمة
+
+  // الوضع العادي (النقاط)
   typing.innerHTML = `<div class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>`;
   messagesEl.appendChild(typing);
 
@@ -2693,8 +2696,20 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
     }
   } catch(e){}
 
+  // ✅ لو المرفق صورة أو ملف: نغير بعد وقت قصير
+  if(type === "file" || type === "image"){
+    const delay = 3000 + Math.random()*2000; // 3-5 ثواني
+    setTimeout(()=>{
+      if(type === "file"){
+        typing.innerHTML = `<div class="typing-text">Analyzing file...</div>`;
+      } else if(type === "image"){
+        typing.innerHTML = `<div class="typing-text">Analyzing image...</div>`;
+      }
+    }, delay);
+  }
+
   return typing;
-}      
+}
 
 // Safe fallback for simulatedAssistantReply if not defined elsewhere
 function simulatedAssistantReply(text){
