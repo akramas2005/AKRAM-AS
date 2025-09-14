@@ -2413,25 +2413,19 @@ async function analyzeImageWithPuter(imageUrl, userPrompt = null) {
 
 // 🟢 تحليل الملفات
 async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
-  const typingEl = (typeof showTyping === 'function') ? showTyping() : null;
   try {
-    if (!fileOrUrl) {
-      if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
-      return null;
-    }
+    if (!fileOrUrl) return null;
 
-    // إذا كانت سلسلة نصية (رابط)
+    // إذا كان رابط نصي
     if (typeof fileOrUrl === 'string') {
       const lower = fileOrUrl.toLowerCase();
 
       // صورة عبر رابط
       if (lower.match(/\.(png|jpe?g|webp|gif|bmp)(?:[?#].*)?$/)) {
-        const res = await analyzeImageWithPuter(fileOrUrl, userPrompt);
-        if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
-        return res;
+        return await analyzeImageWithPuter(fileOrUrl, userPrompt);
       }
 
-      // ✅ محاولة جلب محتوى الملف النصي من الرابط
+      // محاولة جلب محتوى الملف النصي من الرابط
       try {
         const resp = await fetch(fileOrUrl);
         if (resp.ok) {
@@ -2445,7 +2439,6 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
 
               const r = await puter.ai.chat(basePrompt, null, { model: "gpt-5-nano" });
               const txt = parsePuterResult(r);
-              if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
               return txt ? String(txt).trim() : null;
             }
           }
@@ -2454,7 +2447,6 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
         console.warn("fetch file for analysis failed", err);
       }
 
-      if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
       return null;
     }
 
@@ -2469,9 +2461,7 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
             fr.onerror = rej;
             fr.readAsDataURL(fileOrUrl);
           });
-          const r = await analyzeImageWithPuter(dataUrl, userPrompt);
-          if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
-          return r;
+          return await analyzeImageWithPuter(dataUrl, userPrompt);
         }
 
         // ملفات نصية معروفة
@@ -2486,25 +2476,20 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
 
             const r = await puter.ai.chat(basePrompt, null, { model: 'gpt-5-nano' });
             const parsed = parsePuterResult(r);
-            if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
             return parsed ? String(parsed).trim() : null;
           }
         }
 
-        if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
         return null;
       } catch (e) {
         console.warn('analyzeFileWithPuter read text failed', e);
-        if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
         return null;
       }
     }
 
-    if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
     return null;
   } catch (e) {
     console.error('analyzeFileWithPuter error', e);
-    if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
     return null;
   }
 }
