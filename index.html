@@ -1984,7 +1984,7 @@ function parsePuterResult(res) {
   }
 }
       
-      // === sendAttachmentNow (fixed clean) ===
+       // === sendAttachmentNow (fixed clean) ===
 async function sendAttachmentNow() {
   try {
     if (!pendingAttachment) return;
@@ -2033,41 +2033,34 @@ async function sendAttachmentNow() {
 
       // === تحليل المرفق بعد الإرسال ===
       const attached = userMessage.attachment || null;
-      const userText = userMessage.content || ''; // 🟢 هذا هو التعديل
-      const typingEl = (typeof showTyping === 'function') ? showTyping() : null;
-      
-      try {
-        let analysisResult = null;
+const typingEl = (typeof showTyping === 'function') ? showTyping() : null;
+try {
+  let analysisText = null;
 
-        if (attached && attached.mime_type && attached.mime_type.startsWith('image/')) {
-          analysisResult = await analyzeImageWithPuter(attached.url || attached.src || attached.filename || attached.id, userText); // 🟢 تمرير نص المستخدم
-        } else if (attached) {
-          analysisResult = await analyzeFileWithPuter(attached.url || attached.src || attached.filename || attached.id, userText); // 🟢 تمرير نص المستخدم
-        }
+  if (attached && attached.mime_type && attached.mime_type.startsWith('image/')) {
+    analysisText = await analyzeImageWithPuter(attached.url || attached.src || attached.filename || attached.id);
+  } else if (attached) {
+    analysisText = await analyzeFileWithPuter(attached.url || attached.src || attached.filename || attached.id);
+  }
 
-        const cleanText = parsePuterResult(analysisResult);
-        
-        if (cleanText) {
-          const botMsg = { id: genId(), role: 'assistant', content: String(cleanText).trim().slice(0, 15000), meta: {} };
-          messages.push(botMsg);
-          appendMessage(botMsg, messages.length - 1);
-          try {
-            saveSession();
-          } catch (_) {}
-        } else {
-            // إذا لم يتمكن من تحليل المرفق، يمكن أن يطلب من المستخدم إعادة إرسال السؤال.
-        }
-      } catch (err) {
-        console.warn('attachment analysis failed', err);
-        // يمكنك هنا إضافة رسالة خطأ للمستخدم إذا فشل التحليل
-        // toast('Failed to analyze attachment');
-      } finally {
-        if (typingEl && typingEl.parentNode) {
-          try {
-            typingEl.parentNode.removeChild(typingEl);
-          } catch (_) {}
-        }
-      }
+  if (analysisText) {
+    // append assistant message once, مع نص نظيف
+    const botMsg = { id: genId(), role: 'assistant', content: String(analysisText).trim().slice(0,15000), meta: {} };
+    messages.push(botMsg);
+    appendMessage(botMsg, messages.length - 1);
+    try { saveSession(); } catch(_) {}
+  } else {
+    // fallback: استخدم مولد الرد الاعتيادي إن أردت
+    regenerateAssistantForParent(messages.length - 1);
+  }
+} catch (err) {
+  console.warn('attachment analysis failed', err);
+  regenerateAssistantForParent(messages.length - 1);
+} finally {
+  if (typingEl && typingEl.parentNode) {
+    try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
+  }
+}
       return;
     }
 
@@ -2178,33 +2171,224 @@ async function sendAttachmentNow() {
       // cleanup
       clearPreview();
       pendingAttachment = null;
+
+      // assistant reply
+      regenerateAssistantForParent(messages.length - 1);
     }
 
   } catch (e) {
     console.error('sendAttachmentNow error', e);
     toast('Send failed');
   } finally {
-    try {
-      if (pendingAttachment) pendingAttachment._sending = false;
-    } catch (e) {}
+    try { if (pendingAttachment) pendingAttachment._sending = false; } catch (e) {}
   }
 }
-      // 🟢 تحليل الصور
-async function analyzeImageWithPuter(imageUrl, userText) {
+      document.addEventListener('click', (e)=>{ if(attachPanel.classList.contains('open') && !attachPanel.contains(e.target) && !attachBtn.contains(e.target)) closeAttach(); }, true);
+
+      const STORAGE_KEY = 'chat_study';
+      const DRAFT_KEY = 'chat_study_draft';
+      const REPORTS_KEY = 'chat_study_reports';
+      const API_BASE = "https://backend-as-space-1.onrender.com";
+      let messages = [];
+      let editIndex = null;
+      function genId(){ return 'm-'+Math.random().toString(36).slice(2,9); }
+      function escapeHtml(str){ return String(str).replace(/[&<>"]/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s])); }
+      // build a plain-text prompt from last N messages (for context)
+      function buildChatPrompt(msgs, upToIndex = null, windowSize = 15){
+        try{
+          const arr = Array.isArray(msgs) ? msgs : (typeof messages !== 'undefined' ? messages : []);
+          if(!arr || arr.length === 0) return '';
+          // determine slice end
+          let end = (typeof upToIndex === 'number' && upToIndex >= 0) ? Math.min(upToIndex, arr.length - 1) : (arr.length - 1);
+          let start = Math.max(0, end - windowSize + 1);
+          const parts = [];
+          for(let i = start; i <= end; i++){
+            const m = arr[i];
+            if(!m || !m.role) continue;
+            const role = (m.role === 'assistant') ? 'Assistant' : ((m.role === 'user') ? 'User' : m.role);
+            const text = (m.content || '').trim();
+            if(text) parts.push(role + ': ' + text);
+            // include attachment reference as short note
+            if(m.attachment){
+              const a = m.attachment;
+              const aname = a.filename || a.name || a.attachment_name || a.attachmentName || '';
+              const atype = a.mime_type || a.attachment_type || a.type || '';
+              parts.push(role + ' attachment: ' + (aname || atype || (a.url ? 'file' : 'attachment')));
+            }
+          }
+          return parts.join('\n');
+        }catch(e){ console.error('buildChatPrompt error', e); return ''; }
+      }
+
+
+      // Load session
+      function loadSession(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        messages = parsed;
+      } else {
+        messages = [];
+      }
+    } else {
+      messages = [];
+    }
+  }catch(e){ messages = []; }
+}
+      // saveSession now also triggers autosave into savedConvos
+      function saveSession(){ 
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+          // persist into savedConvos (autosave)
+          persistCurrentToHistory();
+        } catch(e) { console.error('saveSession error', e); }
+      }
+
+      // ----------------------
+      // Background sync + file upload helpers
+      // ----------------------
+      const SYNC_DEBOUNCE = 800; // ms
+      let _syncTimer = null;
+      let _syncRunning = false;
+
+      function scheduleSync(delay = SYNC_DEBOUNCE){
+        if(_syncTimer) clearTimeout(_syncTimer);
+        _syncTimer = setTimeout(()=> { syncMessagesToServer(); }, delay);
+      }
+
+      async function syncMessagesToServer(){
+        if(_syncRunning) return;
+        _syncRunning = true;
+        try {
+          for (let i = 0; i < messages.length; i++){
+            const m = messages[i];
+            // already persisted remotely?
+            if (m.meta && m.meta.remoteId) continue;
+
+            try {
+              await postMessageToServer(m, i);
+              // small throttle so we don't hammer the API
+              await new Promise(r => setTimeout(r, 120));
+            } catch (err) {
+              console.warn('syncMessagesToServer: stop on error, will retry later', err);
+              break; // stop and retry later
+            }
+          }
+        } finally {
+          _syncRunning = false;
+        }
+      }
+
+      // Persist a single message to backend /api/messages
+      async function postMessageToServer(msg, index){
+        if (!msg || !API_BASE) throw new Error('postMessageToServer: missing message or API_BASE');
+
+        const payload = {
+          role: msg.role || 'user',
+          content: msg.content || '',
+          parent_id: null,
+          attachmentId: (msg.attachment && msg.attachment.id) ? msg.attachment.id : null,
+          attachmentUrl: (msg.attachment && (msg.attachment.url || msg.attachment.src)) ? (msg.attachment.url || msg.attachment.src) : null,
+          attachmentName: (msg.attachment && (msg.attachment.name || msg.attachment.filename)) ? (msg.attachment.name || msg.attachment.filename) : null,
+          attachmentType: (msg.attachment && (msg.attachment.type || msg.attachment.mime_type)) ? (msg.attachment.type || msg.attachment.mime_type) : null
+        };
+
+        try {
+          const resp = await fetch(API_BASE + '/api/messages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+
+          if (!resp.ok) throw new Error('post message failed: ' + resp.status);
+          const data = await resp.json();
+          // mark message as synced
+          msg.meta = msg.meta || {};
+          msg.meta.remoteId = data.id;
+          msg.meta.synced = true;
+          saveSession(); // persist meta locally
+          return data;
+        } catch (err) {
+          throw err;
+        }
+      }
+
+      // Upload a file to /api/files (returns { id, url, filename, mime_type } expected from backend)
+      
+  // === (NEW) uploadFileToServer ===
+// returns Promise resolving to parsed JSON { id, url, filename, mime_type } from backend
+function uploadFileToServer(file, onProgress){
+  if (!file) return Promise.reject(new Error('uploadFileToServer: missing file'));
+  return new Promise((resolve, reject) => {
+    try {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', API_BASE + '/api/files', true);
+      // use text so we parse robustly (some environments return text)
+      xhr.responseType = 'text';
+
+      // track total size if available
+      xhr.upload.onprogress = function(e){
+        try {
+          if (e.lengthComputable) {
+            xhr._totalSize = e.total;
+            const pct = Math.round((e.loaded / e.total) * 100);
+            if (typeof onProgress === 'function') onProgress(pct, e.loaded, e.total);
+         } else {
+  // lengthComputable = false -> treat as unknown; start from 0 and let the UI show indeterminate/small animation if desired
+  if (typeof onProgress === 'function') onProgress(0, 0, 0);
+}
+        } catch(e){}
+      };
+
+      xhr.onload = function(){
+        try {
+          // ensure final progress callback
+          try {
+            const total = xhr._totalSize || file.size || 0;
+            if (typeof onProgress === 'function') onProgress(100, total, total);
+          } catch(e){}
+
+          if (xhr.status >= 200 && xhr.status < 300) {
+            const txt = xhr.responseText || xhr.response || '';
+            try {
+              const json = txt && typeof txt === 'string' ? JSON.parse(txt) : (typeof txt === 'object' ? txt : {});
+              resolve(json);
+            } catch(e) {
+              // parse failure -> still resolve with empty object
+              resolve({});
+            }
+          } else {
+            const txt = xhr.responseText || '';
+            reject(new Error('file upload failed: ' + xhr.status + ' ' + txt));
+          }
+        } catch(e){
+          reject(e);
+        }
+      };
+
+      xhr.onerror = function(){ reject(new Error('file upload error')); };
+      xhr.onabort = function(){ reject(new Error('file upload aborted')); };
+      xhr.ontimeout = function(){ reject(new Error('file upload timeout')); };
+
+      const fd = new FormData();
+      fd.append('file', file, file.name);
+      xhr.send(fd);
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+// 🟢 تحليل الصور
+async function analyzeImageWithPuter(imageUrl) {
   try {
     if (!imageUrl) return null;
     const typingEl = (typeof showTyping === 'function') ? showTyping() : null;
 
     if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
-      let prompt = `صف محتوى الصورة باختصار (عناصر رئيسية، ألوان، نص ظاهر إن وجد).`;
-
-      // 🟢 التعديل الجديد: دمج نص المستخدم في المطالبة
-      if (userText && userText.trim().length > 0) {
-        prompt = userText;
-      } else {
-         prompt = `بناءً على الصورة، أجب على هذا السؤال: "${userText}".`;
-      }
-      
+      const prompt = `صف محتوى الصورة باختصار (عناصر رئيسية، ألوان، نص ظاهر إن وجد).`;
       const r = await puter.ai.chat(prompt, imageUrl, { model: "gpt-5-nano" });
       const txt = parsePuterResult(r);
 
@@ -2224,7 +2408,7 @@ async function analyzeImageWithPuter(imageUrl, userText) {
 }
 
 // 🟢 تحليل الملفات
-async function analyzeFileWithPuter(fileOrUrl, userText) {
+async function analyzeFileWithPuter(fileOrUrl) {
   try {
     if (!fileOrUrl) return null;
     const typingEl = (typeof showTyping === 'function') ? showTyping() : null;
@@ -2232,18 +2416,12 @@ async function analyzeFileWithPuter(fileOrUrl, userText) {
     if (typeof fileOrUrl === 'string') {
       const lower = fileOrUrl.toLowerCase();
       if (lower.match(/\.(png|jpe?g|webp|gif|bmp)(?:[?#].*)?$/)) {
-        return analyzeImageWithPuter(fileOrUrl, userText); // 🟢 تمرير نص المستخدم
+        return analyzeImageWithPuter(fileOrUrl);
       }
     }
 
     if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
-      let prompt = `حلل هذا الملف (ملخص، نوعه، أي نص داخلي مهم): ${fileOrUrl}`;
-      
-      // 🟢 التعديل الجديد: دمج نص المستخدم في المطالبة
-      if (userText && userText.trim().length > 0) {
-        prompt = `بناءً على محتوى الملف، أجب على هذا السؤال: "${userText}".`;
-      }
-
+      const prompt = `حلل هذا الملف (ملخص، نوعه، أي نص داخلي مهم): ${fileOrUrl}`;
       const r = await puter.ai.chat(prompt, null, { model: "gpt-5-nano" });
       const txt = parsePuterResult(r);
 
