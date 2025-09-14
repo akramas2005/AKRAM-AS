@@ -2383,34 +2383,55 @@ function uploadFileToServer(file, onProgress){
 
 // ✅ دالة تحليل الصور والملفات باستخدام Puter
 async function analyzeImageWithPuter(imageUrl) {
-  try {
-    if (!imageUrl) return null;
-    const typingEl = (typeof showTyping === 'function') ? showTyping() : null;
+    try {
+        if (!imageUrl) return null;
+        const typingEl = (typeof showTyping === 'function') ? showTyping() : null;
+        let analysisText = null;
 
-    if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
-      try {
-        const prompt = `صف محتوى الصورة باختصار (عناصر رئيسية، ألوان/حالة)، وحاول استخراج أي نص ظاهر داخل الصورة إن وُجد. أعطِ ملخصاً قصيراً ونقاطاً.`;
-        const puterResp = await puter.ai.chat(prompt, imageUrl, { model: 'gpt-5-nano' });
-        const analysisText = (typeof puterResp === 'string')
-          ? puterResp
-          : (puterResp && (puterResp.text || puterResp.description || JSON.stringify(puterResp)));
-
-        if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch (_) {}
-
-        if (analysisText) {
-          return analysisText;
+        // 1) محاولة استخدام Puter.js
+        if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
+            try {
+                const prompt = `صف محتوى الصورة باختصار (عناصر رئيسية، ألوان/حالة)، وحاول استخراج أي نص ظاهر داخل الصورة إن وُجد. أعطِ ملخصاً قصيراً ونقاطاً.`;
+                const puterResp = await puter.ai.chat(prompt, imageUrl, { model: 'gpt-5-nano' });
+                analysisText = (typeof puterResp === 'string')
+                    ? puterResp
+                    : (puterResp && (puterResp.text || puterResp.description || JSON.stringify(puterResp)));
+                
+                if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch (_) {}
+                if (analysisText) return analysisText;
+                
+            } catch (err) {
+                console.warn('analyzeImageWithPuter (puter.ai.chat) failed', err);
+            }
         }
-      } catch (err) {
-        console.warn('analyzeImageWithPuter (puter.ai.chat) failed', err);
-      }
+
+        // 2) محاولة استخدام Fallback
+        if (!analysisText && typeof API_BASE === 'string' && API_BASE) {
+            try {
+                const resp = await fetch(API_BASE + '/api/vision', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image_url: imageUrl })
+                });
+                if (!resp.ok) throw new Error('vision api failed: ' + resp.status);
+                const data = await resp.json();
+                analysisText = data && (data.description || data.text || data.summary || JSON.stringify(data));
+                
+                if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch (_) {}
+                if (analysisText) return analysisText;
+                
+            } catch (e) {
+                console.warn('analyzeImageWithPuter fallback failed', e);
+            }
+        }
+        
+        if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch (_) {}
+        return analysisText;
+
+    } catch (e) {
+        console.error('analyzeImageWithPuter error', e);
+        return null;
     }
-    
-    if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch (_) {}
-    return null;
-  } catch (e) {
-    console.error('analyzeImageWithPuter error', e);
-    return null;
-  }
 }
 
         // الجزء الخاص بالـ Fallback
