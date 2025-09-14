@@ -2388,66 +2388,57 @@ function uploadFileToServer(file, onProgress){
 
 // ✅ دالة تحليل الصور والملفات باستخدام Puter
 async function analyzeImageWithPuter(imageUrl) {
-  try {
-    if (!imageUrl) return null;
-    const typingEl = (typeof showTyping === 'function') ? showTyping() : null;
+    try {
+        if (!imageUrl) return null;
+        const typingEl = (typeof showTyping === 'function') ? showTyping() : null;
 
-    if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
-      try {
-        const prompt = `...`;
-        const puterResp = await puter.ai.chat(prompt, imageUrl, { model: 'gpt-5-nano' });
-        const analysisText = (typeof puterResp === 'string')
-          ? puterResp
-          : (puterResp && (puterResp.text || puterResp.description || JSON.stringify(puterResp)));
+        if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
+            try {
+                const prompt = `...`;
+                const puterResp = await puter.ai.chat(prompt, imageUrl, { model: 'gpt-5-nano' });
+                const analysisText = (typeof puterResp === 'string')
+                    ? puterResp
+                    : (puterResp && (puterResp.text || puterResp.description || JSON.stringify(puterResp)));
 
-        if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
+                if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch (_) {}
 
-        if (analysisText) {
-          return analysisText;
+                if (analysisText) {
+                    return analysisText;
+                }
+
+            } catch (err) {
+                console.warn('analyzeImageWithPuter (puter.ai.chat) failed', err);
+            }
         }
 
-      } catch (err) {
-        console.warn('analyzeImageWithPuter (puter.ai.chat) failed', err);
-      }
-    }
-    
-    // الجزء الخاص بالـ Fallback
-    if (typeof API_BASE === 'string' && API_BASE) {
-      try {
-        const resp = await fetch(API_BASE + '/api/vision', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image_url: imageUrl })
-        });
-        if (!resp.ok) throw new Error('vision api failed: ' + resp.status);
-        const data = await resp.json();
-        const analysisText = data && (data.description || data.text || data.summary || JSON.stringify(data));
+        // الجزء الخاص بالـ Fallback
+        if (typeof API_BASE === 'string' && API_BASE) {
+            try {
+                const resp = await fetch(API_BASE + '/api/vision', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image_url: imageUrl })
+                });
+                if (!resp.ok) throw new Error('vision api failed: ' + resp.status);
+                const data = await resp.json();
+                const analysisText = data && (data.description || data.text || data.summary || JSON.stringify(data));
 
-        if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
-        
-        if (analysisText) {
-          return analysisText;
+                if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch (_) {}
+
+                if (analysisText) {
+                    return analysisText;
+                }
+            } catch (e) {
+                console.warn('analyzeImageWithPuter fallback failed', e);
+            }
         }
-      } catch (e) {
-        console.warn('analyzeImageWithPuter fallback failed', e);
-      }
-    }
-    
-    if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
-    return null;
-  } catch (e) {
-    console.error('analyzeImageWithPuter error', e);
-    return null;
-  }
-}
 
-    // cleanup typing if still present
-    if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
-    return null;
-  } catch (e) {
-    console.error('analyzeImageWithPuter error', e);
-    return null;
-  }
+        if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch (_) {}
+        return null;
+    } catch (e) {
+        console.error('analyzeImageWithPuter error', e);
+        return null;
+    }
 }
 
 // 🟢 تحليل الملفات
