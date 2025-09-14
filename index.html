@@ -2385,25 +2385,63 @@ function uploadFileToServer(file, onProgress){
   });
 }
 
-// 🟢 تحليل الصور
+// ✅ دالة تحليل الصور والملفات باستخدام Puter
 async function analyzeImageWithPuter(imageUrl) {
   try {
     if (!imageUrl) return null;
+
+    // show typing indicator (if available) so UX feels like assistant is thinking
     const typingEl = (typeof showTyping === 'function') ? showTyping() : null;
 
+    // 1) Prefer Puter client SDK if loaded and supports .chat
     if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
-      const prompt = `صف محتوى الصورة باختصار (عناصر رئيسية، ألوان، نص ظاهر إن وجد).`;
-      const r = await puter.ai.chat(prompt, imageUrl, { model: "gpt-5-nano" });
-      const txt = parsePuterResult(r);
+      try {
+        // Prompt instructs model to describe + extract visible text
+        const prompt = `صف محتوى الصورة باختصار (عناصر رئيسية، ألوان/حالة)، وحاول استخراج أي نص ظاهر داخل الصورة إن وُجد. أعطِ ملخصاً قصيراً ونقاطاً.`;
+        const puterResp = await puter.ai.chat(prompt, imageUrl, { model: 'gpt-5-nano' });
+        const analysisText = (typeof puterResp === 'string')
+          ? puterResp
+          : (puterResp && (puterResp.text || puterResp.description || JSON.stringify(puterResp)));
 
-      if (typingEl && typingEl.parentNode) typingEl.remove();
+        // remove typing indicator
+        if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
 
-      if (txt) {
-        return txt; // ✅ فقط ترجع النص
+        // لا تقم بإضافة الرسالة هنا، فقط أرجع النص النظيف
+        if (analysisText) {
+          return analysisText;
+        }
+
+      } catch (err) {
+        console.warn('analyzeImageWithPuter (puter.ai.chat) failed', err);
       }
     }
 
-    if (typingEl && typingEl.parentNode) typingEl.remove();
+    // 2) Fallback to your backend vision endpoint (POST /api/vision expecting { image_url })
+    if (typeof API_BASE === 'string' && API_BASE) {
+      try {
+        const resp = await fetch(API_BASE + '/api/vision', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image_url: imageUrl })
+        });
+        if (!resp.ok) throw new Error('vision api failed: ' + resp.status);
+        const data = await resp.json();
+        const analysisText = data && (data.description || data.text || data.summary || JSON.stringify(data));
+
+        // remove typing indicator
+        if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
+        
+        // لا تقم بإضافة الرسالة هنا، فقط أرجع النص النظيف
+        if (analysisText) {
+          return analysisText;
+        }
+      } catch (e) {
+        console.warn('analyzeImageWithPuter fallback failed', e);
+      }
+    }
+
+    // cleanup typing if still present
+    if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
     return null;
   } catch (e) {
     console.error('analyzeImageWithPuter error', e);
