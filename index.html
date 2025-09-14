@@ -2034,33 +2034,29 @@ function parsePuterResult(res) {
       const attached = userMessage.attachment || null;
       const typingEl = (typeof showTyping === 'function') ? showTyping() : null;
       try {
-        let analysisText = null;
+        let analysisResult = null;
 
         if (attached && attached.mime_type && attached.mime_type.startsWith('image/')) {
-          analysisText = await analyzeImageWithPuter(attached.url || attached.src || attached.filename || attached.id);
+          analysisResult = await analyzeImageWithPuter(attached.url || attached.src || attached.filename || attached.id);
         } else if (attached) {
-          analysisText = await analyzeFileWithPuter(attached.url || attached.src || attached.filename || attached.id);
+          analysisResult = await analyzeFileWithPuter(attached.url || attached.src || attached.filename || attached.id);
         }
 
-        if (analysisText) {
-          // فرض استخراج النص النظيف من الرد
-          const cleanText = parsePuterResult(analysisText);
-          
-          if (cleanText) {
-              const botMsg = { id: genId(), role: 'assistant', content: String(cleanText).trim().slice(0, 15000), meta: {} };
-              messages.push(botMsg);
-              appendMessage(botMsg, messages.length - 1);
-              try {
-                saveSession();
-              } catch (_) {}
-          }
-      }
-        } else {
-          // لا يوجد رد إذا فشل التحليل.
+        // فرض استخراج النص النظيف من الرد
+        const cleanText = parsePuterResult(analysisResult);
+        
+        if (cleanText) {
+          const botMsg = { id: genId(), role: 'assistant', content: String(cleanText).trim().slice(0, 15000), meta: {} };
+          messages.push(botMsg);
+          appendMessage(botMsg, messages.length - 1);
+          try {
+            saveSession();
+          } catch (_) {}
         }
       } catch (err) {
         console.warn('attachment analysis failed', err);
-        // لا يوجد رد احتياطي
+        // يمكنك هنا إضافة رسالة خطأ للمستخدم إذا فشل التحليل
+        // toast('Failed to analyze attachment');
       } finally {
         if (typingEl && typingEl.parentNode) {
           try {
