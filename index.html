@@ -1850,13 +1850,7 @@ function showFilePreview(file){
 
       toast('Upload complete! Click send to post it.');
       updateSendVisibility();
-
-      // optional: if it's an image-like file or you want to analyze general files
-      try {
-        if (typeof analyzeImageWithPuter === 'function') {
-          analyzeImageWithPuter(result.url).catch(()=>{});
-        }
-      } catch(e){}
+      
     }).catch(err => {
       console.error('retry upload failed', err);
       pendingAttachment.uploadState = 'failed';
