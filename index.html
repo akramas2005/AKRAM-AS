@@ -2169,14 +2169,14 @@ try {
 
       // cleanup
       clearPreview();
-      pendingAttachment = null;
+      pendingAttachment = null;
 
-  } catch (e) {
-    console.error('sendAttachmentNow error', e);
-    toast('Send failed');
-  } finally {
-    try { if (pendingAttachment) pendingAttachment._sending = false; } catch (e) {}
-  }
+  } catch (e) { // هذا الـ `}` يخص الـ `if` التي تم حذفها
+    console.error('sendAttachmentNow error', e);
+    toast('Send failed');
+  } finally {
+    try { if (pendingAttachment) pendingAttachment._sending = false; } catch (e) {}
+  }
 }
       document.addEventListener('click', (e)=>{ if(attachPanel.classList.contains('open') && !attachPanel.contains(e.target) && !attachBtn.contains(e.target)) closeAttach(); }, true);
 
