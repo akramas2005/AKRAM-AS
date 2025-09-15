@@ -1334,6 +1334,20 @@ function setRectProgress(rect, pct) {
       let pendingMessageDeleteIndex = null;
       let userActionsTimeout = null; // MODIFICATION: Timeout for user actions
 
+      // 🟢 conversation id (current)
+let currentConversationId = localStorage.getItem('currentConversationId') || null;
+
+function newConversation() {
+  try {
+    currentConversationId = 'conv_' + (crypto && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2,10));
+  } catch (e) {
+    currentConversationId = 'conv_' + Math.random().toString(36).slice(2,10);
+  }
+  localStorage.setItem('currentConversationId', currentConversationId);
+  // هنا ممكن تفرغ الرسائل من الواجهة مثلا:
+  messagesEl.innerHTML = '';
+}
+
       // file inputs
       const cameraInput = document.createElement('input');
       cameraInput.type = 'file'; cameraInput.accept = 'image/*'; cameraInput.capture = 'environment'; cameraInput.style.display='none';
@@ -2048,6 +2062,7 @@ async function sendAttachmentNow() {
           filename: pendingAttachment.filename || pendingAttachment.name,
           mime_type: pendingAttachment.mime_type || pendingAttachment.type || ''
         },
+        conversation_id: currentConversationId || null,
         meta: {}
       };
 
@@ -2262,21 +2277,68 @@ async function sendAttachmentNow() {
       }
 
 
-      // Load session
-      function loadSession(){
-  try{
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if(raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        messages = parsed;
-      } else {
-        messages = [];
+      // Load session (new: try server by conversation_id, fallback to localStorage)
+async function loadSession(){
+  try {
+    // ensure currentConversationId is set (read from localStorage if exists)
+    try {
+      currentConversationId = localStorage.getItem('currentConversationId') || currentConversationId || null;
+    } catch(e){ currentConversationId = currentConversationId || null; }
+
+    // if we have a conversation id and API_BASE -> try fetch from server
+    if (currentConversationId && typeof API_BASE !== 'undefined' && API_BASE) {
+      try {
+        const limit = 500;
+        const resp = await fetch(API_BASE + '/api/messages?conversation_id=' + encodeURIComponent(currentConversationId) + '&limit=' + limit);
+        if (resp.ok) {
+          const rows = await resp.json();
+          if (Array.isArray(rows)) {
+            messages = rows.map(r => {
+              return {
+                id: 'srv-' + (r.id || Math.random().toString(36).slice(2,9)),
+                role: r.role,
+                content: r.content || '',
+                attachment: (r.attachment_id || r.attachment_url) ? {
+                  id: r.attachment_id || null,
+                  url: r.attachment_url || null,
+                  filename: r.attachment_name || null,
+                  mime_type: r.attachment_type || null
+                } : null,
+                meta: { remoteId: r.id, created_at: r.created_at, conversation_id: r.conversation_id || null }
+              };
+            });
+            return; // 🟢 إذا نجح الجلب من السيرفر ما نحتاج نكمل
+          }
+        }
+      } catch (e) {
+        console.warn('server fetch failed, fallback to local', e);
       }
-    } else {
-      messages = [];
     }
-  }catch(e){ messages = []; }
+
+    // fallback: load from localStorage
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      messages = raw ? JSON.parse(raw) : [];
+    }catch(e){ messages = []; }
+
+  } catch(e) {
+    console.error('loadSession fatal', e);
+    messages = [];
+  }
+}
+
+    // render fallback
+    if (typeof renderMessages === 'function') {
+      renderMessages();
+    } else {
+      try { messagesEl.innerHTML = ''; } catch(e){}
+      messages.forEach((m, idx) => appendMessage(m, idx));
+    }
+
+  } catch (e) {
+    console.error('loadSession error', e);
+    messages = [];
+  }
 }
       // saveSession now also triggers autosave into savedConvos
       function saveSession(){ 
@@ -2327,14 +2389,15 @@ async function sendAttachmentNow() {
         if (!msg || !API_BASE) throw new Error('postMessageToServer: missing message or API_BASE');
 
         const payload = {
-          role: msg.role || 'user',
-          content: msg.content || '',
-          parent_id: null,
-          attachmentId: (msg.attachment && msg.attachment.id) ? msg.attachment.id : null,
-          attachmentUrl: (msg.attachment && (msg.attachment.url || msg.attachment.src)) ? (msg.attachment.url || msg.attachment.src) : null,
-          attachmentName: (msg.attachment && (msg.attachment.name || msg.attachment.filename)) ? (msg.attachment.name || msg.attachment.filename) : null,
-          attachmentType: (msg.attachment && (msg.attachment.type || msg.attachment.mime_type)) ? (msg.attachment.type || msg.attachment.mime_type) : null
-        };
+  role: msg.role || 'user',
+  content: msg.content || '',
+  parent_id: null,
+  attachmentId: (msg.attachment && msg.attachment.id) ? msg.attachment.id : null,
+  attachmentUrl: (msg.attachment && (msg.attachment.url || msg.attachment.src)) ? (msg.attachment.url || msg.attachment.src) : null,
+  attachmentName: (msg.attachment && (msg.attachment.name || msg.attachment.filename)) ? (msg.attachment.name || msg.attachment.filename) : null,
+  attachmentType: (msg.attachment && (msg.attachment.type || msg.attachment.mime_type)) ? (msg.attachment.type || msg.attachment.mime_type) : null,
+  conversation_id: currentConversationId || null
+};
 
         try {
           const resp = await fetch(API_BASE + '/api/messages', {
@@ -2414,8 +2477,16 @@ function uploadFileToServer(file, onProgress){
       xhr.ontimeout = function(){ reject(new Error('file upload timeout')); };
 
       const fd = new FormData();
-      fd.append('file', file, file.name);
-      xhr.send(fd);
+fd.append('file', file, file.name);
+
+// أضف conversation_id (إن متاح) حتى يخزن السيرفر الرسالة مربوطة بالمحادثة
+try {
+  if (typeof currentConversationId !== 'undefined' && currentConversationId) {
+    fd.append('conversation_id', String(currentConversationId));
+  }
+} catch(e) { /* ignore if not available */ }
+
+xhr.send(fd);
     } catch (err) {
       reject(err);
     }
