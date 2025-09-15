@@ -4272,9 +4272,11 @@ else if (act === 'sendFeedback') {
       savedConvos = savedConvos.filter(c => c.id !== pendingDeleteId);
       saveHistory();
 
-      // إذا كانت المحادثة الحالية هي نفسها المحذوفة → أنشئ محادثة جديدة
+      // إذا كانت المحادثة الحالية هي نفسها المحذوفة
       if (currentConversationId === pendingDeleteId) {
-        newConversation();
+        newConversation(); // ينقلك لصفحة جديدة
+        // ✨ اغلق قائمة الهمبرغر لأنه غيّرك لمحادثة جديدة
+        try { convoPanel.classList.remove('show'); } catch(_){}
       }
 
       renderHistoryPanel();
