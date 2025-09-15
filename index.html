@@ -1260,6 +1260,16 @@ function setRectProgress(rect, pct) {
     // ignore
   }
 }
+    function scheduleDeletionOnServer(url){
+  try {
+    fetch(url, { method: 'DELETE' })
+      .then(r => r.json())
+      .then(d => console.log('server deletion ok', d))
+      .catch(e => console.error('server deletion failed', e));
+  } catch(err){
+    console.error('scheduleDeletionOnServer error', err);
+  }
+}
 
     // copy helper with fallback (fixes mobile "copy not available")
     async function copyTextToClipboard(text){
@@ -1422,17 +1432,6 @@ const allowedMimesExtra = [
           else { currentSessionId = 's-'+Math.random().toString(36).slice(2,9); localStorage.setItem(CURRENT_ID_KEY, currentSessionId); }
         } catch(e) { currentSessionId = 's-'+Math.random().toString(36).slice(2,9); try{ localStorage.setItem(CURRENT_ID_KEY, currentSessionId); }catch(_e){} }
       }
-
-         function scheduleDeletionOnServer(url){
-  try {
-    fetch(url, { method: 'DELETE' })
-      .then(r => r.json())
-      .then(d => console.log('server deletion ok', d))
-      .catch(e => console.error('server deletion failed', e));
-  } catch(err){
-    console.error('scheduleDeletionOnServer error', err);
-  }
-}
 
       // persist current messages into savedConvos under currentSessionId (autosave).
       // only create/update if there are messages (do not create empty records).
