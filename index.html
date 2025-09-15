@@ -4247,7 +4247,7 @@ else if (act === 'sendFeedback') {
       // delete saved modal wiring
       deleteSavedModal.addEventListener('click', (e)=>{ if(e.target === deleteSavedModal) deleteSavedModal.classList.remove('show'); });
       deleteSavedModal.querySelector('[data-delete="no"]').addEventListener('click', ()=> deleteSavedModal.classList.remove('show'));
-      deleteSavedModal.querySelector('[data-confirm="yes"]').addEventListener('click', ()=>{
+      deleteSavedModal.querySelector('[data-delete="yes"]').addEventListener('click', ()=>{
   try {
     if (pendingDeleteId) {
       // احذف من local
