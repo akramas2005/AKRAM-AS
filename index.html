@@ -4247,31 +4247,33 @@ else if (act === 'sendFeedback') {
       // delete saved modal wiring
       deleteSavedModal.addEventListener('click', (e)=>{ if(e.target === deleteSavedModal) deleteSavedModal.classList.remove('show'); });
       deleteSavedModal.querySelector('[data-delete="no"]').addEventListener('click', ()=> deleteSavedModal.classList.remove('show'));
-      deleteSavedModal.querySelector('[data-delete="yes"]').addEventListener('click', ()=>{
+      deleteSavedModal.querySelector('[data-confirm="yes"]').addEventListener('click', ()=>{
   try {
-    const idx = Number(deleteSavedModal.dataset.idx);
-    if (isNaN(idx) || !savedConvos[idx]) {
-      deleteSavedModal.classList.remove('show');
-      return;
-    }
-    const conv = savedConvos[idx];
+    if (pendingDeleteId) {
+      // احذف من local
+      savedConvos = savedConvos.filter(c => c.id !== pendingDeleteId);
+      saveHistory();
 
-    // if this saved convo has a server-side conversation id, delete on server too
-    const convServerId = conv && (conv.conversationId || (conv.meta && conv.meta.conversation_id) || conv.remoteConversationId) || null;
-    if (convServerId && typeof API_BASE !== 'undefined' && API_BASE) {
-      const url = API_BASE + '/api/conversations/' + encodeURIComponent(convServerId);
-      scheduleDeletionOnServer(url);
-    }
+      // إذا كانت المحادثة الحالية هي نفسها المحذوفة → أنشئ محادثة جديدة
+      if (currentConversationId === pendingDeleteId) {
+        newConversation();
+      }
 
-    // remove locally
-    savedConvos.splice(idx,1);
-    saveHistory();
-    renderHistoryPanel();
-    toast('Saved conversation deleted');
-  } catch (e) {
-    console.error('deleteSavedModal handler error', e);
+      renderHistoryPanel();
+
+      // ✨ إذا لها نسخة في السيرفر، امسحها هناك أيضًا
+      if (typeof API_BASE !== 'undefined' && API_BASE) {
+        const url = API_BASE + '/api/conversations/' + encodeURIComponent(pendingDeleteId);
+        scheduleDeletionOnServer(url);
+      }
+
+      toast('Saved conversation deleted');
+    }
+  } catch(e) {
+    console.error('deleteSavedModal error', e);
   } finally {
     try { deleteSavedModal.classList.remove('show'); } catch(_) {}
+    pendingDeleteId = null;
   }
 });
 
