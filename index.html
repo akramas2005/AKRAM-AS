@@ -2249,6 +2249,48 @@ async function sendAttachmentNow() {
       let editIndex = null;
       function genId(){ return 'm-'+Math.random().toString(36).slice(2,9); }
       function escapeHtml(str){ return String(str).replace(/[&<>"]/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s])); }
+
+      // === Helpers for deletions ===
+function scheduleDeletionOnServer(url, opts = {}) {
+  if (!url) return;
+  fetch(url, Object.assign({ method: 'DELETE' }, opts)).then(resp=>{
+    if (!resp.ok) throw new Error('delete failed: ' + resp.status);
+  }).catch(err=>{
+    try {
+      const key = 'pendingDeletions';
+      const arr = JSON.parse(localStorage.getItem(key) || '[]');
+      arr.push({ url, opts, ts: Date.now() });
+      localStorage.setItem(key, JSON.stringify(arr));
+      console.warn('Deletion queued (will retry later)', url);
+    } catch(e){ console.warn('queue deletion failed', e); }
+  });
+}
+
+async function flushPendingDeletions() {
+  try {
+    const key = 'pendingDeletions';
+    const arr = JSON.parse(localStorage.getItem(key) || '[]');
+    if (!Array.isArray(arr) || arr.length === 0) return;
+    const remaining = [];
+    for (const item of arr) {
+      try {
+        const resp = await fetch(item.url, Object.assign({ method: 'DELETE' }, item.opts || {}));
+        if (!resp.ok) {
+          remaining.push(item);
+        } else {
+          console.info('Pending deletion succeeded:', item.url);
+        }
+      } catch (e) {
+        remaining.push(item);
+      }
+    }
+    localStorage.setItem(key, JSON.stringify(remaining));
+  } catch(e){ console.warn('flushPendingDeletions error', e); }
+}
+
+window.addEventListener('online', flushPendingDeletions);
+setTimeout(flushPendingDeletions, 1500);
+
       // build a plain-text prompt from last N messages (for context)
       function buildChatPrompt(msgs, upToIndex = null, windowSize = 15){
         try{
@@ -3643,25 +3685,45 @@ else if (act === 'sendFeedback') {
 
       messageConfirmModal.addEventListener('click', (e)=>{ if(e.target === messageConfirmModal) messageConfirmModal.classList.remove('show'); });
       messageConfirmModal.querySelector('[data-msg-confirm="no"]').addEventListener('click', ()=>{ messageConfirmModal.classList.remove('show'); pendingMessageDeleteIndex = null; });
-     messageConfirmModal.querySelector('[data-msg-confirm="yes"]').addEventListener('click', ()=>{ 
-  if (typeof pendingMessageDeleteIndex === 'number') {
-    const start = pendingMessageDeleteIndex;
-
-    // حدّث البيانات
-    messages.splice(start);
-
-    // احذف عناصر DOM من نفس الموضع للأخير — بدون إعادة رندر كامل
-    const nodes = [...messagesEl.querySelectorAll('.msg')];
-    for (const el of nodes) {
-      const i = Number(el.dataset.index || -1);
-      if (i >= start) el.remove();
+     messageConfirmModal.querySelector('[data-msg-confirm="yes"]').addEventListener('click', async ()=>{
+  try {
+    const idx = Number(pendingMessageDeleteIndex);
+    if (isNaN(idx)) {
+      messageConfirmModal.classList.remove('show');
+      return;
     }
 
+    // find a server message id to base the deletion on (remoteId)
+    let serverId = null;
+    if (messages[idx] && messages[idx].meta && messages[idx].meta.remoteId) {
+      serverId = messages[idx].meta.remoteId;
+    } else {
+      // fallback: try to find the first message after idx that has remoteId
+      for (let i = idx; i < messages.length; i++){
+        if (messages[i] && messages[i].meta && messages[i].meta.remoteId) {
+          serverId = messages[i].meta.remoteId;
+          break;
+        }
+      }
+    }
+
+    // remove locally (keep messages before idx)
+    messages = messages.slice(0, idx);
     saveSession();
-    toast('Messages deleted');
+    renderMessages();
+
+    // ask server to delete messages from that serverId onward
+    if (serverId && typeof API_BASE !== 'undefined' && API_BASE) {
+      const url = API_BASE + '/api/messages/after/' + encodeURIComponent(serverId);
+      scheduleDeletionOnServer(url);
+    } else {
+      console.info('No serverId found for deletion; local only.');
+    }
+  } catch(err) {
+    console.error('message-delete handler error', err);
+  } finally {
+    try { messageConfirmModal.classList.remove('show'); } catch(_) {}
   }
-  pendingMessageDeleteIndex = null;
-  messageConfirmModal.classList.remove('show');
 });
 
       function findPrevUserIndex(i){
@@ -3758,14 +3820,25 @@ else if (act === 'sendFeedback') {
       confirmModal.addEventListener('click', (e)=>{ if(e.target === confirmModal) closeConfirm(); });
       confirmModal.querySelector('[data-confirm="no"]').addEventListener('click', closeConfirm);
       confirmModal.querySelector('[data-confirm="yes"]').addEventListener('click', ()=>{
-        messages = [];
-        saveSession();
-        localStorage.removeItem(DRAFT_KEY);
-        renderMessages();
-        updateWelcomeVisibility();
-        closeConfirm();
-        toast('Conversation deleted');
-      });
+  try {
+    // remove locally
+    messages = [];
+    saveSession();
+    renderMessages();
+
+    // delete on server if we have currentConversationId
+    if (currentConversationId && typeof API_BASE !== 'undefined' && API_BASE) {
+      const url = API_BASE + '/api/conversations/' + encodeURIComponent(currentConversationId);
+      scheduleDeletionOnServer(url);
+      try { localStorage.removeItem('currentConversationId'); } catch(_) {}
+      currentConversationId = null;
+    }
+  } catch(e) {
+    console.error('confirmModal delete error', e);
+  } finally {
+    try { confirmModal.classList.remove('show'); } catch(_) {}
+  }
+});
       const reasons = [
         'Violent content','Self-harm','Explicit sexual content','Hate / incitement',
         'Misinformation','Sensitive content','Privacy issue','Other'
@@ -4175,15 +4248,32 @@ else if (act === 'sendFeedback') {
       deleteSavedModal.addEventListener('click', (e)=>{ if(e.target === deleteSavedModal) deleteSavedModal.classList.remove('show'); });
       deleteSavedModal.querySelector('[data-delete="no"]').addEventListener('click', ()=> deleteSavedModal.classList.remove('show'));
       deleteSavedModal.querySelector('[data-delete="yes"]').addEventListener('click', ()=>{
-        const idx = Number(deleteSavedModal.dataset.idx);
-        if(!isNaN(idx) && savedConvos[idx]){
-          savedConvos.splice(idx,1);
-          saveHistory();
-          renderHistoryPanel();
-          toast('Saved conversation deleted');
-        }
-        deleteSavedModal.classList.remove('show');
-      });
+  try {
+    const idx = Number(deleteSavedModal.dataset.idx);
+    if (isNaN(idx) || !savedConvos[idx]) {
+      deleteSavedModal.classList.remove('show');
+      return;
+    }
+    const conv = savedConvos[idx];
+
+    // if this saved convo has a server-side conversation id, delete on server too
+    const convServerId = conv && (conv.conversationId || (conv.meta && conv.meta.conversation_id) || conv.remoteConversationId) || null;
+    if (convServerId && typeof API_BASE !== 'undefined' && API_BASE) {
+      const url = API_BASE + '/api/conversations/' + encodeURIComponent(convServerId);
+      scheduleDeletionOnServer(url);
+    }
+
+    // remove locally
+    savedConvos.splice(idx,1);
+    saveHistory();
+    renderHistoryPanel();
+    toast('Saved conversation deleted');
+  } catch (e) {
+    console.error('deleteSavedModal handler error', e);
+  } finally {
+    try { deleteSavedModal.classList.remove('show'); } catch(_) {}
+  }
+});
 
       // loadSavedConversation (no locking - lock feature removed)
       function loadSavedConversation(idx){
