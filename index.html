@@ -1423,6 +1423,17 @@ const allowedMimesExtra = [
         } catch(e) { currentSessionId = 's-'+Math.random().toString(36).slice(2,9); try{ localStorage.setItem(CURRENT_ID_KEY, currentSessionId); }catch(_e){} }
       }
 
+         function scheduleDeletionOnServer(url){
+  try {
+    fetch(url, { method: 'DELETE' })
+      .then(r => r.json())
+      .then(d => console.log('server deletion ok', d))
+      .catch(e => console.error('server deletion failed', e));
+  } catch(err){
+    console.error('scheduleDeletionOnServer error', err);
+  }
+}
+
       // persist current messages into savedConvos under currentSessionId (autosave).
       // only create/update if there are messages (do not create empty records).
       function persistCurrentToHistory(){
