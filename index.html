@@ -1333,6 +1333,7 @@ function setRectProgress(rect, pct) {
       let convoMenuTargetIndex = null; // which savedConvo index the contextual menu is for
       let pendingMessageDeleteIndex = null;
       let userActionsTimeout = null; // MODIFICATION: Timeout for user actions
+      let pendingDeleteId = null;
 
       // 🟢 conversation id (current)
 let currentConversationId = localStorage.getItem('currentConversationId') || null;
