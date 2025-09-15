@@ -3821,22 +3821,25 @@ else if (act === 'sendFeedback') {
       confirmModal.querySelector('[data-confirm="no"]').addEventListener('click', closeConfirm);
       confirmModal.querySelector('[data-confirm="yes"]').addEventListener('click', ()=>{
   try {
-    // remove locally
+    if (currentConversationId) {
+      if (typeof API_BASE !== 'undefined' && API_BASE) {
+        const url = API_BASE + '/api/conversations/' + encodeURIComponent(currentConversationId);
+        scheduleDeletionOnServer(url);
+      }
+    }
+
     messages = [];
     saveSession();
+    localStorage.removeItem(DRAFT_KEY);
     renderMessages();
+    updateWelcomeVisibility();
+    closeConfirm();
+    toast('Conversation deleted');
 
-    // delete on server if we have currentConversationId
-    if (currentConversationId && typeof API_BASE !== 'undefined' && API_BASE) {
-      const url = API_BASE + '/api/conversations/' + encodeURIComponent(currentConversationId);
-      scheduleDeletionOnServer(url);
-      try { localStorage.removeItem('currentConversationId'); } catch(_) {}
-      currentConversationId = null;
-    }
+    // ✨ أنشئ محادثة جديدة فاضية بعد الحذف
+    newConversation();
   } catch(e) {
-    console.error('confirmModal delete error', e);
-  } finally {
-    try { confirmModal.classList.remove('show'); } catch(_) {}
+    console.error('conversation delete error', e);
   }
 });
       const reasons = [
