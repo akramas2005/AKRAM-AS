@@ -4244,13 +4244,17 @@ else if (act === 'sendFeedback') {
       });
 
       menuDeleteBtn.addEventListener('click', ()=>{
-        convoItemMenu.classList.remove('show');
-        const idx = convoMenuTargetIndex;
-        if(typeof idx !== 'number' || !savedConvos[idx]) return;
-        // show small delete confirmation
-        deleteSavedModal.classList.add('show');
-        deleteSavedModal.dataset.idx = idx;
-      });
+  try {
+    convoItemMenu.classList.remove('show');
+    if (convoMenuTargetIndex != null && savedConvos[convoMenuTargetIndex]) {
+      const conv = savedConvos[convoMenuTargetIndex];
+      pendingDeleteId = conv.id; // 🟢 خزّن الـ id هنا
+      deleteSavedModal.classList.add('show');
+    }
+  } catch(e){ 
+    console.error(e); 
+  }
+});
 
       menuLockSoonBtn.addEventListener('click', ()=>{
         convoItemMenu.classList.remove('show');
