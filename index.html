@@ -4284,7 +4284,6 @@ else if (act === 'sendFeedback') {
       deleteSavedModal.querySelector('[data-delete="yes"]').addEventListener('click', ()=>{
   try {
     if (pendingDeleteId) {
-      // التحقق مما إذا كانت المحادثة المحذوفة هي النشطة حالياً
       const isDeletingCurrent = currentConversationId === pendingDeleteId;
 
       // 1. حذف المحادثة من القائمة المحلية ومن الخادم
@@ -4295,20 +4294,34 @@ else if (act === 'sendFeedback') {
         scheduleDeletionOnServer(url);
       }
       
-      // 2. أغلق نافذة التأكيد وأظهر رسالة للمستخدم
+      // 2. أغلق نافذة التأكيد وأظهر رسالة
       deleteSavedModal.classList.remove('show');
       toast('Saved conversation deleted');
 
       if (isDeletingCurrent) {
-        // --- هنا تطبيق فكرتك الرائعة ---
-        // إذا كان المستخدم يحذف الصفحة التي هو فيها،
-        // قم بالضغط على زر "New Chat" تلقائياً عبر الكود!
-        const newChatBtn = document.getElementById('newChatBtn');
-        if (newChatBtn) {
-          newChatBtn.click(); // <-- هذا السطر هو مفتاح الحل
-        }
+        // --- الحل النهائي باستخدام setTimeout ---
+        // نعطي المتصفح مهلة قصيرة (50 ميلي ثانية) لإنهاء عملية إغلاق النافذة،
+        // ثم ننفذ عملية الانتقال إلى صفحة جديدة.
+        setTimeout(() => {
+          // أ. أولاً وقبل كل شيء، نفرغ الرسائل الحالية من الذاكرة
+          messages = [];
+          
+          // ب. نقوم بإنشاء جلسة جديدة تمامًا
+          currentSessionId = 's-' + Math.random().toString(36).slice(2, 9);
+          try { localStorage.setItem(CURRENT_ID_KEY, currentSessionId); } catch(e) {}
+          
+          // ج. نحفظ الحالة الجديدة الفارغة ونحدث الواجهة بالكامل
+          saveSession();
+          renderMessages();
+          updateWelcomeVisibility();
+          renderHistoryPanel(); // تحديث القائمة لإزالة العنصر
+          
+          // د. أغلق القائمة الجانبية
+          closeConvoPanel();
+        }, 50); // <-- هذا هو مفتاح الحل
+
       } else {
-        // إذا كان يحذف صفحة أخرى، فقط قم بتحديث القائمة
+        // إذا تم حذف محادثة أخرى، فقط حدث القائمة
         renderHistoryPanel();
       }
     }
