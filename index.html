@@ -1278,12 +1278,12 @@
 
 <div class="modal-backdrop" id="renameModal">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="renameTitle">
-    <h3 id="renameTitle">إعادة تسمية المحادثة</h3>
-    <p>أدخل اسمًا جديدًا لهذه المحادثة.</p>
-    <input type="text" id="renameInput" class="rename-input" placeholder="اسم المحادثة الجديد...">
+    <h3 id="renameTitle">Rename Conversation</h3>
+    <p>Enter a new name for this conversation.</p>
+    <input type="text" id="renameInput" class="rename-input" placeholder="New conversation name...">
     <div class="row">
-      <button class="btn ghost" data-rename="cancel">إلغاء</button>
-      <button class="btn primary" data-rename="save" style="background: var(--accent);">حفظ</button>
+      <button class="btn ghost" data-rename="cancel">Cancel</button>
+      <button class="btn primary" data-rename="save" style="background: var(--accent);">Save</button>
     </div>
   </div>
 </div>
@@ -4361,21 +4361,21 @@ else if (act === 'sendFeedback') {
       renameCancelBtn.addEventListener('click', closeRenameModal);
 
       // عند الضغط على زر الحفظ
-      renameSaveBtn.addEventListener('click', () => {
-        const idx = convoMenuTargetIndex;
-        if (typeof idx !== 'number' || !savedConvos[idx]) return;
+renameSaveBtn.addEventListener('click', () => {
+    const idx = convoMenuTargetIndex;
+    if (typeof idx !== 'number' || !savedConvos[idx]) return;
 
-        const newName = renameInput.value.trim();
-        if (newName.length > 0) {
-          savedConvos[idx].title = newName;
-          saveHistory();
-          renderHistoryPanel();
-          toast('تمت إعادة تسمية المحادثة');
-          closeRenameModal();
-        } else {
-          toast('لا يمكن أن يكون الاسم فارغًا');
-        }
-      });
+    const newName = renameInput.value.trim();
+    if (newName.length > 0) {
+      savedConvos[idx].title = newName;
+      saveHistory();
+      renderHistoryPanel();
+      toast('Conversation renamed');
+      closeRenameModal();
+    } else {
+      toast('Name cannot be empty');
+    }
+  });
       // --- END: New Rename Logic ---
 
       menuDeleteBtn.addEventListener('click', (e) => {
