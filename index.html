@@ -4284,9 +4284,10 @@ else if (act === 'sendFeedback') {
       deleteSavedModal.querySelector('[data-delete="yes"]').addEventListener('click', ()=>{
   try {
     if (pendingDeleteId) {
+      // التحقق مما إذا كانت المحادثة المحذوفة هي النشطة حالياً
       const isDeletingCurrent = currentConversationId === pendingDeleteId;
 
-      // الخطوات المشتركة: حذف المحادثة من الذاكرة ومن الخادم
+      // 1. حذف المحادثة من القائمة المحلية ومن الخادم
       savedConvos = savedConvos.filter(c => c.id !== pendingDeleteId);
       saveHistory();
       if (typeof API_BASE !== 'undefined' && API_BASE) {
@@ -4294,24 +4295,20 @@ else if (act === 'sendFeedback') {
         scheduleDeletionOnServer(url);
       }
       
-      // أغلق نافذة التأكيد فوراً
+      // 2. أغلق نافذة التأكيد وأظهر رسالة للمستخدم
       deleteSavedModal.classList.remove('show');
       toast('Saved conversation deleted');
 
       if (isDeletingCurrent) {
-        // إذا تم حذف المحادثة الحالية:
-        // قم بإنشاء محادثة جديدة تماماً بنفس منطق زر "New Chat" الناجح
-        currentSessionId = 's-'+Math.random().toString(36).slice(2,9);
-        try { localStorage.setItem(CURRENT_ID_KEY, currentSessionId); } catch(e){}
-        messages = [];
-        saveSession();
-        renderMessages();
-        updateWelcomeVisibility();
-        renderHistoryPanel(); // تحديث القائمة لإزالة العنصر المحذوف
-        closeConvoPanel(); // إغلاق القائمة باستخدام الدالة الرئيسية
+        // --- هنا تطبيق فكرتك الرائعة ---
+        // إذا كان المستخدم يحذف الصفحة التي هو فيها،
+        // قم بالضغط على زر "New Chat" تلقائياً عبر الكود!
+        const newChatBtn = document.getElementById('newChatBtn');
+        if (newChatBtn) {
+          newChatBtn.click(); // <-- هذا السطر هو مفتاح الحل
+        }
       } else {
-        // إذا تم حذف محادثة أخرى:
-        // فقط أعد رسم القائمة لإظهار التغيير، وستبقى القائمة مفتوحة
+        // إذا كان يحذف صفحة أخرى، فقط قم بتحديث القائمة
         renderHistoryPanel();
       }
     }
