@@ -4106,10 +4106,15 @@ else if (act === 'sendFeedback') {
         try{
           if(convoPanel && convoPanel.classList.contains('open')){
             const ct = e.target;
-            const deleteModal = document.getElementById('deleteSavedModal'); // <-- إضافة
-            
-            // الشرط الجديد: لا تغلق القائمة إذا كان الضغط داخلها، أو على زر فتحها، أو داخل نافذة التأكيد
-            if(!convoPanel.contains(ct) && !convosBtn.contains(ct) && !deleteModal.contains(ct) ){
+            // جلب كل العناصر التي لا يجب أن تسبب الإغلاق
+            const deleteModal = document.getElementById('deleteSavedModal');
+            const convoItemMenu = document.getElementById('convoItemMenu'); // <-- إضافة مهمة جداً
+
+            // الشرط المحدث: لا تغلق القائمة إذا كان الضغط داخل أي من هذه العناصر
+            if( !convoPanel.contains(ct) && 
+                !convosBtn.contains(ct) && 
+                !deleteModal.contains(ct) && 
+                !convoItemMenu.contains(ct) ){
               closeConvoPanelInternal();
             }
           }
@@ -4279,52 +4284,43 @@ else if (act === 'sendFeedback') {
       deleteSavedModal.querySelector('[data-delete="yes"]').addEventListener('click', ()=>{
   try {
     if (pendingDeleteId) {
-      // تحقق أولاً مما إذا كانت المحادثة المحذوفة هي النشطة حالياً
       const isDeletingCurrent = currentConversationId === pendingDeleteId;
 
-      // 1. قم بحذف المحادثة من الخادم (السيرفر) إذا كان متاحاً
+      // الخطوات المشتركة: حذف المحادثة من الذاكرة ومن الخادم
+      savedConvos = savedConvos.filter(c => c.id !== pendingDeleteId);
+      saveHistory();
       if (typeof API_BASE !== 'undefined' && API_BASE) {
         const url = API_BASE + '/api/conversations/' + encodeURIComponent(pendingDeleteId);
         scheduleDeletionOnServer(url);
       }
+      
+      // أغلق نافذة التأكيد فوراً
+      deleteSavedModal.classList.remove('show');
+      toast('Saved conversation deleted');
 
-      // 2. قم بحذف المحادثة من القائمة المحلية المحفوظة
-      savedConvos = savedConvos.filter(c => c.id !== pendingDeleteId);
-      saveHistory();
-
-      // 3. اتخذ الإجراء المناسب بناءً على نوع الحذف
       if (isDeletingCurrent) {
         // إذا تم حذف المحادثة الحالية:
-        // أ. أفرغ الرسائل وانتقل إلى محادثة جديدة
+        // قم بإنشاء محادثة جديدة تماماً بنفس منطق زر "New Chat" الناجح
+        currentSessionId = 's-'+Math.random().toString(36).slice(2,9);
+        try { localStorage.setItem(CURRENT_ID_KEY, currentSessionId); } catch(e){}
         messages = [];
-        newConversation(); // <-- هذه الدالة تنشئ ID جديد وتفرغ واجهة الرسائل
-        saveSession(); // حفظ الحالة الجديدة الفارغة
-        
-        // ب. أعد رسم واجهة الدردشة (ستكون فارغة) وأظهر رسالة الترحيب
+        saveSession();
         renderMessages();
         updateWelcomeVisibility();
-
-        // ج. أغلق نافذة الهمبرغر لأننا انتقلنا إلى صفحة جديدة
-        closeConvoPanelInternal(); 
-        
+        renderHistoryPanel(); // تحديث القائمة لإزالة العنصر المحذوف
+        closeConvoPanel(); // إغلاق القائمة باستخدام الدالة الرئيسية
       } else {
-        // إذا تم حذف محادثة أخرى (ليست الحالية):
-        // فقط قم بتحديث محتويات قائمة الهمبرغر لتعكس الحذف
+        // إذا تم حذف محادثة أخرى:
+        // فقط أعد رسم القائمة لإظهار التغيير، وستبقى القائمة مفتوحة
         renderHistoryPanel();
-        // القائمة ستبقى مفتوحة كما هي
       }
-
-      toast('Saved conversation deleted');
     }
   } catch(e) {
     console.error('deleteSavedModal error', e);
   } finally {
-    // 4. في كل الحالات، أغلق نافذة التأكيد وأعد تعيين المتغير
-    deleteSavedModal.classList.remove('show');
     pendingDeleteId = null;
   }
 });
-
       // loadSavedConversation (no locking - lock feature removed)
       function loadSavedConversation(idx){
         if(!savedConvos[idx]) return;
