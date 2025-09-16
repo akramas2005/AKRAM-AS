@@ -595,13 +595,82 @@
   .user-actions .act-btn:hover{ background: rgba(0,0,0,0.04); }
 
   .modal-backdrop{
-    position:fixed; inset:0; background:rgba(8,16,28,.45); backdrop-filter: blur(2px);
-    display:none; align-items:center; justify-content:center; z-index:14080;
+    position:fixed; 
+    inset:0; 
+    background:rgba(8,16,28,.6); /* زيادة التعتيم قليلاً */
+    backdrop-filter: blur(4px); /* زيادة قوة التغبيش */
+    display:flex; /* تم نقله هنا ليكون دائماً flex */
+    align-items:center; 
+    justify-content:center; 
+    z-index:14080;
+    opacity: 0; /* يبدأ شفافاً */
+    pointer-events: none; /* لا يمكن التفاعل معه وهو مخفي */
+    transition: opacity .25s ease; /* حركة ظهور ناعمة */
   }
-  .modal-backdrop.show{ display:flex; }
+  .modal-backdrop.show{ 
+    opacity: 1; /* يظهر بالكامل */
+    pointer-events: auto; /* يمكن التفاعل معه */
+  }
   .modal{
-    width:min(92vw, 520px); background:#fff; border-radius:14px; box-shadow:0 24px 70px rgba(6,30,60,.28);
-    padding:16px; direction:rtl;
+    width:min(92vw, 480px); /* تصغير العرض قليلاً */
+    background: #fff; 
+    border-radius: 18px; /* زيادة دائرية الحواف */
+    box-shadow: 0 16px 40px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.04); /* ظل أكثر حداثة */
+    padding: 24px; /* زيادة المساحة الداخلية */
+    direction:rtl;
+    text-align: center; /* توسيط كل شيء */
+    transform: scale(0.95) translateY(10px); /* الحالة الأولية للحركة (مصغر ومزاح للأسفل) */
+    opacity: 0;
+    transition: transform .25s cubic-bezier(.2,.9,.25,1), opacity .2s ease;
+  }
+  /* عند ظهور النافذة، يتحرك الـ modal للداخل */
+  .modal-backdrop.show .modal {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+  .modal h3{ 
+    margin:0 0 8px; 
+    font-size:18px;
+    font-weight: 700; /* خط أعرض */
+    color: #111;
+  }
+  .modal p{ 
+    margin:0 0 20px; /* زيادة المسافة السفلية */
+    color:#55626c; /* لون أغمق قليلاً وأوضح */
+    font-size:14px; 
+    line-height: 1.5;
+  }
+  .modal .row{ 
+    display:flex; 
+    gap:12px; /* زيادة المسافة بين الأزرار */
+    justify-content:center; /* توسيط الأزرار */
+    margin-top:10px; 
+  }
+  /* تصميم محسن للأزرار مع حركة */
+  .btn{ 
+    padding:10px 20px; /* حجم أكبر قليلاً */
+    border-radius:12px; 
+    border:none; 
+    cursor:pointer; 
+    font-weight:700; /* خط أعرض */
+    font-size: 14px;
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+  .btn:hover {
+    transform: translateY(-2px); /* حركة للأعلى عند مرور الماوس */
+    box-shadow: 0 6px 16px rgba(0,0,0,0.1);
+  }
+  .btn:active {
+    transform: translateY(0);
+    box-shadow: none;
+  }
+  .btn.primary{ 
+    background:var(--danger, #ff4d4f); /* استخدام متغير danger color لزر الحذف */
+    color:#fff; 
+  }
+  .btn.ghost{ 
+    background:#f0f4f8; 
+    color: #333;
   }
   .modal h3{ margin:0 0 8px; font-size:16px; }
   .modal p{ margin:6px 0 12px; color:#44525c; font-size:13px; }
@@ -1191,6 +1260,43 @@
     </div>
   </div>
 </div>
+  <div class="modal-backdrop" id="renameModal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="renameTitle">
+    <h3 id="renameTitle">إعادة تسمية المحادثة</h3>
+    <p>أدخل اسمًا جديدًا لهذه المحادثة.</p>
+    <input type="text" id="renameInput" class="rename-input" placeholder="اسم المحادثة الجديد...">
+    <div class="row">
+      <button class="btn ghost" data-rename="cancel">إلغاء</button>
+      <button class="btn primary" data-rename="save" style="background: var(--accent);">حفظ</button>
+    </div>
+  </div>
+</div>
+
+<div id="imageLightboxRoot" aria-hidden="true"></div> ```
+
+#### 2. إضافة CSS لتصميم حقل الإدخال
+
+في أي مكان داخل وسم `<style>` في ملفك، أضف كود الـ CSS التالي لتصميم حقل الإدخال الجديد:
+
+```css
+/* Style for the new rename input */
+.rename-input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid #dde4ea;
+  font-size: 14px;
+  margin-top: 12px;
+  margin-bottom: 16px;
+  box-sizing: border-box;
+  transition: border-color .2s ease, box-shadow .2s ease;
+  text-align: right; /* محاذاة النص لليمين */
+}
+.rename-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(0, 120, 255, 0.15);
+}
 
 <div id="imageLightboxRoot" aria-hidden="true"></div>
 
@@ -4232,24 +4338,55 @@ else if (act === 'sendFeedback') {
         }, 10);
       }
 
-      // menu actions: Rename, Delete, Lock soon
-      menuRenameBtn.addEventListener('click', ()=>{
+      // --- START: New Rename Logic ---
+      const renameModal = document.getElementById('renameModal');
+      const renameInput = document.getElementById('renameInput');
+      const renameSaveBtn = renameModal.querySelector('[data-rename="save"]');
+      const renameCancelBtn = renameModal.querySelector('[data-rename="cancel"]');
+
+      // وظيفة لإظهار نافذة إعادة التسمية
+      function openRenameModal(currentIndex) {
+        const currentName = savedConvos[currentIndex]?.title || '';
+        renameInput.value = currentName;
+        renameModal.classList.add('show');
+        renameInput.focus();
+        renameInput.select();
+      }
+
+      // وظيفة لإغلاق النافذة
+      function closeRenameModal() {
+        renameModal.classList.remove('show');
+      }
+
+      // عند الضغط على زر إعادة التسمية في القائمة
+      menuRenameBtn.addEventListener('click', () => {
         convoItemMenu.classList.remove('show');
         const idx = convoMenuTargetIndex;
-        if(typeof idx !== 'number' || !savedConvos[idx]) return;
-        const newName = prompt('Rename conversation', savedConvos[idx].title || '');
-        if(newName !== null){
-          const trimmed = String(newName || '').trim();
-          if(trimmed.length>0){
-            savedConvos[idx].title = trimmed;
-            saveHistory();
-            renderHistoryPanel();
-            toast('Conversation renamed');
-          } else {
-            toast('Name cannot be empty');
-          }
+        if (typeof idx === 'number' && savedConvos[idx]) {
+          openRenameModal(idx);
         }
       });
+
+      // عند الضغط على زر الإلغاء
+      renameCancelBtn.addEventListener('click', closeRenameModal);
+
+      // عند الضغط على زر الحفظ
+      renameSaveBtn.addEventListener('click', () => {
+        const idx = convoMenuTargetIndex;
+        if (typeof idx !== 'number' || !savedConvos[idx]) return;
+        
+        const newName = renameInput.value.trim();
+        if (newName.length > 0) {
+          savedConvos[idx].title = newName;
+          saveHistory();
+          renderHistoryPanel();
+          toast('Conversation renamed');
+          closeRenameModal();
+        } else {
+          toast('Name cannot be empty');
+        }
+      });
+      // --- END: New Rename Logic ---
 
       menuDeleteBtn.addEventListener('click', (e) => {
   e.stopPropagation();
