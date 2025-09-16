@@ -4101,12 +4101,15 @@ else if (act === 'sendFeedback') {
       });
       convoCloseBtn.addEventListener('click', ()=> closeConvoPanel());
 
-      // click outside to close convoPanel (requirement)
+     // click outside to close convoPanel (requirement)
       document.addEventListener('pointerdown', (e)=>{
         try{
           if(convoPanel && convoPanel.classList.contains('open')){
             const ct = e.target;
-            if(!convoPanel.contains(ct) && !convosBtn.contains(ct)){
+            const deleteModal = document.getElementById('deleteSavedModal'); // <-- إضافة
+            
+            // الشرط الجديد: لا تغلق القائمة إذا كان الضغط داخلها، أو على زر فتحها، أو داخل نافذة التأكيد
+            if(!convoPanel.contains(ct) && !convosBtn.contains(ct) && !deleteModal.contains(ct) ){
               closeConvoPanelInternal();
             }
           }
@@ -4276,45 +4279,39 @@ else if (act === 'sendFeedback') {
       deleteSavedModal.querySelector('[data-delete="yes"]').addEventListener('click', ()=>{
   try {
     if (pendingDeleteId) {
-      // تحقق مما إذا كنا نحذف المحادثة النشطة حاليًا
-      const isDeletingCurrentConversation = (currentConversationId === pendingDeleteId);
+      // تحقق أولاً مما إذا كانت المحادثة المحذوفة هي النشطة حالياً
+      const isDeletingCurrent = currentConversationId === pendingDeleteId;
 
-      // 1. احذف المحادثة من القائمة المحلية واحفظ التغييرات
-      savedConvos = savedConvos.filter(c => c.id !== pendingDeleteId);
-      saveHistory();
-
-      // 2. أرسل طلب الحذف إلى الخادم (السيرفر)
+      // 1. قم بحذف المحادثة من الخادم (السيرفر) إذا كان متاحاً
       if (typeof API_BASE !== 'undefined' && API_BASE) {
         const url = API_BASE + '/api/conversations/' + encodeURIComponent(pendingDeleteId);
         scheduleDeletionOnServer(url);
       }
-      
-      // 3. طبق المنطق الجديد بناءً على نوع الحذف
-      if (isDeletingCurrentConversation) {
-        // الحالة الأولى: المستخدم حذف المحادثة التي يشاهدها
-        
-        // أفرغ الرسائل الحالية بالكامل
-        messages = [];
-        // أنشئ جلسة محادثة جديدة بمعرّف جديد
-        newConversation(); 
-        // احفظ الجلسة الفارغة
-        saveSession();
-        // أعد رسم واجهة الدردشة (ستصبح فارغة)
-        renderMessages();
-        // أظهر رسالة الترحيب مجددًا
-        updateWelcomeVisibility();
-        
-        // أغلق قائمة الهمبرغر لأننا انتقلنا لصفحة جديدة
-        if(convoPanel) {
-            convoPanel.classList.remove('open');
-            convosBtn.classList.remove('open');
-        }
 
+      // 2. قم بحذف المحادثة من القائمة المحلية المحفوظة
+      savedConvos = savedConvos.filter(c => c.id !== pendingDeleteId);
+      saveHistory();
+
+      // 3. اتخذ الإجراء المناسب بناءً على نوع الحذف
+      if (isDeletingCurrent) {
+        // إذا تم حذف المحادثة الحالية:
+        // أ. أفرغ الرسائل وانتقل إلى محادثة جديدة
+        messages = [];
+        newConversation(); // <-- هذه الدالة تنشئ ID جديد وتفرغ واجهة الرسائل
+        saveSession(); // حفظ الحالة الجديدة الفارغة
+        
+        // ب. أعد رسم واجهة الدردشة (ستكون فارغة) وأظهر رسالة الترحيب
+        renderMessages();
+        updateWelcomeVisibility();
+
+        // ج. أغلق نافذة الهمبرغر لأننا انتقلنا إلى صفحة جديدة
+        closeConvoPanelInternal(); 
+        
       } else {
-        // الحالة الثانية: المستخدم حذف محادثة أخرى
-        // فقط قم بتحديث قائمة المحادثات لتعكس الحذف
+        // إذا تم حذف محادثة أخرى (ليست الحالية):
+        // فقط قم بتحديث محتويات قائمة الهمبرغر لتعكس الحذف
         renderHistoryPanel();
-        // القائمة ستبقى مفتوحة
+        // القائمة ستبقى مفتوحة كما هي
       }
 
       toast('Saved conversation deleted');
@@ -4322,8 +4319,8 @@ else if (act === 'sendFeedback') {
   } catch(e) {
     console.error('deleteSavedModal error', e);
   } finally {
-    // أغلق نافذة التأكيد في كل الحالات
-    try { deleteSavedModal.classList.remove('show'); } catch(_) {}
+    // 4. في كل الحالات، أغلق نافذة التأكيد وأعد تعيين المتغير
+    deleteSavedModal.classList.remove('show');
     pendingDeleteId = null;
   }
 });
