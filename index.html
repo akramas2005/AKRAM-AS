@@ -4244,18 +4244,19 @@ else if (act === 'sendFeedback') {
       });
 
       menuDeleteBtn.addEventListener('click', (e) => {
-  // لا ندع هذا النقر يغلق أي قوائم عامة
   e.stopPropagation();
   e.preventDefault();
 
   try {
     if (convoMenuTargetIndex != null && savedConvos[convoMenuTargetIndex]) {
       const conv = savedConvos[convoMenuTargetIndex];
-      // خزّن id المحادثة للحذف لاحقاً
       pendingDeleteId = conv.id;
-      // عرض نافذة التأكيد (لا نغلق convoPanel هنا)
+
+      // ✅ هنا: أغلق القائمة الصغيرة فقط
+      convoItemMenu.classList.remove('show');
+
+      // ✅ افتح نافذة التأكيد
       deleteSavedModal.classList.add('show');
-      // احتفظ بالاندكس إن احتجت لاحقًا
       deleteSavedModal.dataset.idx = convoMenuTargetIndex;
     }
   } catch (err) {
