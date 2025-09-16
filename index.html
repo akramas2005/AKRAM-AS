@@ -4276,23 +4276,45 @@ else if (act === 'sendFeedback') {
       deleteSavedModal.querySelector('[data-delete="yes"]').addEventListener('click', ()=>{
   try {
     if (pendingDeleteId) {
-      // احذف من local
+      // تحقق مما إذا كنا نحذف المحادثة النشطة حاليًا
+      const isDeletingCurrentConversation = (currentConversationId === pendingDeleteId);
+
+      // 1. احذف المحادثة من القائمة المحلية واحفظ التغييرات
       savedConvos = savedConvos.filter(c => c.id !== pendingDeleteId);
       saveHistory();
 
-      // إذا كانت المحادثة الحالية هي نفسها المحذوفة
-      if (currentConversationId === pendingDeleteId) {
-        newConversation(); // ينقلك لصفحة جديدة
-        // ✨ اغلق قائمة الهمبرغر لأنه غيّرك لمحادثة جديدة
-        try { convoPanel.classList.remove('show'); } catch(_){}
-      }
-
-      renderHistoryPanel();
-
-      // ✨ إذا لها نسخة في السيرفر، امسحها هناك أيضًا
+      // 2. أرسل طلب الحذف إلى الخادم (السيرفر)
       if (typeof API_BASE !== 'undefined' && API_BASE) {
         const url = API_BASE + '/api/conversations/' + encodeURIComponent(pendingDeleteId);
         scheduleDeletionOnServer(url);
+      }
+      
+      // 3. طبق المنطق الجديد بناءً على نوع الحذف
+      if (isDeletingCurrentConversation) {
+        // الحالة الأولى: المستخدم حذف المحادثة التي يشاهدها
+        
+        // أفرغ الرسائل الحالية بالكامل
+        messages = [];
+        // أنشئ جلسة محادثة جديدة بمعرّف جديد
+        newConversation(); 
+        // احفظ الجلسة الفارغة
+        saveSession();
+        // أعد رسم واجهة الدردشة (ستصبح فارغة)
+        renderMessages();
+        // أظهر رسالة الترحيب مجددًا
+        updateWelcomeVisibility();
+        
+        // أغلق قائمة الهمبرغر لأننا انتقلنا لصفحة جديدة
+        if(convoPanel) {
+            convoPanel.classList.remove('open');
+            convosBtn.classList.remove('open');
+        }
+
+      } else {
+        // الحالة الثانية: المستخدم حذف محادثة أخرى
+        // فقط قم بتحديث قائمة المحادثات لتعكس الحذف
+        renderHistoryPanel();
+        // القائمة ستبقى مفتوحة
       }
 
       toast('Saved conversation deleted');
@@ -4300,6 +4322,7 @@ else if (act === 'sendFeedback') {
   } catch(e) {
     console.error('deleteSavedModal error', e);
   } finally {
+    // أغلق نافذة التأكيد في كل الحالات
     try { deleteSavedModal.classList.remove('show'); } catch(_) {}
     pendingDeleteId = null;
   }
