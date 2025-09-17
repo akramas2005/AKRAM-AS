@@ -85,10 +85,11 @@
   transform: translateY(0);
 }
 
-  /* --- Professional Code Block Styles --- */
+ /* --- Professional Code Block Styles (Improved) --- */
 .msg .code-block-container {
   position: relative;
-  background-color: #282c34; /* Same as atom-one-dark theme */
+  background-color: #282c34; /* Dark background */
+  color: #abb2bf; /* Light grey text color for readability */
   border-radius: 12px;
   margin-top: 12px;
   overflow: hidden;
@@ -100,7 +101,7 @@
   align-items: center;
   background-color: rgba(0,0,0,0.2);
   padding: 6px 12px;
-  color: #abb2bf;
+  color: #c8ced8; /* Lighter color for header text */
   font-size: 12px;
   font-family: 'Courier New', Courier, monospace;
   text-transform: uppercase;
@@ -108,7 +109,7 @@
 .msg .code-block-actions button {
   background: none;
   border: none;
-  color: #abb2bf;
+  color: #c8ced8;
   cursor: pointer;
   padding: 4px;
   opacity: 0.7;
@@ -121,6 +122,16 @@
   width: 14px;
   height: 14px;
   vertical-align: middle;
+}
+.code-block-container pre {
+  margin: 0;
+  padding: 16px;
+  overflow-x: auto;
+}
+/* Ensure the code tag itself inherits the light color */
+.code-block-container pre code {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 14px;
 }
 /* Style for the <pre> tag inside our container */
 .code-block-container pre {
