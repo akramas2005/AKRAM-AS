@@ -539,7 +539,9 @@
   .send-inside{
     position:absolute; right:8px; top:50%; transform: translateY(-50%) translateX(6px);
     display:inline-flex; align-items:center; justify-content:center;
-    padding:8px; width:40px; height:40px; border-radius:999px; background: linear-gradient(135deg,#0078ff,#00aaff); color:white; font-weight:800; border:none; cursor:pointer;
+    /* التعديل: تم تصغير الحجم من 40px إلى 36px */
+    width:36px; height:36px; 
+    padding:8px; border-radius:999px; background: linear-gradient(135deg,#0078ff,#00aaff); color:white; font-weight:800; border:none; cursor:pointer;
     opacity:0; pointer-events:none; transition: opacity .22s ease, transform .22s ease;
     box-shadow: 0 8px 20px rgba(0,120,255,0.18);
   }
@@ -547,15 +549,21 @@
   .send-inside.sending{ opacity:0; transform: translateY(-50%) scale(.98); transition: opacity .36s ease, transform .36s ease; }
 
   .send-inside .send-icon{
-    width:18px; height:18px; position:relative; display:block;
+    /* التعديل: تم تصغير حجم حاوية الأيقونة من 18px إلى 16px */
+    width:16px; height:16px; 
+    position:relative; display:block;
   }
   .send-inside .send-icon::before{
-    content:''; position:absolute; left:50%; bottom:10%; transform:translateX(-50%); width:4px; height:10px; border-radius:2px;
+    content:''; position:absolute; left:50%; bottom:10%; transform:translateX(-50%); 
+    /* التعديل: تم تصغير أبعاد جسم السهم */
+    width:3px; height:9px; 
+    border-radius:2px;
     background: linear-gradient(180deg,#ffffff,#dbeeff);
   }
   .send-inside .send-icon::after{
     content:''; position:absolute; left:50%; top:0; transform:translateX(-50%) rotate(0deg);
-    width:12px; height:8px;
+    /* التعديل: تم تصغير أبعاد رأس السهم */
+    width:11px; height:7px;
     background: linear-gradient(180deg,#ffffff,#dbeeff);
     clip-path: polygon(50% 0, 100% 100%, 0 100%);
   }
