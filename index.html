@@ -85,48 +85,69 @@
   transform: translateY(0);
 }
 
- /* --- Professional Code Block Styles (Improved) --- */
+ /* --- NEW: Advanced Code Block Styles --- */
 .msg .code-block-container {
   position: relative;
-  background-color: #282c34; /* Dark background */
-  color: #abb2bf; /* Light grey text color for readability */
-  border-radius: 12px;
+  /* تصميم زجاجي عصري */
+  background-color: rgba(30, 32, 37, 0.85);
+  backdrop-filter: blur(8px) saturate(120%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
   margin-top: 12px;
   overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
 }
 .msg .code-block-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background-color: rgba(0,0,0,0.2);
-  padding: 6px 12px;
-  color: #c8ced8; /* Lighter color for header text */
-  font-size: 12px;
-  font-family: 'Courier New', Courier, monospace;
+  background-color: transparent;
+  padding: 8px 14px;
+  color: #d0d8e1;
+  font-size: 13px;
+  font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
   text-transform: uppercase;
+  /* خط فاصل أنيق */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.msg .code-block-actions {
+  display: flex;
+  gap: 8px; /* مسافة بين الأزرار */
 }
 .msg .code-block-actions button {
-  background: none;
+  background: rgba(255, 255, 255, 0.1);
   border: none;
-  color: #c8ced8;
+  color: #d0d8e1;
   cursor: pointer;
-  padding: 4px;
-  opacity: 0.7;
-  transition: opacity .2s ease;
+  padding: 6px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color .2s ease, transform .15s ease;
 }
 .msg .code-block-actions button:hover {
-  opacity: 1;
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(1.05);
+}
+.msg .code-block-actions button:active {
+    transform: scale(0.95);
 }
 .msg .code-block-actions button svg {
   width: 14px;
   height: 14px;
-  vertical-align: middle;
 }
 .code-block-container pre {
   margin: 0;
   padding: 16px;
   overflow-x: auto;
+}
+.code-block-container pre code.hljs {
+  padding: 0; /* إزالة الحشو الداخلي لتجنب التكرار */
+  background: none; /* إزالة الخلفية الافتراضية من المكتبة */
+  color: #cdd0d3; /* لون أساسي فاتح للنص لضمان ظهوره */
+  font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
+  font-size: 14px;
 }
 /* Ensure the code tag itself inherits the light color */
 .code-block-container pre code {
@@ -2907,15 +2928,14 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
       function enhanceCodeBlocks(messageElement) {
     if (!messageElement) return;
 
-    const codeBlocks = messageElement.querySelectorAll('pre > code:not(.hljs)');
+    // ابحث فقط عن بلوكات الكود التي لم يتم تحسينها من قبل
+    const codeBlocks = messageElement.querySelectorAll('pre > code:not(.hljs-enhanced)');
     codeBlocks.forEach(codeBlock => {
         const preElement = codeBlock.parentElement;
         if (preElement.parentElement.classList.contains('code-block-container')) return;
 
-        // Extract language
         const language = [...codeBlock.classList].find(cls => cls.startsWith('language-'))?.replace('language-', '') || 'code';
 
-        // Create container and header
         const container = document.createElement('div');
         container.className = 'code-block-container';
 
@@ -2927,30 +2947,48 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
 
         const actions = document.createElement('div');
         actions.className = 'code-block-actions';
-
-        // Copy button
+        
+        // زر النسخ
         const copyBtn = document.createElement('button');
         copyBtn.title = 'Copy code';
-        copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
+        copyBtn.innerHTML = `<svg xmlns="http://www.w.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
         copyBtn.onclick = () => {
             copyTextToClipboard(codeBlock.textContent);
             toast('Code copied!');
         };
+        
+        // --- START: زر المشاركة الجديد ---
+        const shareBtn = document.createElement('button');
+        shareBtn.title = 'Share code';
+        shareBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>`;
+        shareBtn.onclick = async () => {
+            const codeText = codeBlock.textContent;
+            if (navigator.share) {
+                try {
+                    await navigator.share({ text: codeText });
+                } catch (err) {
+                    console.warn('Share failed:', err);
+                }
+            } else {
+                // fallback for desktop
+                copyTextToClipboard(codeText);
+                toast('Code copied for sharing!');
+            }
+        };
+        // --- END: زر المشاركة الجديد ---
 
         actions.appendChild(copyBtn);
+        actions.appendChild(shareBtn); // إضافة الزر الجديد
         header.appendChild(langName);
         header.appendChild(actions);
 
-        // Restructure DOM
         preElement.parentNode.insertBefore(container, preElement);
         container.appendChild(header);
         container.appendChild(preElement);
 
-        // Mark as highlighted to avoid re-processing
         codeBlock.classList.add('hljs-enhanced'); 
     });
 }
-
 
       function saveDraft(){ localStorage.setItem(DRAFT_KEY, composer.value || ''); }
       function loadDraft(){
@@ -3190,7 +3228,6 @@ async function sendMessage(text, parentIndex = null) {
 
     let assistantEl = null;
     let bubbleEl = null;
-    let textContainer = null; // <-- سنستخدم هذا لعرض النص الخام
     let assistantMessage = null;
     let isFirstChunk = true;
 
@@ -3206,30 +3243,35 @@ async function sendMessage(text, parentIndex = null) {
 
                 assistantMessage = { id: genId(), role: 'assistant', content: '', parent: messages.length - 1, meta: {} };
                 messages.push(assistantMessage);
-
+                
                 assistantEl = createMessageElement(assistantMessage, messages.length - 1);
                 messagesEl.appendChild(assistantEl);
                 requestAnimationFrame(() => setTimeout(() => assistantEl.classList.add('show'), 20));
-
+                
                 bubbleEl = assistantEl.querySelector('.bubble');
-                // سنضع النص الخام داخل هذا العنصر لتجنب التحليل المستمر
-                textContainer = bubbleEl.querySelector('div') || document.createElement('div');
-                bubbleEl.innerHTML = '';
-                bubbleEl.appendChild(textContainer);
                 isFirstChunk = false;
             }
-
-            // أثناء الرد: فقط أضف النص الخام. هذا سريع جدًا!
+            
+            // أثناء الرد: قم بتحليل Markdown وإنشاء البلوك غير الملون
             assistantMessage.content += piece;
-            textContainer.textContent = assistantMessage.content; // <-- تحديث سريع
+            if (bubbleEl) {
+                bubbleEl.innerHTML = marked.parse(assistantMessage.content);
+                // قم بإنشاء الهيكل الاحترافي للبلوك بدون تلوين
+                enhanceCodeBlocks(bubbleEl);
+            }
             messagesEl.scrollTop = messagesEl.scrollHeight;
         }
 
         // بعد انتهاء الرد بالكامل...
-        if (bubbleEl) {
-            // ... الآن فقط قم بتحليل وتنسيق كل شيء مرة واحدة
-            bubbleEl.innerHTML = marked.parse(assistantMessage.content);
-            enhanceCodeBlocks(bubbleEl);
+        if (assistantEl) {
+            // ... الآن فقط قم بتلوين الكود مرة واحدة
+            const codeBlocksToHighlight = assistantEl.querySelectorAll('pre code.hljs-enhanced');
+            codeBlocksToHighlight.forEach(block => {
+                // hljs.highlightElement(block) is deprecated, this is the new way
+                const result = hljs.highlightAuto(block.textContent);
+                block.innerHTML = result.value;
+                block.classList.add(result.language);
+            });
         }
         saveSession();
 
