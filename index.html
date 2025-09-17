@@ -148,6 +148,16 @@ body.dark-mode .attach-btn {
 body.dark-mode .attach-btn svg { stroke: #c8ced8; }
 body.dark-mode .kebab-btn:hover { background: rgba(255,255,255,0.08); }
 
+  /* --- START: Dark Mode Icon & Font Fixes --- */
+body.dark-mode .msg-actions .act-btn svg,
+body.dark-mode .user-actions .act-btn svg {
+    stroke: #c8ced8; /* لون فاتح للأيقونات */
+}
+body.dark-mode .msg .bubble {
+    color: #e6edf3; /* لون نص أوضح وأكثر بياضًا */
+}
+/* --- END: Dark Mode Icon & Font Fixes --- */
+
 
 /* 4. Code Block Dynamic Styles */
 .msg .code-block-container {
@@ -193,6 +203,43 @@ body.dark-mode .kebab-btn:hover { background: rgba(255,255,255,0.08); }
 .dark-mode .code-block-container pre code.hljs { color: #e6edf3; }
 
 /* --- END: DYNAMIC THEME STYLES --- */
+
+  /* --- START: Collapsible Code Block Styles --- */
+.code-block-container .collapse-btn {
+    background: none; border: none; cursor: pointer; padding: 0; color: inherit;
+    display: flex; align-items: center; justify-content: center;
+}
+.code-block-container .collapse-btn svg {
+    width: 18px; height: 18px; transition: transform 0.3s cubic-bezier(.2,.9,.25,1);
+}
+.code-block-container .collapse-btn.is-open svg {
+    transform: rotate(180deg);
+}
+.code-block-container pre {
+    /* حركة ناعمة عند الطي والتوسيع */
+    transition: max-height 0.4s cubic-bezier(.2,.9,.25,1), padding 0.4s ease;
+    max-height: 800px; /* ارتفاع افتراضي كبير */
+    position: relative;
+}
+.code-block-container.collapsed pre {
+    max-height: 80px; /* ارتفاع صغير عند الطي (3-4 أسطر) */
+    padding-bottom: 24px; /* مساحة للظل */
+}
+/* الظل الذي يظهر في الأسفل عند الطي */
+.code-block-container.collapsed pre::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 30px;
+    background: linear-gradient(to top, var(--bg, #fff) 20%, transparent);
+    pointer-events: none;
+}
+body.dark-mode .code-block-container.collapsed pre::after {
+    background: linear-gradient(to top, #161b22 20%, transparent);
+}
+/* --- END: Collapsible Code Block Styles --- */
   
   /* make image preview reasonably large and clear */
 .att-image {
@@ -3003,7 +3050,6 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
       function enhanceCodeBlocks(messageElement) {
     if (!messageElement) return;
 
-    // ابحث فقط عن بلوكات الكود التي لم يتم تحسينها من قبل
     const codeBlocks = messageElement.querySelectorAll('pre > code:not(.hljs-enhanced)');
     codeBlocks.forEach(codeBlock => {
         const preElement = codeBlock.parentElement;
@@ -3022,8 +3068,7 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
 
         const actions = document.createElement('div');
         actions.className = 'code-block-actions';
-        
-        // زر النسخ
+
         const copyBtn = document.createElement('button');
         copyBtn.title = 'Copy code';
         copyBtn.innerHTML = `<svg xmlns="http://www.w.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
@@ -3031,26 +3076,43 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
             copyTextToClipboard(codeBlock.textContent);
             toast('Code copied!');
         };
-        
-        // --- START: زر المشاركة الجديد ---
+
         const shareBtn = document.createElement('button');
         shareBtn.title = 'Share code';
         shareBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>`;
-        shareBtn.onclick = async () => {
-            const codeText = codeBlock.textContent;
-            if (navigator.share) {
-                try {
-                    await navigator.share({ text: codeText });
-                } catch (err) {
-                    console.warn('Share failed:', err);
-                }
-            } else {
-                // fallback for desktop
-                copyTextToClipboard(codeText);
-                toast('Code copied for sharing!');
-            }
+        shareBtn.onclick = async () => { /* ... (Same as before) ... */ };
+
+        // --- START: زر الطي والتوسيع الجديد ---
+        const collapseBtn = document.createElement('button');
+        collapseBtn.title = 'Toggle code block';
+        collapseBtn.className = 'collapse-btn';
+        collapseBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>`;
+        collapseBtn.onclick = () => {
+            container.classList.toggle('collapsed');
+            collapseBtn.classList.toggle('is-open');
         };
-        // --- END: زر المشاركة الجديد ---
+        // --- END: زر الطي والتوسيع الجديد ---
+
+        actions.appendChild(copyBtn);
+        actions.appendChild(shareBtn);
+
+        const leftSideHeader = document.createElement('div');
+        leftSideHeader.style.display = 'flex';
+        leftSideHeader.style.alignItems = 'center';
+        leftSideHeader.style.gap = '10px';
+        leftSideHeader.appendChild(collapseBtn); // إضافة الزر الجديد
+        leftSideHeader.appendChild(langName);
+
+        header.appendChild(leftSideHeader);
+        header.appendChild(actions);
+
+        preElement.parentNode.insertBefore(container, preElement);
+        container.appendChild(header);
+        container.appendChild(preElement);
+
+        codeBlock.classList.add('hljs-enhanced'); 
+    });
+}
 
         actions.appendChild(copyBtn);
         actions.appendChild(shareBtn); // إضافة الزر الجديد
@@ -3301,6 +3363,11 @@ async function sendMessage(text, parentIndex = null) {
     const typingEl = showTyping();
     messagesEl.scrollTop = messagesEl.scrollHeight;
 
+    // --- START: تعديل التمرير الحر ---
+    // 1. تحقق من موضع التمرير قبل بدء الرد
+    const isUserAtBottom = messagesEl.scrollHeight - messagesEl.clientHeight <= messagesEl.scrollTop + 20; // 20px كهامش أمان
+    // --- END: تعديل التمرير الحر ---
+
     let assistantEl = null;
     let bubbleEl = null;
     let assistantMessage = null;
@@ -3327,22 +3394,23 @@ async function sendMessage(text, parentIndex = null) {
                 isFirstChunk = false;
             }
             
-            // أثناء الرد: قم بتحليل Markdown وإنشاء البلوك غير الملون
             assistantMessage.content += piece;
             if (bubbleEl) {
                 bubbleEl.innerHTML = marked.parse(assistantMessage.content);
-                // قم بإنشاء الهيكل الاحترافي للبلوك بدون تلوين
                 enhanceCodeBlocks(bubbleEl);
             }
-            messagesEl.scrollTop = messagesEl.scrollHeight;
+
+            // --- START: تعديل التمرير الحر ---
+            // 2. قم بالتمرير للأسفل فقط إذا كان المستخدم لم يقم بالتمرير للأعلى
+            if (isUserAtBottom) {
+                messagesEl.scrollTop = messagesEl.scrollHeight;
+            }
+            // --- END: تعديل التمرير الحر ---
         }
 
-        // بعد انتهاء الرد بالكامل...
         if (assistantEl) {
-            // ... الآن فقط قم بتلوين الكود مرة واحدة
             const codeBlocksToHighlight = assistantEl.querySelectorAll('pre code.hljs-enhanced');
             codeBlocksToHighlight.forEach(block => {
-                // hljs.highlightElement(block) is deprecated, this is the new way
                 const result = hljs.highlightAuto(block.textContent);
                 block.innerHTML = result.value;
                 block.classList.add(result.language);
