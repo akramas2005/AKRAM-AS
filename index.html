@@ -149,12 +149,14 @@
   font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
   font-size: 14px;
 }
-/* Ensure the code tag itself has a clear, bright base color */
+/* --- Final Code Block Text Color Fix --- */
 .code-block-container pre code.hljs {
-  font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
-  font-size: 14px;
-  /* التعديل الأهم: لون ساطع للنص الافتراضي */
-  color: #e6edf3; 
+    font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
+    font-size: 14px;
+    /* هذا هو السطر الحاسم. 
+      سيجبر كل النص على أن يبدأ بهذا اللون الفاتح والواضح.
+    */
+    color: #e6edf3 !important; 
 }
 /* Style for the <pre> tag inside our container */
 .code-block-container pre {
