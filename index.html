@@ -150,6 +150,12 @@ body.dark-mode .msg .bubble {
 }
 /* --- END: Dark Mode Icon & Font Fixes --- */
 
+  /* --- START: Dark Mode Code Block Icon Fix --- */
+body.dark-mode .code-block-actions button svg {
+    stroke: #d0d8e1; /* هذا هو السطر الذي سيصلح لون أيقونات البلوك */
+}
+/* --- END: Dark Mode Code Block Icon Fix --- */
+
 
 /* 4. Code Block Dynamic Styles */
 .msg .code-block-container {
@@ -3266,14 +3272,26 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
       }
 
       function renderMessages(scrollToBottom=true){
-        messagesEl.innerHTML = '';
-        messages.forEach((m, idx)=>{
-            const messageEl = createMessageElement(m, idx);
-            messagesEl.appendChild(messageEl);
-            requestAnimationFrame(()=> setTimeout(()=> messageEl.classList.add('show'), 20));
-        });
-        if(scrollToBottom) messagesEl.scrollTop = messagesEl.scrollHeight;
-      }
+  messagesEl.innerHTML = '';
+  messages.forEach((m, idx)=>{
+      const messageEl = createMessageElement(m, idx);
+      messagesEl.appendChild(messageEl);
+
+      // --- START: تعديل لجعل التلوين دائمًا ---
+      // بعد عرض الرسالة، ابحث عن أي بلوكات أكواد بداخلها وقم بتلوينها
+      const codeBlocksToHighlight = messageEl.querySelectorAll('pre code');
+      codeBlocksToHighlight.forEach(block => {
+          // تأكد من أن البلوك لم يتم تلوينه من قبل لتجنب الأخطاء
+          if (block.classList.contains('hljs-enhanced')) {
+              hljs.highlightElement(block);
+          }
+      });
+      // --- END: تعديل لجعل التلوين دائمًا ---
+
+      requestAnimationFrame(()=> setTimeout(()=> messageEl.classList.add('show'), 20));
+  });
+  if(scrollToBottom) messagesEl.scrollTop = messagesEl.scrollHeight;
+}
       
       function appendMessage(m, idx) {
         const messageEl = createMessageElement(m, idx);
