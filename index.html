@@ -56,6 +56,34 @@
   box-shadow: 0 2px 10px rgba(0,0,0,0.08);
   cursor: pointer;
 }
+
+  .scroll-to-bottom-btn {
+  position: absolute;
+  bottom: 120px; /* تعديل المسافة حسب الحاجة */
+  right: 25px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(4px);
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #333;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(10px);
+  transition: opacity .2s ease, transform .2s ease;
+  z-index: 1000;
+}
+.scroll-to-bottom-btn.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
   /* make image preview reasonably large and clear */
 .att-image {
   display: block;
@@ -1115,6 +1143,7 @@
 
 </style>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
   <div class="wrap">
@@ -1146,6 +1175,9 @@
 
   <div class="chat-panel" id="chatPanel" role="dialog" aria-modal="true" aria-hidden="true">
     <div class="chat-shell" role="document" aria-label="Study chat">
+     <button id="scrollToBottomBtn" class="scroll-to-bottom-btn" title="Scroll to bottom">
+  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14m-7-7l7 7 7-7"/></svg>
+</button>
       <div class="chat-header">
         <div class="left-controls" aria-hidden="false" style="flex-shrink:0;">
           <button class="back-btn" id="backBtn" title="Back">←</button>
@@ -1428,6 +1460,23 @@ function setRectProgress(rect, pct) {
       const welcomeBanner = document.getElementById('welcomeBanner');
       const filePreviewContainer = document.getElementById('filePreviewContainer');
       const imageLightboxRoot = document.getElementById('imageLightboxRoot');
+      const scrollToBottomBtn = document.getElementById('scrollToBottomBtn');
+
+  messagesEl.addEventListener('scroll', () => {
+    // إذا قام المستخدم بالتمرير للأعلى لمسافة معينة، أظهر الزر
+    if (messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight > 200) {
+      scrollToBottomBtn.classList.add('visible');
+    } else {
+      scrollToBottomBtn.classList.remove('visible');
+    }
+  });
+
+  scrollToBottomBtn.addEventListener('click', () => {
+    messagesEl.scrollTo({
+      top: messagesEl.scrollHeight,
+      behavior: 'smooth'
+    });
+  });
 
       // conversation sidebar elements
       const convosBtn = document.getElementById('convosBtn');
@@ -2801,7 +2850,7 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
 
         if (m.content && typeof m.content === 'string' && String(m.content||'').trim()) {
   const txt = document.createElement('div');
-  txt.innerHTML = escapeHtml(m.content).replace(/\n/g,'<br>');
+  txt.innerHTML = marked.parse(m.content || '');
   bubble.appendChild(txt);
 }
 
@@ -3006,7 +3055,7 @@ async function sendMessage(text, parentIndex = null) {
         return;
     }
 
-    // 1) add user message locally
+    // 1. أضف رسالة المستخدم محليًا
     const userMessage = { id: genId(), role: 'user', content: textToUse, parent: parentIndex, meta: {} };
     messages.push(userMessage);
     appendMessage(userMessage, messages.length - 1);
@@ -3014,119 +3063,48 @@ async function sendMessage(text, parentIndex = null) {
     localStorage.removeItem(DRAFT_KEY);
     updateWelcomeVisibility();
 
-    // Try to post the user message to backend (fire & forget; on failure schedule sync)
     postMessageToServer(userMessage).catch((err) => {
-      console.warn('postMessageToServer failed (will retry):', err);
-      scheduleSync();
+        console.warn('postMessageToServer failed (will retry):', err);
+        scheduleSync();
     });
 
-    // 2) create assistant placeholder message (push to messages[] BUT DO NOT append DOM yet)
+    // 2. أنشئ رسالة مساعد فارغة في DOM واستعد لاستقبال الرد
     const assistantMessage = { id: genId(), role: 'assistant', content: '', parent: messages.length - 1, meta: {} };
     messages.push(assistantMessage);
     const assistantIdx = messages.length - 1;
-    saveSession();
 
-    // 3) show typing indicator ONLY (no DOM bubble yet)
-    const oldTyping = messagesEl.querySelector('.typing');
-    if (oldTyping && oldTyping.parentNode) {
-      oldTyping.parentNode.removeChild(oldTyping);
-    }
-    const typingEl = showTyping();
-    if (typeof messagesEl !== 'undefined' && messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
+    // أضف الفقاعة الفارغة إلى الشاشة
+    const assistantEl = createMessageElement(assistantMessage, assistantIdx);
+    messagesEl.appendChild(assistantEl);
+    requestAnimationFrame(() => setTimeout(() => assistantEl.classList.add('show'), 20));
 
-    // placeholders for DOM refs that we'll create upon first chunk
-    let botMessageEl = null;
-    let bubbleEl = null;
-    let domAppended = false;
+    // اجعل الشاشة تمرر للأسفل
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    const bubbleEl = assistantEl.querySelector('.bubble');
 
     try {
         const response = await puter.ai.chat(buildChatPrompt(messages), { model: 'gpt-5-nano', stream: true });
 
-        let buffer = '';
-
         for await (const part of response) {
-            if (!part) continue;
             const piece = part.text || (part.message && part.message.content) || '';
             if (!piece) continue;
 
-            // On first chunk: remove typing indicator and append canonical assistant DOM
-            if (!domAppended) {
-                if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl);
-
-                // Use canonical appendMessage so the created DOM matches your app's structure
-                appendMessage(assistantMessage, assistantIdx);
-
-                // locate the newly appended DOM element by data-id or index
-                botMessageEl = messagesEl.querySelector('.msg[data-id="'+assistantMessage.id+'"]')
-                            || messagesEl.querySelector('.msg[data-index="'+assistantIdx+'"]')
-                            || messagesEl.querySelector('.msg:last-child');
-
-                if (botMessageEl) {
-                    if (!botMessageEl.dataset.id) botMessageEl.dataset.id = assistantMessage.id;
-                    bubbleEl = botMessageEl.querySelector('.bubble');
-                    if (!bubbleEl) {
-                        bubbleEl = document.createElement('div');
-                        bubbleEl.className = 'bubble';
-                        botMessageEl.appendChild(bubbleEl);
-                    }
-                }
-
-                domAppended = true;
-            }
-
-            // Append stream text
-            buffer += String(piece);
-            assistantMessage.content = buffer;
-
+            // 3. أضف كل جزء جديد من النص إلى الرسالة وقم بتحديث الواجهة
+            assistantMessage.content += piece;
+            // استخدم marked.parse لتحديث المحتوى بشكل مستمر
             if (bubbleEl) {
-                bubbleEl.innerHTML = escapeHtml(assistantMessage.content).replace(/\n/g, '<br>');
+                bubbleEl.innerHTML = marked.parse(assistantMessage.content);
             }
-
             messagesEl.scrollTop = messagesEl.scrollHeight;
         }
 
-        // After stream completes: add actions and replace with canonical element for consistency
-        if (!domAppended) {
-            // no content arrived (edge case) — remove typing and append empty assistant bubble
-            if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl);
-            appendMessage(assistantMessage, assistantIdx);
-            botMessageEl = messagesEl.querySelector('.msg[data-id="'+assistantMessage.id+'"]') || messagesEl.querySelector('.msg:last-child');
-            bubbleEl = botMessageEl ? botMessageEl.querySelector('.bubble') : null;
-        }
-
-        // actions
-        const messageActions = document.createElement('div');
-        messageActions.className = 'msg-actions';
-        messageActions.innerHTML = `<button class="act-btn" data-act="regen" data-tip="Regenerate" title="Regenerate"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0b2633" stroke-width="2"><path d="M21 12a9 9 0 1 1-3-6.7"/><polyline points="21 3 21 9 15 9"/></svg></button><span class="divider"></span>`;
-        if (botMessageEl) botMessageEl.appendChild(messageActions);
-
-        // Replace with canonical render if possible (keeps DOM consistent)
-        try {
-            const newEl = createMessageElement(Object.assign({}, assistantMessage), assistantIdx);
-            if (botMessageEl && newEl) {
-                botMessageEl.replaceWith(newEl);
-                requestAnimationFrame(()=> setTimeout(()=> newEl.classList.add('show'), 20));
-            }
-        } catch (e) {
-            // fallback: we already updated bubbleEl
-            console.error('replace final message failed', e);
-        }
-
+        // 4. بعد انتهاء الرد، احفظ الجلسة بالكامل
         saveSession();
 
     } catch (error) {
         console.error("Puter.js Error:", error);
-        // remove typing if present
-        if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl);
-
-        // show error bubble (create DOM if needed)
-        if (!domAppended) {
-            appendMessage(assistantMessage, assistantIdx);
-            botMessageEl = messagesEl.querySelector('.msg[data-id="'+assistantMessage.id+'"]') || messagesEl.querySelector('.msg:last-child');
-            bubbleEl = botMessageEl ? botMessageEl.querySelector('.bubble') : null;
-        }
-        if (bubbleEl) {
-            bubbleEl.innerHTML = `<div class="bubble">حدث خطأ. يرجى المحاولة مرة أخرى.</div>`;
+        if(bubbleEl) {
+            bubbleEl.innerHTML = marked.parse("حدث خطأ. يرجى المحاولة مرة أخرى.");
         }
         assistantMessage.content = 'حدث خطأ. يرجى المحاولة مرة أخرى.';
         saveSession();
