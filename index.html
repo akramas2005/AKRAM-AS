@@ -149,10 +149,12 @@
   font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
   font-size: 14px;
 }
-/* Ensure the code tag itself inherits the light color */
-.code-block-container pre code {
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 14px;
+/* Ensure the code tag itself has a clear, bright base color */
+.code-block-container pre code.hljs {
+  font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
+  font-size: 14px;
+  /* التعديل الأهم: لون ساطع للنص الافتراضي */
+  color: #e6edf3; 
 }
 /* Style for the <pre> tag inside our container */
 .code-block-container pre {
