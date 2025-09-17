@@ -2177,6 +2177,7 @@ async function sendAttachmentNow() {
       messages.push(userMessage);
       appendMessage(userMessage, messages.length - 1);
       saveSession();
+      updateWelcomeVisibility(); // <-- هذا هو السطر الجديد والمهم
 
       // clear composer & preview
       composer.value = '';
@@ -2292,16 +2293,17 @@ async function sendAttachmentNow() {
         meta: {}
       };
 
-      // append locally
+     // append locally
       messages.push(userMessage);
       appendMessage(userMessage, messages.length - 1);
       saveSession();
+      updateWelcomeVisibility(); // <-- هذا هو السطر الجديد والمهم
 
       // clear composer & preview
       composer.value = '';
       updateSendVisibility();
       autoGrowTextarea();
-      try { if(pendingAttachment && pendingAttachment._objectUrl) URL.revokeObjectURL(pendingAttachment._objectUrl); } catch(e){}
+      try { if (pendingAttachment && pendingAttachment._objectUrl) URL.revokeObjectURL(pendingAttachment._objectUrl); } catch(e){}
 
       // persist to server
       postMessageToServer(userMessage).catch(err => {
