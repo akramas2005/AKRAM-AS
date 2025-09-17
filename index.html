@@ -84,6 +84,50 @@
   pointer-events: auto;
   transform: translateY(0);
 }
+
+  /* --- Professional Code Block Styles --- */
+.msg .code-block-container {
+  position: relative;
+  background-color: #282c34; /* Same as atom-one-dark theme */
+  border-radius: 12px;
+  margin-top: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+.msg .code-block-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: rgba(0,0,0,0.2);
+  padding: 6px 12px;
+  color: #abb2bf;
+  font-size: 12px;
+  font-family: 'Courier New', Courier, monospace;
+  text-transform: uppercase;
+}
+.msg .code-block-actions button {
+  background: none;
+  border: none;
+  color: #abb2bf;
+  cursor: pointer;
+  padding: 4px;
+  opacity: 0.7;
+  transition: opacity .2s ease;
+}
+.msg .code-block-actions button:hover {
+  opacity: 1;
+}
+.msg .code-block-actions button svg {
+  width: 14px;
+  height: 14px;
+  vertical-align: middle;
+}
+/* Style for the <pre> tag inside our container */
+.code-block-container pre {
+  margin: 0;
+  padding: 16px;
+  overflow-x: auto; /* Allow horizontal scrolling for long code lines */
+}
   /* make image preview reasonably large and clear */
 .att-image {
   display: block;
@@ -452,6 +496,12 @@
   }
   .msg.show{ opacity:1; transform:translateY(0); }
   .msg.user{ width: fit-content; /* <-- هذا هو السطر الجديد والمهم */ align-self:flex-end; background:linear-gradient(90deg,var(--accent),#00aaff); color:white; border-bottom-right-radius:6px; z-index: 14030; }
+  /* Fix for user bubble width with Markdown */
+.msg.user .bubble p {
+  margin: 0;
+  display: inline-block;
+  text-align: left; /* To ensure text inside aligns correctly */
+}
   .msg.assistant{ align-self:flex-start; background: #fff; color:#0b2633; border-bottom-left-radius:6px; z-index: 1; }
   .msg-actions{
     display:flex; align-items:center; gap:6px; margin-top:6px; opacity:.95;
@@ -1144,6 +1194,8 @@
 </style>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 </head>
 <body>
   <div class="wrap">
@@ -1347,6 +1399,14 @@
     appId: "1:603668140355:web:df2164f348ba8507b41ff6",
     measurementId: "G-7HJZV2V4ZX"
   };
+
+    // Configure marked.js to use highlight.js for code blocks
+marked.setOptions({
+  highlight: function(code, lang) {
+    const language = hljs.getLanguage(lang) ? lang : 'plaintext';
+    return hljs.highlight(code, { language }).value;
+  }
+});
 
   // Initialize Firebase
   firebase.initializeApp(firebaseConfig);
@@ -2833,6 +2893,53 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
   try { saveSession(); } catch(_) {}
 }
 
+      function enhanceCodeBlocks(messageElement) {
+    if (!messageElement) return;
+
+    const codeBlocks = messageElement.querySelectorAll('pre > code:not(.hljs)');
+    codeBlocks.forEach(codeBlock => {
+        const preElement = codeBlock.parentElement;
+        if (preElement.parentElement.classList.contains('code-block-container')) return;
+
+        // Extract language
+        const language = [...codeBlock.classList].find(cls => cls.startsWith('language-'))?.replace('language-', '') || 'code';
+
+        // Create container and header
+        const container = document.createElement('div');
+        container.className = 'code-block-container';
+
+        const header = document.createElement('div');
+        header.className = 'code-block-header';
+
+        const langName = document.createElement('span');
+        langName.textContent = language;
+
+        const actions = document.createElement('div');
+        actions.className = 'code-block-actions';
+
+        // Copy button
+        const copyBtn = document.createElement('button');
+        copyBtn.title = 'Copy code';
+        copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
+        copyBtn.onclick = () => {
+            copyTextToClipboard(codeBlock.textContent);
+            toast('Code copied!');
+        };
+
+        actions.appendChild(copyBtn);
+        header.appendChild(langName);
+        header.appendChild(actions);
+
+        // Restructure DOM
+        preElement.parentNode.insertBefore(container, preElement);
+        container.appendChild(header);
+        container.appendChild(preElement);
+
+        // Mark as highlighted to avoid re-processing
+        codeBlock.classList.add('hljs-enhanced'); 
+    });
+}
+
 
       function saveDraft(){ localStorage.setItem(DRAFT_KEY, composer.value || ''); }
       function loadDraft(){
@@ -2852,6 +2959,7 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
   const txt = document.createElement('div');
   txt.innerHTML = marked.parse(m.content || '');
   bubble.appendChild(txt);
+  enhanceCodeBlocks(bubble);
 }
 
         
@@ -3106,6 +3214,7 @@ async function sendMessage(text, parentIndex = null) {
             assistantMessage.content += piece;
             if (bubbleEl) {
                 bubbleEl.innerHTML = marked.parse(assistantMessage.content);
+              enhanceCodeBlocks(bubbleEl);
             }
             messagesEl.scrollTop = messagesEl.scrollHeight;
         }
