@@ -101,7 +101,7 @@ body.dark-mode, body.dark-mode .lead { color: #e6edf3; }
 body.dark-mode .card { background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01)), url('https://images.unsplash.com/photo-1518972559570-7cc1309f6f3b?q=80&w=1400&auto=format&fit=crop&ixlib=rb-4.0.3&s=bd14a4a2b5bf327c3b6f6e8fc4c6b3b7') center/cover no-repeat; box-shadow: 0 18px 50px rgba(0,0,0,0.25); }
 body.dark-mode .card .overlay { background: linear-gradient(to top, rgba(0,0,0,0.7), rgba(0,0,0,0.2) 45%, rgba(0,0,0,0.1) 80%); }
 
-/* 3. CHAT PANEL & COMPONENTS DARK MODE */
+/* 3. CHAT PANEL DARK MODE */
 body.dark-mode .chat-shell { background: linear-gradient(180deg, #1f242c, #1a1e25); box-shadow: 0 30px 80px rgba(0,0,0,0.3); }
 body.dark-mode .chat-header { background: linear-gradient(90deg, rgba(47,129,247,0.05), rgba(47,129,247,0.02)); border-bottom: 1px solid #30363d; }
 body.dark-mode .persona-name, body.dark-mode .small, body.dark-mode .kebab-btn, body.dark-mode .back-btn { color: #e6edf3; }
@@ -119,13 +119,17 @@ body.dark-mode .msg-actions .act-btn svg, body.dark-mode .user-actions .act-btn 
 body.dark-mode .feedback-input { background: #21262d; color: #e6edf3; border-color: #30363d; }
 
 /* 4. MENUS & MODALS DARK MODE */
-body.dark-mode .menu-dropdown, body.dark-mode .convo-item-menu { background: #2a3038; border-color: #30363d; box-shadow: 0 12px 40px rgba(0,0,0,0.4); }
-body.dark-mode .menu-dropdown button, body.dark-mode .convo-item-menu button { color: #e6edf3; }
-body.dark-mode .menu-dropdown button:hover, body.dark-mode .convo-item-menu button:hover { background: rgba(139, 148, 158, 0.1); color: var(--accent); }
+body.dark-mode .menu-dropdown, body.dark-mode .convo-item-menu, body.dark-mode .attach-panel { background: #2a3038; border-color: #30363d; box-shadow: 0 12px 40px rgba(0,0,0,0.4); }
+body.dark-mode .menu-dropdown button, body.dark-mode .convo-item-menu button, body.dark-mode .attach-option { color: #e6edf3; }
+body.dark-mode .menu-dropdown button:hover, body.dark-mode .convo-item-menu button:hover, body.dark-mode .attach-option:hover { background: rgba(139, 148, 158, 0.1); color: var(--accent); }
 body.dark-mode .modal { background: #21262d; box-shadow: 0 16px 40px rgba(0,0,0,0.3); }
 body.dark-mode .modal h3 { color: #e6edf3; }
 body.dark-mode .modal p { color: #8b949e; }
 body.dark-mode .btn.ghost { background: #30363d; color: #e6edf3; }
+body.dark-mode .reason { border-color: #30363d; color: #e6edf3; }
+body.dark-mode .reason.selected { border-color: var(--accent); background: rgba(47, 129, 247, 0.15); }
+body.dark-mode .report-text, body.dark-mode .rename-input { background: #21262d; color: #e6edf3; border-color: #30363d; }
+body.dark-mode .rename-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(47, 129, 247, 0.2); }
 
 /* 5. HAMBURGER MENU DARK MODE */
 body.dark-mode .convos-btn .lines i { background: #e6edf3; }
