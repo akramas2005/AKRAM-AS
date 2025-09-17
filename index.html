@@ -451,7 +451,7 @@
     max-width: 100%;
   }
   .msg.show{ opacity:1; transform:translateY(0); }
-  .msg.user{ align-self:flex-end; background:linear-gradient(90deg,var(--accent),#00aaff); color:white; border-bottom-right-radius:6px; z-index: 14030; }
+  .msg.user{ width: fit-content; /* <-- هذا هو السطر الجديد والمهم */ align-self:flex-end; background:linear-gradient(90deg,var(--accent),#00aaff); color:white; border-bottom-right-radius:6px; z-index: 14030; }
   .msg.assistant{ align-self:flex-start; background: #fff; color:#0b2633; border-bottom-left-radius:6px; z-index: 1; }
   .msg-actions{
     display:flex; align-items:center; gap:6px; margin-top:6px; opacity:.95;
@@ -3055,32 +3055,27 @@ async function sendMessage(text, parentIndex = null) {
         return;
     }
 
-    // 1. أضف رسالة المستخدم محليًا
+    // أضف رسالة المستخدم كالمعتاد
     const userMessage = { id: genId(), role: 'user', content: textToUse, parent: parentIndex, meta: {} };
     messages.push(userMessage);
     appendMessage(userMessage, messages.length - 1);
     saveSession();
     localStorage.removeItem(DRAFT_KEY);
     updateWelcomeVisibility();
-
     postMessageToServer(userMessage).catch((err) => {
         console.warn('postMessageToServer failed (will retry):', err);
         scheduleSync();
     });
 
-    // 2. أنشئ رسالة مساعد فارغة في DOM واستعد لاستقبال الرد
-    const assistantMessage = { id: genId(), role: 'assistant', content: '', parent: messages.length - 1, meta: {} };
-    messages.push(assistantMessage);
-    const assistantIdx = messages.length - 1;
-
-    // أضف الفقاعة الفارغة إلى الشاشة
-    const assistantEl = createMessageElement(assistantMessage, assistantIdx);
-    messagesEl.appendChild(assistantEl);
-    requestAnimationFrame(() => setTimeout(() => assistantEl.classList.add('show'), 20));
-
-    // اجعل الشاشة تمرر للأسفل
+    // 1. إظهار مؤشر الكتابة (الثلاث نقاط) أولاً
+    const typingEl = showTyping();
     messagesEl.scrollTop = messagesEl.scrollHeight;
-    const bubbleEl = assistantEl.querySelector('.bubble');
+
+    // متغيرات لتتبع حالة الرد
+    let assistantEl = null;
+    let bubbleEl = null;
+    let assistantMessage = null;
+    let isFirstChunk = true;
 
     try {
         const response = await puter.ai.chat(buildChatPrompt(messages), { model: 'gpt-5-nano', stream: true });
@@ -3089,28 +3084,45 @@ async function sendMessage(text, parentIndex = null) {
             const piece = part.text || (part.message && part.message.content) || '';
             if (!piece) continue;
 
-            // 3. أضف كل جزء جديد من النص إلى الرسالة وقم بتحديث الواجهة
+            // 2. عند وصول أول جزء من الرد...
+            if (isFirstChunk) {
+                // 3. قم بإزالة مؤشر الكتابة
+                if (typingEl) typingEl.remove();
+
+                // أنشئ رسالة المساعد وأضفها للشاشة
+                assistantMessage = { id: genId(), role: 'assistant', content: '', parent: messages.length - 1, meta: {} };
+                messages.push(assistantMessage);
+                const assistantIdx = messages.length - 1;
+
+                assistantEl = createMessageElement(assistantMessage, assistantIdx);
+                messagesEl.appendChild(assistantEl);
+                requestAnimationFrame(() => setTimeout(() => assistantEl.classList.add('show'), 20));
+
+                bubbleEl = assistantEl.querySelector('.bubble');
+                isFirstChunk = false; // لمنع تكرار هذه الكتلة
+            }
+
+            // 4. تحديث النص باستمرار في الفقاعة التي تم إنشاؤها
             assistantMessage.content += piece;
-            // استخدم marked.parse لتحديث المحتوى بشكل مستمر
             if (bubbleEl) {
                 bubbleEl.innerHTML = marked.parse(assistantMessage.content);
             }
             messagesEl.scrollTop = messagesEl.scrollHeight;
         }
 
-        // 4. بعد انتهاء الرد، احفظ الجلسة بالكامل
+        // 5. بعد انتهاء الرد، احفظ الجلسة
         saveSession();
 
     } catch (error) {
         console.error("Puter.js Error:", error);
-        if(bubbleEl) {
-            bubbleEl.innerHTML = marked.parse("حدث خطأ. يرجى المحاولة مرة أخرى.");
-        }
-        assistantMessage.content = 'حدث خطأ. يرجى المحاولة مرة أخرى.';
-        saveSession();
+        // في حالة حدوث خطأ، تأكد من إزالة مؤشر الكتابة أيضًا
+        if (typingEl) typingEl.remove();
+
+        // يمكنك هنا إضافة رسالة خطأ إذا أردت
+        const errorMsg = { id: genId(), role: 'assistant', content: 'عذرًا، حدث خطأ ما.', meta: {} };
+        appendMessage(errorMsg, messages.length);
     }
 }
-
       
 
 // Regenerate assistant reply for a given parent message index
