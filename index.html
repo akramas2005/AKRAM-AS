@@ -88,9 +88,7 @@
 /* --- FINAL & COMPLETE: DYNAMIC THEME STYLES --- */
 
 /* 1. Theme Toggle Button Styles */
-.theme-toggle-btn {
-  background: none; border: none; cursor: pointer; padding: 6px; display: flex; align-items: center; justify-content: center; margin-right: 15px;
-}
+.theme-toggle-btn { background: none; border: none; cursor: pointer; padding: 6px; display: flex; align-items: center; justify-content: center; margin-right: 15px; }
 .theme-toggle-btn svg { width: 20px; height: 20px; stroke: #57606a; stroke-width: 2; fill: none; transition: transform 0.3s ease; }
 .theme-toggle-btn .moon-icon { display: none; }
 .dark-mode .theme-toggle-btn .sun-icon { display: none; }
@@ -100,53 +98,43 @@
 /* 2. Page & Card General Theme Styles */
 body.dark-mode { --bg:#161b22; --accent:#2f81f7; --muted:#8a939b; }
 body.dark-mode, body.dark-mode .lead { color: #e6edf3; }
-body.dark-mode .card {
-    background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01)), url('https://images.unsplash.com/photo-1518972559570-7cc1309f6f3b?q=80&w=1400&auto=format&fit=crop&ixlib=rb-4.0.3&s=bd14a4a2b5bf327c3b6f6e8fc4c6b3b7') center/cover no-repeat;
-    box-shadow: 0 18px 50px rgba(0,0,0,0.25);
-}
+body.dark-mode .card { background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01)), url('https://images.unsplash.com/photo-1518972559570-7cc1309f6f3b?q=80&w=1400&auto=format&fit=crop&ixlib=rb-4.0.3&s=bd14a4a2b5bf327c3b6f6e8fc4c6b3b7') center/cover no-repeat; box-shadow: 0 18px 50px rgba(0,0,0,0.25); }
 body.dark-mode .card .overlay { background: linear-gradient(to top, rgba(0,0,0,0.7), rgba(0,0,0,0.2) 45%, rgba(0,0,0,0.1) 80%); }
 
-/* 3. CHAT PANEL DARK MODE STYLES */
-body.dark-mode .chat-shell {
-  background: linear-gradient(180deg, #1f242c, #1a1e25);
-  box-shadow: 0 30px 80px rgba(0,0,0,0.3);
-}
-body.dark-mode .chat-header {
-  background: linear-gradient(90deg, rgba(47,129,247,0.05), rgba(47,129,247,0.02));
-  border-bottom: 1px solid #30363d;
-}
-body.dark-mode .persona-name, body.dark-mode .small, body.dark-mode .kebab-btn, body.dark-mode .back-btn {
-  color: #e6edf3;
-}
+/* 3. CHAT PANEL & COMPONENTS DARK MODE */
+body.dark-mode .chat-shell { background: linear-gradient(180deg, #1f242c, #1a1e25); box-shadow: 0 30px 80px rgba(0,0,0,0.3); }
+body.dark-mode .chat-header { background: linear-gradient(90deg, rgba(47,129,247,0.05), rgba(47,129,247,0.02)); border-bottom: 1px solid #30363d; }
+body.dark-mode .persona-name, body.dark-mode .small, body.dark-mode .kebab-btn, body.dark-mode .back-btn { color: #e6edf3; }
 body.dark-mode .persona-desc { color: #8b949e; }
-body.dark-mode .messages {
-  background: linear-gradient(180deg, rgba(31,36,44,0), rgba(31,36,44,0.4));
-}
-body.dark-mode .msg.assistant {
-  background: #2a3038;
-  color: #e6edf3;
-}
-body.dark-mode .composer {
-  background: #161b22;
-  border-top: 1px solid #30363d;
-  box-shadow: 0 -6px 18px rgba(0,0,0,0.2);
-}
-body.dark-mode .input-field {
-  background: #21262d;
-  color: #e6edf3;
-  border-color: rgba(139,148,158,0.2);
-  box-shadow: inset 0 2px 8px rgba(0,0,0,0.2);
-}
-body.dark-mode .input-field:focus {
-  border-color: var(--accent);
-  box-shadow: 0 10px 30px rgba(0,100,255,0.1), inset 0 2px 10px rgba(0,0,0,0.1);
-}
-body.dark-mode .attach-btn {
-  background: linear-gradient(180deg, rgba(47,129,247,0.1), rgba(47,129,247,0.05));
-  box-shadow: 0 6px 14px rgba(0,100,255,0.08);
-}
+body.dark-mode .messages { background: linear-gradient(180deg, rgba(31,36,44,0), rgba(31,36,44,0.4)); }
+body.dark-mode .msg.assistant { background: #2a3038; }
+body.dark-mode .msg .bubble { color: #e6edf3; }
+body.dark-mode .composer { background: #161b22; border-top: 1px solid #30363d; box-shadow: 0 -6px 18px rgba(0,0,0,0.2); }
+body.dark-mode .input-field { background: #21262d; color: #e6edf3; border-color: rgba(139,148,158,0.2); box-shadow: inset 0 2px 8px rgba(0,0,0,0.2); }
+body.dark-mode .input-field:focus { border-color: var(--accent); box-shadow: 0 10px 30px rgba(0,100,255,0.1), inset 0 2px 10px rgba(0,0,0,0.1); }
+body.dark-mode .attach-btn { background: linear-gradient(180deg, rgba(47,129,247,0.1), rgba(47,129,247,0.05)); box-shadow: 0 6px 14px rgba(0,100,255,0.08); }
 body.dark-mode .attach-btn svg { stroke: #c8ced8; }
 body.dark-mode .kebab-btn:hover { background: rgba(255,255,255,0.08); }
+body.dark-mode .msg-actions .act-btn svg, body.dark-mode .user-actions .act-btn svg { stroke: #c8ced8; }
+body.dark-mode .feedback-input { background: #21262d; color: #e6edf3; border-color: #30363d; }
+
+/* 4. MENUS & MODALS DARK MODE */
+body.dark-mode .menu-dropdown, body.dark-mode .convo-item-menu { background: #2a3038; border-color: #30363d; box-shadow: 0 12px 40px rgba(0,0,0,0.4); }
+body.dark-mode .menu-dropdown button, body.dark-mode .convo-item-menu button { color: #e6edf3; }
+body.dark-mode .menu-dropdown button:hover, body.dark-mode .convo-item-menu button:hover { background: rgba(139, 148, 158, 0.1); color: var(--accent); }
+body.dark-mode .modal { background: #21262d; box-shadow: 0 16px 40px rgba(0,0,0,0.3); }
+body.dark-mode .modal h3 { color: #e6edf3; }
+body.dark-mode .modal p { color: #8b949e; }
+body.dark-mode .btn.ghost { background: #30363d; color: #e6edf3; }
+
+/* 5. HAMBURGER MENU DARK MODE */
+body.dark-mode .convos-btn .lines i { background: #e6edf3; }
+body.dark-mode .convo-panel { background: rgba(22, 27, 34, 0.92); backdrop-filter: blur(8px); box-shadow: 0 30px 80px rgba(0,0,0,0.4); }
+body.dark-mode .convo-close { color: #e6edf3; }
+body.dark-mode .convo-item { background: rgba(48, 54, 61, 0.7); border-color: #30363d; }
+body.dark-mode .convo-item .title { color: #e6edf3; }
+body.dark-mode .convo-item .meta { color: #8b949e; }
+body.dark-mode .convo-chip { background: #2a3038; color: #e6edf3; border-color: #30363d; }
 
   /* --- START: Dark Mode Icon & Font Fixes --- */
 body.dark-mode .msg-actions .act-btn svg,
@@ -3360,11 +3348,6 @@ async function sendMessage(text, parentIndex = null) {
     const typingEl = showTyping();
     messagesEl.scrollTop = messagesEl.scrollHeight;
 
-    // --- START: تعديل التمرير الحر ---
-    // 1. تحقق من موضع التمرير قبل بدء الرد
-    const isUserAtBottom = messagesEl.scrollHeight - messagesEl.clientHeight <= messagesEl.scrollTop + 20; // 20px كهامش أمان
-    // --- END: تعديل التمرير الحر ---
-
     let assistantEl = null;
     let bubbleEl = null;
     let assistantMessage = null;
@@ -3377,20 +3360,22 @@ async function sendMessage(text, parentIndex = null) {
             const piece = part.text || (part.message && part.message.content) || '';
             if (!piece) continue;
 
+            // --- START: تعديل التمرير الحر ---
+            // 1. تحقق من موضع التمرير داخل الحلقة باستمرار
+            const isUserAtBottom = messagesEl.scrollHeight - messagesEl.clientHeight <= messagesEl.scrollTop + 20;
+            // --- END: تعديل التمرير الحر ---
+
             if (isFirstChunk) {
                 if (typingEl) typingEl.remove();
-
                 assistantMessage = { id: genId(), role: 'assistant', content: '', parent: messages.length - 1, meta: {} };
                 messages.push(assistantMessage);
-                
                 assistantEl = createMessageElement(assistantMessage, messages.length - 1);
                 messagesEl.appendChild(assistantEl);
                 requestAnimationFrame(() => setTimeout(() => assistantEl.classList.add('show'), 20));
-                
                 bubbleEl = assistantEl.querySelector('.bubble');
                 isFirstChunk = false;
             }
-            
+
             assistantMessage.content += piece;
             if (bubbleEl) {
                 bubbleEl.innerHTML = marked.parse(assistantMessage.content);
@@ -3398,7 +3383,7 @@ async function sendMessage(text, parentIndex = null) {
             }
 
             // --- START: تعديل التمرير الحر ---
-            // 2. قم بالتمرير للأسفل فقط إذا كان المستخدم لم يقم بالتمرير للأعلى
+            // 2. قم بالتمرير للأسفل فقط إذا كان المستخدم في الأسفل
             if (isUserAtBottom) {
                 messagesEl.scrollTop = messagesEl.scrollHeight;
             }
@@ -3406,12 +3391,8 @@ async function sendMessage(text, parentIndex = null) {
         }
 
         if (assistantEl) {
-            const codeBlocksToHighlight = assistantEl.querySelectorAll('pre code.hljs-enhanced');
-            codeBlocksToHighlight.forEach(block => {
-                const result = hljs.highlightAuto(block.textContent);
-                block.innerHTML = result.value;
-                block.classList.add(result.language);
-            });
+            const codeBlocksToHighlight = assistantEl.querySelectorAll('pre code');
+            codeBlocksToHighlight.forEach(block => { hljs.highlightElement(block); });
         }
         saveSession();
 
