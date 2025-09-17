@@ -3068,21 +3068,32 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
 
         const actions = document.createElement('div');
         actions.className = 'code-block-actions';
-
+        
         const copyBtn = document.createElement('button');
         copyBtn.title = 'Copy code';
-        copyBtn.innerHTML = `<svg xmlns="http://www.w.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
+        copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
         copyBtn.onclick = () => {
             copyTextToClipboard(codeBlock.textContent);
             toast('Code copied!');
         };
-
+        
         const shareBtn = document.createElement('button');
         shareBtn.title = 'Share code';
         shareBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>`;
-        shareBtn.onclick = async () => { /* ... (Same as before) ... */ };
+        shareBtn.onclick = async () => {
+            const codeText = codeBlock.textContent;
+            if (navigator.share) {
+                try {
+                    await navigator.share({ text: codeText });
+                } catch (err) {
+                    console.warn('Share failed:', err);
+                }
+            } else {
+                copyTextToClipboard(codeText);
+                toast('Code copied for sharing!');
+            }
+        };
 
-        // --- START: زر الطي والتوسيع الجديد ---
         const collapseBtn = document.createElement('button');
         collapseBtn.title = 'Toggle code block';
         collapseBtn.className = 'collapse-btn';
@@ -3091,32 +3102,18 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
             container.classList.toggle('collapsed');
             collapseBtn.classList.toggle('is-open');
         };
-        // --- END: زر الطي والتوسيع الجديد ---
 
         actions.appendChild(copyBtn);
         actions.appendChild(shareBtn);
-
+        
         const leftSideHeader = document.createElement('div');
         leftSideHeader.style.display = 'flex';
         leftSideHeader.style.alignItems = 'center';
         leftSideHeader.style.gap = '10px';
-        leftSideHeader.appendChild(collapseBtn); // إضافة الزر الجديد
+        leftSideHeader.appendChild(collapseBtn);
         leftSideHeader.appendChild(langName);
 
         header.appendChild(leftSideHeader);
-        header.appendChild(actions);
-
-        preElement.parentNode.insertBefore(container, preElement);
-        container.appendChild(header);
-        container.appendChild(preElement);
-
-        codeBlock.classList.add('hljs-enhanced'); 
-    });
-}
-
-        actions.appendChild(copyBtn);
-        actions.appendChild(shareBtn); // إضافة الزر الجديد
-        header.appendChild(langName);
         header.appendChild(actions);
 
         preElement.parentNode.insertBefore(container, preElement);
