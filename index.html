@@ -85,41 +85,39 @@
   transform: translateY(0);
 }
 
- /* --- NEW: Advanced Code Block Styles --- */
+/* --- FINAL: Light Theme Code Block Styles --- */
 .msg .code-block-container {
   position: relative;
-  /* تصميم زجاجي عصري */
-  background-color: rgba(30, 32, 37, 0.85);
-  backdrop-filter: blur(8px) saturate(120%);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 14px;
+  /* تصميم فاتح ونظيف */
+  background-color: #f6f8fa; /* لون خلفية رمادي فاتح جدًا مثل GitHub */
+  border: 1px solid #d0d7dd; /* حدود واضحة وناعمة */
+  border-radius: 10px;
   margin-top: 12px;
   overflow: hidden;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06); /* ظل خفيف جدًا */
 }
 .msg .code-block-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background-color: transparent;
+  background-color: #eef2f5; /* خلفية أغمق قليلاً للشريط العلوي */
   padding: 8px 14px;
-  color: #d0d8e1;
-  font-size: 13px;
+  color: #57606a; /* لون نص داكن للشريط العلوي */
+  font-size: 12px;
   font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
   text-transform: uppercase;
-  /* خط فاصل أنيق */
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid #d0d7dd;
 }
 .msg .code-block-actions {
   display: flex;
-  gap: 8px; /* مسافة بين الأزرار */
+  gap: 8px;
 }
 .msg .code-block-actions button {
-  background: rgba(255, 255, 255, 0.1);
+  background: transparent;
   border: none;
-  color: #d0d8e1;
+  color: #57606a; /* لون داكن للأيقونات */
   cursor: pointer;
-  padding: 6px;
+  padding: 4px;
   border-radius: 6px;
   display: flex;
   align-items: center;
@@ -127,11 +125,11 @@
   transition: background-color .2s ease, transform .15s ease;
 }
 .msg .code-block-actions button:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.05);
   transform: scale(1.05);
 }
 .msg .code-block-actions button:active {
-    transform: scale(0.95);
+  transform: scale(0.95);
 }
 .msg .code-block-actions button svg {
   width: 14px;
@@ -143,26 +141,12 @@
   overflow-x: auto;
 }
 .code-block-container pre code.hljs {
-  padding: 0; /* إزالة الحشو الداخلي لتجنب التكرار */
-  background: none; /* إزالة الخلفية الافتراضية من المكتبة */
-  color: #cdd0d3; /* لون أساسي فاتح للنص لضمان ظهوره */
+  padding: 0;
+  background: none;
+  /* اللون الأساسي للنص سيكون داكنًا، والثيم سيلون الباقي */
+  color: #24292e; 
   font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
   font-size: 14px;
-}
-/* --- Final Code Block Text Color Fix --- */
-.code-block-container pre code.hljs {
-    font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
-    font-size: 14px;
-    /* هذا هو السطر الحاسم. 
-      سيجبر كل النص على أن يبدأ بهذا اللون الفاتح والواضح.
-    */
-    color: #e6edf3 !important; 
-}
-/* Style for the <pre> tag inside our container */
-.code-block-container pre {
-  margin: 0;
-  padding: 16px;
-  overflow-x: auto; /* Allow horizontal scrolling for long code lines */
 }
   /* make image preview reasonably large and clear */
 .att-image {
@@ -1230,7 +1214,7 @@
 </style>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/stackoverflow-light.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 </head>
 <body>
