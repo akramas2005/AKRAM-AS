@@ -85,69 +85,67 @@
   transform: translateY(0);
 }
 
-/* --- FINAL: Light Theme Code Block Styles --- */
+/* --- START: DYNAMIC THEME STYLES --- */
+
+/* 1. Theme Toggle Button Styles */
+.theme-toggle-btn {
+  background: none; border: none; cursor: pointer; padding: 6px; display: flex; align-items: center; justify-content: center; margin-right: 15px;
+}
+.theme-toggle-btn svg { width: 20px; height: 20px; stroke: #57606a; stroke-width: 2; fill: none; transition: transform 0.3s ease; }
+.theme-toggle-btn .moon-icon { display: none; }
+.dark-mode .theme-toggle-btn .sun-icon { display: none; }
+.dark-mode .theme-toggle-btn .moon-icon { display: block; stroke: #c8ced8; }
+.theme-toggle-btn:hover svg { transform: scale(1.1) rotate(15deg); }
+
+/* 2. Page Theme Styles */
+body.dark-mode { --bg:#1c2025; --accent:#0088ff; --muted:#8a939b; }
+body.dark-mode .card, body.dark-mode .appbar, body.dark-mode .lead { color: #e6edf3; }
+
+/* 3. Code Block Styles */
 .msg .code-block-container {
-  position: relative;
-  /* تصميم فاتح ونظيف */
-  background-color: #f6f8fa; /* لون خلفية رمادي فاتح جدًا مثل GitHub */
-  border: 1px solid #d0d7dd; /* حدود واضحة وناعمة */
-  border-radius: 10px;
-  margin-top: 12px;
-  overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06); /* ظل خفيف جدًا */
+  position: relative; margin-top: 12px; border-radius: 10px; overflow: hidden;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 .msg .code-block-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background-color: #eef2f5; /* خلفية أغمق قليلاً للشريط العلوي */
-  padding: 8px 14px;
-  color: #57606a; /* لون نص داكن للشريط العلوي */
-  font-size: 12px;
-  font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
-  text-transform: uppercase;
-  border-bottom: 1px solid #d0d7dd;
+  display: flex; justify-content: space-between; align-items: center; padding: 8px 14px;
+  font-size: 12px; font-family: 'SF Mono', 'Consolas', monospace; text-transform: uppercase;
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
 }
-.msg .code-block-actions {
-  display: flex;
-  gap: 8px;
-}
+.msg .code-block-actions { display: flex; gap: 8px; }
 .msg .code-block-actions button {
-  background: transparent;
-  border: none;
-  color: #57606a; /* لون داكن للأيقونات */
-  cursor: pointer;
-  padding: 4px;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background-color .2s ease, transform .15s ease;
+  background: transparent; border: none; cursor: pointer; padding: 4px; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  transition: background-color .2s ease, transform .15s ease, color 0.3s ease;
 }
-.msg .code-block-actions button:hover {
-  background: rgba(0, 0, 0, 0.05);
-  transform: scale(1.05);
+.msg .code-block-actions button:hover { transform: scale(1.05); }
+.msg .code-block-actions button svg { width: 14px; height: 14px; }
+.code-block-container pre { margin: 0; padding: 16px; overflow-x: auto; }
+.code-block-container pre code.hljs { padding: 0; background: none; font-size: 14px; }
+
+/* --- Light Mode Code Block --- */
+.code-block-container {
+  background-color: #f6f8fa; border: 1px solid #d0d7dd;
 }
-.msg .code-block-actions button:active {
-  transform: scale(0.95);
+.code-block-header {
+  background-color: #eef2f5; color: #57606a; border-bottom: 1px solid #d0d7dd;
 }
-.msg .code-block-actions button svg {
-  width: 14px;
-  height: 14px;
+.code-block-actions button { color: #57606a; }
+.code-block-actions button:hover { background: rgba(0, 0, 0, 0.05); }
+.code-block-container pre code.hljs { color: #24292e; }
+
+/* --- Dark Mode Code Block --- */
+body.dark-mode .code-block-container {
+  background-color: rgba(30, 32, 37, 0.85); border: 1px solid rgba(255, 255, 255, 0.1);
 }
-.code-block-container pre {
-  margin: 0;
-  padding: 16px;
-  overflow-x: auto;
+body.dark-mode .code-block-header {
+  background-color: transparent; color: #d0d8e1; border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
-.code-block-container pre code.hljs {
-  padding: 0;
-  background: none;
-  /* اللون الأساسي للنص سيكون داكنًا، والثيم سيلون الباقي */
-  color: #24292e; 
-  font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
-  font-size: 14px;
-}
+body.dark-mode .code-block-actions button { color: #d0d8e1; }
+body.dark-mode .code-block-actions button:hover { background: rgba(255, 255, 255, 0.1); }
+body.dark-mode .code-block-container pre code.hljs { color: #e6edf3; }
+
+/* --- END: DYNAMIC THEME STYLES --- */
+  
   /* make image preview reasonably large and clear */
 .att-image {
   display: block;
@@ -1214,16 +1212,20 @@
 </style>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/stackoverflow-light.min.css">
+<link rel="stylesheet" id="highlight-theme" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/stackoverflow-light.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 </head>
 <body>
   <div class="wrap">
     <header class="appbar" aria-hidden="false">
-      <div class="site-name">Às Space</div>
-      <div class="header-spacer"></div>
-      <div class="lead">Test: Study Assistant — demo vertical slice</div>
-    </header>
+  <div class="site-name">Às Space</div>
+  <div class="header-spacer"></div>
+  <button id="theme-toggle-btn" class="theme-toggle-btn" title="Toggle theme">
+    <svg class="sun-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+    <svg class="moon-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+  </button>
+  <div class="lead">Test: Study Assistant — demo vertical slice</div>
+</header>
 
 <main class="sections-grid" role="main" aria-label="All sections">
       <article class="card" id="studyCard" data-id="study" aria-labelledby="studyTitle" role="article">
@@ -1541,6 +1543,43 @@ function setRectProgress(rect, pct) {
       const filePreviewContainer = document.getElementById('filePreviewContainer');
       const imageLightboxRoot = document.getElementById('imageLightboxRoot');
       const scrollToBottomBtn = document.getElementById('scrollToBottomBtn');
+
+      // --- START: DYNAMIC THEME LOGIC ---
+const themeToggleBtn = document.getElementById('theme-toggle-btn');
+const lightThemeUrl = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/stackoverflow-light.min.css';
+const darkThemeUrl = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css';
+
+// دالة لتغيير ملف تصميم تلوين الأكواد
+function setTheme(theme) {
+    let themeLink = document.getElementById('highlight-theme');
+    if (theme === 'dark') {
+        document.body.classList.add('dark-mode');
+        if (themeLink) themeLink.href = darkThemeUrl;
+        localStorage.setItem('chat_theme', 'dark');
+    } else {
+        document.body.classList.remove('dark-mode');
+        if (themeLink) themeLink.href = lightThemeUrl;
+        localStorage.setItem('chat_theme', 'light');
+    }
+}
+
+// عند الضغط على زر التبديل
+themeToggleBtn.addEventListener('click', () => {
+    if (document.body.classList.contains('dark-mode')) {
+        setTheme('light');
+    } else {
+        setTheme('dark');
+    }
+});
+
+// عند تحميل الصفحة، تحقق من الوضع المحفوظ
+const savedTheme = localStorage.getItem('chat_theme');
+if (savedTheme) {
+    setTheme(savedTheme);
+} else {
+    setTheme('light'); // الوضع الافتراضي
+}
+// --- END: DYNAMIC THEME LOGIC ---
 
   messagesEl.addEventListener('scroll', () => {
     // إذا قام المستخدم بالتمرير للأعلى لمسافة معينة، أظهر الزر
