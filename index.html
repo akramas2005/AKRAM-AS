@@ -3163,7 +3163,6 @@ async function sendMessage(text, parentIndex = null) {
         return;
     }
 
-    // أضف رسالة المستخدم كالمعتاد
     const userMessage = { id: genId(), role: 'user', content: textToUse, parent: parentIndex, meta: {} };
     messages.push(userMessage);
     appendMessage(userMessage, messages.length - 1);
@@ -3175,13 +3174,12 @@ async function sendMessage(text, parentIndex = null) {
         scheduleSync();
     });
 
-    // 1. إظهار مؤشر الكتابة (الثلاث نقاط) أولاً
     const typingEl = showTyping();
     messagesEl.scrollTop = messagesEl.scrollHeight;
 
-    // متغيرات لتتبع حالة الرد
     let assistantEl = null;
     let bubbleEl = null;
+    let textContainer = null; // <-- سنستخدم هذا لعرض النص الخام
     let assistantMessage = null;
     let isFirstChunk = true;
 
@@ -3192,42 +3190,41 @@ async function sendMessage(text, parentIndex = null) {
             const piece = part.text || (part.message && part.message.content) || '';
             if (!piece) continue;
 
-            // 2. عند وصول أول جزء من الرد...
             if (isFirstChunk) {
-                // 3. قم بإزالة مؤشر الكتابة
                 if (typingEl) typingEl.remove();
 
-                // أنشئ رسالة المساعد وأضفها للشاشة
                 assistantMessage = { id: genId(), role: 'assistant', content: '', parent: messages.length - 1, meta: {} };
                 messages.push(assistantMessage);
-                const assistantIdx = messages.length - 1;
 
-                assistantEl = createMessageElement(assistantMessage, assistantIdx);
+                assistantEl = createMessageElement(assistantMessage, messages.length - 1);
                 messagesEl.appendChild(assistantEl);
                 requestAnimationFrame(() => setTimeout(() => assistantEl.classList.add('show'), 20));
 
                 bubbleEl = assistantEl.querySelector('.bubble');
-                isFirstChunk = false; // لمنع تكرار هذه الكتلة
+                // سنضع النص الخام داخل هذا العنصر لتجنب التحليل المستمر
+                textContainer = bubbleEl.querySelector('div') || document.createElement('div');
+                bubbleEl.innerHTML = '';
+                bubbleEl.appendChild(textContainer);
+                isFirstChunk = false;
             }
 
-            // 4. تحديث النص باستمرار في الفقاعة التي تم إنشاؤها
+            // أثناء الرد: فقط أضف النص الخام. هذا سريع جدًا!
             assistantMessage.content += piece;
-            if (bubbleEl) {
-                bubbleEl.innerHTML = marked.parse(assistantMessage.content);
-              enhanceCodeBlocks(bubbleEl);
-            }
+            textContainer.textContent = assistantMessage.content; // <-- تحديث سريع
             messagesEl.scrollTop = messagesEl.scrollHeight;
         }
 
-        // 5. بعد انتهاء الرد، احفظ الجلسة
+        // بعد انتهاء الرد بالكامل...
+        if (bubbleEl) {
+            // ... الآن فقط قم بتحليل وتنسيق كل شيء مرة واحدة
+            bubbleEl.innerHTML = marked.parse(assistantMessage.content);
+            enhanceCodeBlocks(bubbleEl);
+        }
         saveSession();
 
     } catch (error) {
         console.error("Puter.js Error:", error);
-        // في حالة حدوث خطأ، تأكد من إزالة مؤشر الكتابة أيضًا
         if (typingEl) typingEl.remove();
-
-        // يمكنك هنا إضافة رسالة خطأ إذا أردت
         const errorMsg = { id: genId(), role: 'assistant', content: 'عذرًا، حدث خطأ ما.', meta: {} };
         appendMessage(errorMsg, messages.length);
     }
