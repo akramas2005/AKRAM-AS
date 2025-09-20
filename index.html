@@ -3334,26 +3334,10 @@ function setToAnalyzing(indicator) {
   const content = indicator.querySelector('.content');
   if (!content) return;
 
-  content.classList.add('to-analyzing');
+  const analyzingLayer = indicator.querySelector('.analyzingLayer');
+  const path = indicator.querySelector('.led-path');
 
-  // تحديث النص حسب النوع المخزن
-  const type = indicator.dataset.indicatorType || "default";
-  const analyzingText = indicator.querySelector('.analyzingText');
-  if (analyzingText) {
-    if (type === "image") analyzingText.textContent = "Analyzing image";
-    else if (type === "file") analyzingText.textContent = "Analyzing file";
-    else analyzingText.textContent = "Analyzing";
-  }
-}
-
-  // حفظ عرض inner لمنع أي انزياح أفقي أثناء التحويل
-  const inner = indicator.querySelector('.indicatorInner');
-  if (inner) {
-    const w = inner.getBoundingClientRect().width;
-    inner.style.width = (w || inner.offsetWidth) + 'px';
-  }
-
-  // تحديث نص Analyzing حسب نوع المؤشر (fallback إن تغيّر)
+  // تحديث نص Analyzing حسب نوع المؤشر
   const type = indicator.dataset.indicatorType;
   const txtEl = indicator.querySelector('.analyzingText');
   if (txtEl) {
@@ -3362,10 +3346,9 @@ function setToAnalyzing(indicator) {
     else txtEl.textContent = 'Analyzing';
   }
 
-  // إذا المسار لم يُقاس بعد: قياس سريع كـ fallback (نستخدم قياس بسيط)
+  // إذا المسار لم يُقاس بعد: قياس سريع كـ fallback
   if (path && !path.dataset.measured && typeof path.getTotalLength === 'function') {
     try {
-      // اجعل العنصر قابلاً للقياس مؤقتاً خارج الشاشة (لا يظهر للمستخدم)
       analyzingLayer.style.transition = 'none';
       analyzingLayer.style.opacity = '1';
       analyzingLayer.style.position = 'absolute';
@@ -3380,7 +3363,6 @@ function setToAnalyzing(indicator) {
     } catch (e) {
       console.warn('setToAnalyzing fallback measurement failed', e);
     } finally {
-      // إعادة الأنماط
       analyzingLayer.style.transition = '';
       analyzingLayer.style.opacity = '';
       analyzingLayer.style.position = '';
@@ -3388,7 +3370,7 @@ function setToAnalyzing(indicator) {
     }
   }
 
-  // أخيراً: شغّل التحول CSS (سيقوم بإخفاء البارات وإظهار analyzing دون قفز)
+  // أخيراً: تشغيل التحول CSS
   requestAnimationFrame(() => {
     content.classList.add('to-analyzing');
     if (analyzingLayer) analyzingLayer.setAttribute('aria-hidden', 'false');
