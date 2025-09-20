@@ -264,6 +264,64 @@ body.dark-mode .code-block-container.collapsed pre::after {
     background: linear-gradient(to top, #161b22 20%, transparent);
 }
 /* --- END: Collapsible Code Block Styles --- */
+
+  /* --- START: New Bouncing Bars Animation --- */
+.msg.typing-indicator .bubble {
+  background: transparent !important; /* No bubble for the indicator */
+  box-shadow: none !important;
+}
+.content.typing {
+  display: block;
+  padding: 6px 0;
+  margin: 0;
+  position: relative;
+  min-height: 36px;
+}
+.indicatorInner {
+  position: absolute;
+  top: 50%;
+  left: 0; /* محاذاة لليسار لتناسب رسائل المساعد */
+  transform: translateY(-50%);
+  height: 36px;
+  pointer-events: none;
+}
+.barsLayer {
+  position: absolute;
+  top: 50%;
+  left: 0; /* محاذاة لليسار لتناسب رسائل المساعد */
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+}
+.barsLayer .bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 20px;
+}
+.barsLayer .bar {
+  width: 4px;
+  height: 14px;
+  background: #aab5c0; /* لون رمادي فاتح يناسب الوضعين */
+  border-radius: 3px;
+  transform-origin: bottom;
+  animation: bounce 1s infinite ease-in-out;
+}
+/* لون الأعمدة في الوضع الداكن */
+body.dark-mode .barsLayer .bar {
+  background: #6e7681;
+}
+.barsLayer .bar:nth-child(1) { animation-delay: -0.9s; }
+.barsLayer .bar:nth-child(2) { animation-delay: -0.7s; }
+.barsLayer .bar:nth-child(3) { animation-delay: -0.5s; }
+.barsLayer .bar:nth-child(4) { animation-delay: -0.3s; }
+.barsLayer .bar:nth-child(5) { animation-delay: -0.1s; }
+@keyframes bounce {
+  0%, 100% { transform: scaleY(.38); opacity: .6; }
+  40% { transform: scaleY(1); opacity: 1; }
+  80% { transform: scaleY(.78); opacity: .85; }
+}
+/* --- END: New Bouncing Bars Animation --- */
   
   /* make image preview reasonably large and clear */
 .att-image {
@@ -3328,25 +3386,44 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
 
       // Typing indicator (supports text like "Analyzing file..." or "Analyzing image...")
 function showTyping(type = "default"){
-  // 🔹 احذف أي مؤشر كتابة قديم
-  const oldTyping = messagesEl.querySelector('.typing');
-  if (oldTyping && oldTyping.parentNode) {
-    oldTyping.parentNode.removeChild(oldTyping);
-  }
+  // ابحث عن أي مؤشر قديم واحذفه
+  const oldTyping = messagesEl.querySelector('.typing-indicator');
+  if (oldTyping) oldTyping.remove();
 
+  // أنشئ الحاوية الرئيسية للمؤشر
   const typing = document.createElement('div');
-  typing.className = 'typing msg assistant show';
-  typing.setAttribute("dir","auto"); // ✅ يخلي النصوص المختلطة عربية+إنجليزية منظمة
+  typing.className = 'msg assistant typing-indicator show';
 
-  // الوضع العادي (النقاط)
-  typing.innerHTML = `<div class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>`;
+  // أدخل الـ HTML الجديد الخاص بحركة الأعمدة
+  typing.innerHTML = `
+    <div class="bubble">
+      <div class="content typing">
+        <div class="indicatorInner">
+          <div class="barsLayer">
+            <div class="bars">
+              <span class="bar"></span>
+              <span class="bar"></span>
+              <span class="bar"></span>
+              <span class="bar"></span>
+              <span class="bar"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
   messagesEl.appendChild(typing);
 
-  try {
-    if (typeof autoScrollEnabled === 'undefined' || autoScrollEnabled) {
-      messagesEl.scrollTop = messagesEl.scrollHeight;
+  // إذا كان هذا النوع من المؤشر مخصصًا للتحليل (سنستخدمه لاحقًا)
+  if (type === "analyzing") {
+    const content = typing.querySelector('.content.typing');
+    if (content) {
+        // سنضيف المنطق هنا في الخطوة التالية
     }
-  } catch(e){}
+  }
+
+  return typing;
+}
 
  // ✅ لو المرفق صورة أو ملف: نغير بعد وقت قصير
 if(type === "file" || type === "image"){
