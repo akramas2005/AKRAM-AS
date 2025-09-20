@@ -3316,24 +3316,29 @@ function clearIndicator() {
 function setToAnalyzing(indicator) {
     if (!indicator) return;
     const content = indicator.querySelector('.content.typing');
-    if (!content) return;
+    const analyzingLayer = indicator.querySelector('.analyzingLayer');
+    if (!content || !analyzingLayer) return;
 
-    // 1. أضف الكلاس لبدء حركة التحول
-    content.classList.add('to-analyzing');
-
-    // 2. الآن وبعد أن أصبح العنصر على وشك الظهور، قم بقياس الـ SVG
-    const path = indicator.querySelector('.led-path');
-    requestAnimationFrame(() => {
+    // هذه هي الدالة التي ستقوم بالقياس
+    const setupSVGPath = () => {
+        const path = indicator.querySelector('.led-path');
         if (path && typeof path.getTotalLength === 'function') {
             try {
+                // قم بالقياس الآن فقط، بعد أن أصبح العنصر مرئيًا تمامًا
                 const pathLen = Math.round(path.getTotalLength());
                 path.style.setProperty('--pathLen', pathLen);
                 path.style.strokeDashoffset = pathLen;
             } catch (e) {
-                console.warn("Could not measure SVG path, it might still be non-rendered.", e);
+                console.warn("SVG path measurement failed on transitionend:", e);
             }
         }
-    });
+    };
+
+    // استمع لحدث انتهاء الحركة مرة واحدة فقط
+    analyzingLayer.addEventListener('transitionend', setupSVGPath, { once: true });
+
+    // الآن، أضف الكلاس لبدء حركة الظهور
+    content.classList.add('to-analyzing');
 }
 
       // Typing indicator (supports text like "Analyzing file..." or "Analyzing image...")
