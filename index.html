@@ -3330,93 +3330,137 @@ function clearIndicator() {
 }
 
 function setToAnalyzing(indicator) {
-    if (!indicator) return;
-    const content = indicator.querySelector('.content.typing');
-    const analyzingLayer = indicator.querySelector('.analyzingLayer');
-    const path = indicator.querySelector('.led-path');
-    if (!content || !path || !analyzingLayer) return;
+  if (!indicator) return;
+  const content = indicator.querySelector('.content.typing');
+  const analyzingLayer = indicator.querySelector('.analyzingLayer');
+  const path = indicator.querySelector('.led-path');
+  if (!content || !analyzingLayer) return;
 
-    // --- START: الحل النهائي لقياس العنصر المخفي ---
+  // حفظ عرض inner لمنع أي انزياح أفقي أثناء التحويل
+  const inner = indicator.querySelector('.indicatorInner');
+  if (inner) {
+    const w = inner.getBoundingClientRect().width;
+    inner.style.width = (w || inner.offsetWidth) + 'px';
+  }
 
-    // 1. نجبر العنصر على أن يكون قابلاً للقياس عن طريق جعله مرئيًا ولكن خارج الشاشة
-    analyzingLayer.style.transition = 'none'; // أوقف الحركة مؤقتًا
-    analyzingLayer.style.opacity = '1';
-    analyzingLayer.style.position = 'absolute';
-    analyzingLayer.style.left = '-9999px'; // أرسله بعيدًا جدًا
+  // تحديث نص Analyzing حسب نوع المؤشر (fallback إن تغيّر)
+  const type = indicator.dataset.indicatorType;
+  const txtEl = indicator.querySelector('.analyzingText');
+  if (txtEl) {
+    if (type === 'image') txtEl.textContent = 'Analyzing image';
+    else if (type === 'file') txtEl.textContent = 'Analyzing file';
+    else txtEl.textContent = 'Analyzing';
+  }
 
-    // 2. قم بالقياس الآن بعد أن أصبح العنصر مرئيًا (خارج الشاشة)
+  // إذا المسار لم يُقاس بعد: قياس سريع كـ fallback (نستخدم قياس بسيط)
+  if (path && !path.dataset.measured && typeof path.getTotalLength === 'function') {
     try {
-        const pathLen = Math.round(path.getTotalLength());
-        path.style.setProperty('--pathLen', pathLen);
-        path.style.strokeDashoffset = pathLen;
+      // اجعل العنصر قابلاً للقياس مؤقتاً خارج الشاشة (لا يظهر للمستخدم)
+      analyzingLayer.style.transition = 'none';
+      analyzingLayer.style.opacity = '1';
+      analyzingLayer.style.position = 'absolute';
+      analyzingLayer.style.left = '-9999px';
+
+      const pathLen = Math.round(path.getTotalLength());
+      path.style.setProperty('--pathLen', pathLen);
+      path.style.strokeDasharray = `8 ${pathLen}`;
+      path.style.strokeDashoffset = pathLen;
+      path.dataset.measured = '1';
+      path.dataset.pathLen = String(pathLen);
     } catch (e) {
-        console.warn("SVG path measurement failed:", e);
+      console.warn('setToAnalyzing fallback measurement failed', e);
+    } finally {
+      // إعادة الأنماط
+      analyzingLayer.style.transition = '';
+      analyzingLayer.style.opacity = '';
+      analyzingLayer.style.position = '';
+      analyzingLayer.style.left = '';
     }
+  }
 
-    // 3. أعد كل شيء إلى وضعه الطبيعي استعدادًا لبدء الأنيميشن المرئي
-    analyzingLayer.style.transition = '';
-    analyzingLayer.style.opacity = '';
-    analyzingLayer.style.position = '';
-    analyzingLayer.style.left = '';
-
-    // 4. استخدم requestAnimationFrame لبدء حركة الظهور بسلاسة
-    requestAnimationFrame(() => {
-        content.classList.add('to-analyzing');
-    });
-    // --- END: الحل النهائي ---
+  // أخيراً: شغّل التحول CSS (سيقوم بإخفاء البارات وإظهار analyzing دون قفز)
+  requestAnimationFrame(() => {
+    content.classList.add('to-analyzing');
+    if (analyzingLayer) analyzingLayer.setAttribute('aria-hidden', 'false');
+  });
 }
 
       // Typing indicator (supports text like "Analyzing file..." or "Analyzing image...")
      function showTyping(type = "default"){
   clearIndicator();
 
+  // container
   const msg = document.createElement('div');
   msg.className = 'msg assistant typing-indicator show';
+  msg.dataset.indicatorType = type; // حفظ النوع (image/file/default)
+
+  // content + inner
   const content = document.createElement('div');
   content.className = 'content typing';
   const inner = document.createElement('div');
   inner.className = 'indicatorInner';
 
+  // bars layer
   const barsLayer = document.createElement('div');
   barsLayer.className = 'barsLayer';
   barsLayer.innerHTML = `<div class="bars"><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span></div>`;
 
-  // --- START: Dynamic Text Logic ---
-  let analyzingLabel = 'Analyzing'; // النص الافتراضي
-  if (type === 'image') {
-      analyzingLabel = 'Analyzing Image';
-  } else if (type === 'file') {
-      analyzingLabel = 'Analyzing File';
-  }
-  // --- END: Dynamic Text Logic ---
+  // dynamic label
+  let analyzingLabel = 'Analyzing';
+  if (type === 'image') analyzingLabel = 'Analyzing image';
+  else if (type === 'file') analyzingLabel = 'Analyzing file';
 
+  // analyzing layer (text + led rect)
   const analyzingLayer = document.createElement('div');
   analyzingLayer.className = 'analyzingLayer';
   const gradId = 'ledGrad-' + Date.now();
-  // استخدام النص الديناميكي الجديد هنا
   analyzingLayer.innerHTML = `
-      <span class="analyzingText">${analyzingLabel}</span>
-      <svg class="led-svg" viewBox="0 0 160 44">
-        <defs><linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="var(--accent)"></stop><stop offset="100%" stop-color="#00aaff"></stop></linearGradient></defs>
-        <rect class="led-path" x="2" y="2" width="156" height="40" rx="10" ry="10" stroke="url(#${gradId})"></rect>
-      </svg>`;
+    <span class="analyzingText">${analyzingLabel}</span>
+    <svg class="led-svg" viewBox="0 0 160 44" aria-hidden="true" focusable="false">
+      <defs>
+        <linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="var(--accent)"></stop>
+          <stop offset="100%" stop-color="#00aaff"></stop>
+        </linearGradient>
+      </defs>
+      <rect class="led-path" x="2" y="2" width="156" height="40" rx="10" ry="10" stroke="url(#${gradId})"></rect>
+    </svg>`;
 
   inner.appendChild(barsLayer);
   inner.appendChild(analyzingLayer);
   content.appendChild(inner);
   msg.appendChild(content);
-  messagesEl.appendChild(msg);
 
+  // append to correct container (fallback to document.querySelector('.messages') if messagesEl undefined)
+  const container = (typeof messagesEl !== 'undefined' && messagesEl) ? messagesEl : document.querySelector('.messages') || document.body;
+  container.appendChild(msg);
+  scrollToBottom?.();
+
+  // measure widths & SVG path once (store results as data attributes to avoid re-measure)
   requestAnimationFrame(() => {
+    try {
       const barsW = barsLayer.getBoundingClientRect().width || 0;
       const analyW = analyzingLayer.getBoundingClientRect().width || 0;
-      inner.style.width = Math.ceil(Math.max(barsW, analyW) + 24) + 'px'; // زيادة المساحة قليلًا
+      inner.style.width = Math.ceil(Math.max(barsW, analyW) + 24) + 'px';
+
+      const path = msg.querySelector('.led-path');
+      if (path && typeof path.getTotalLength === 'function') {
+        const pathLen = Math.round(path.getTotalLength());
+        path.style.setProperty('--pathLen', pathLen);
+        path.style.strokeDasharray = `8 ${pathLen}`;
+        path.style.strokeDashoffset = pathLen;
+        // store measurement so setToAnalyzing يمكنه الاعتماد عليها
+        path.dataset.measured = '1';
+        path.dataset.pathLen = String(pathLen);
+      }
+    } catch (e) {
+      console.warn('showTyping measurement error', e);
+    }
   });
 
   currentIndicator = msg;
   return msg;
 }
-
       // Safe fallback for simulatedAssistantReply if not defined elsewhere
       function simulatedAssistantReply(text){
         try {
