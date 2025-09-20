@@ -3385,70 +3385,56 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
       }
 
       // Typing indicator (supports text like "Analyzing file..." or "Analyzing image...")
-function showTyping(type = "default"){
-  // ابحث عن أي مؤشر قديم واحذفه
-  const oldTyping = messagesEl.querySelector('.typing-indicator');
-  if (oldTyping) oldTyping.remove();
+      function showTyping(type = "default"){
+        // ابحث عن أي مؤشر قديم واحذفه
+        const oldTyping = messagesEl.querySelector('.typing-indicator');
+        if (oldTyping) oldTyping.remove();
 
-  // أنشئ الحاوية الرئيسية للمؤشر
-  const typing = document.createElement('div');
-  typing.className = 'msg assistant typing-indicator show';
+        // أنشئ الحاوية الرئيسية للمؤشر
+        const typing = document.createElement('div');
+        typing.className = 'msg assistant typing-indicator show';
 
-  // أدخل الـ HTML الجديد الخاص بحركة الأعمدة
-  typing.innerHTML = `
-    <div class="bubble">
-      <div class="content typing">
-        <div class="indicatorInner">
-          <div class="barsLayer">
-            <div class="bars">
-              <span class="bar"></span>
-              <span class="bar"></span>
-              <span class="bar"></span>
-              <span class="bar"></span>
-              <span class="bar"></span>
+        // أدخل الـ HTML الجديد الخاص بحركة الأعمدة
+        typing.innerHTML = `
+          <div class="bubble">
+            <div class="content typing">
+              <div class="indicatorInner">
+                <div class="barsLayer">
+                  <div class="bars">
+                    <span class="bar"></span>
+                    <span class="bar"></span>
+                    <span class="bar"></span>
+                    <span class="bar"></span>
+                    <span class="bar"></span>
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-      </div>
-    </div>`;
+          </div>`;
 
-  messagesEl.appendChild(typing);
+        messagesEl.appendChild(typing);
+        
+        // هذا الجزء جاهز للاستخدام في الخطوات القادمة
+        if (type === "analyzing") {
+          const content = typing.querySelector('.content.typing');
+          if (content) {
+              // سنضيف المنطق هنا لاحقًا
+          }
+        }
 
-  // هذا الجزء جاهز للاستخدام في الخطوات القادمة
-  if (type === "analyzing") {
-    const content = typing.querySelector('.content.typing');
-    if (content) {
-        // سنضيف المنطق هنا لاحقًا
-    }
-  }
+        return typing;
+      }
 
-  return typing;
-}
- // ✅ لو المرفق صورة أو ملف: نغير بعد وقت قصير
-if(type === "file" || type === "image"){
-  const delay = 3000 + Math.random()*2000; // 3-5 ثواني
-  setTimeout(()=>{
-    if(type === "file"){
-      typing.innerHTML = `<div class="analyzing">Analyzing file...</div>`;
-    } else if(type === "image"){
-      typing.innerHTML = `<div class="analyzing">Analyzing image...</div>`;
-    }
-  }, delay);
-}
-
-return typing;
-}
-
-// Safe fallback for simulatedAssistantReply if not defined elsewhere
-function simulatedAssistantReply(text){
-  try {
-    text = String(text || '').trim();
-    if(!text) return '...';
-    return 'Assistant (offline): ' + (text.length > 240 ? text.slice(0,240) + '…' : text);
-  } catch(e) {
-    return 'Assistant (offline)';
-  }
-}
+      // Safe fallback for simulatedAssistantReply if not defined elsewhere
+      function simulatedAssistantReply(text){
+        try {
+          text = String(text || '').trim();
+          if(!text) return '...';
+          return 'Assistant (offline): ' + (text.length > 240 ? text.slice(0,240) + '…' : text);
+        } catch(e) {
+          return 'Assistant (offline)';
+        }
+      }
 async function sendMessage(text, parentIndex = null) {
     let textToUse = (text || '').trim();
     if (!textToUse && !pendingAttachment) return;
