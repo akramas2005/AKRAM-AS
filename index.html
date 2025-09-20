@@ -3331,10 +3331,20 @@ function clearIndicator() {
 
 function setToAnalyzing(indicator) {
   if (!indicator) return;
-  const content = indicator.querySelector('.content.typing');
-  const analyzingLayer = indicator.querySelector('.analyzingLayer');
-  const path = indicator.querySelector('.led-path');
-  if (!content || !analyzingLayer) return;
+  const content = indicator.querySelector('.content');
+  if (!content) return;
+
+  content.classList.add('to-analyzing');
+
+  // تحديث النص حسب النوع المخزن
+  const type = indicator.dataset.indicatorType || "default";
+  const analyzingText = indicator.querySelector('.analyzingText');
+  if (analyzingText) {
+    if (type === "image") analyzingText.textContent = "Analyzing image";
+    else if (type === "file") analyzingText.textContent = "Analyzing file";
+    else analyzingText.textContent = "Analyzing";
+  }
+}
 
   // حفظ عرض inner لمنع أي انزياح أفقي أثناء التحويل
   const inner = indicator.querySelector('.indicatorInner');
