@@ -2928,7 +2928,10 @@ async function analyzeImageWithPuter(imageUrl, userPrompt = null) {
   
   // 1. إظهار الأنيميشن مع تفعيل مؤقت التحول إلى "Analyzing"
   clearIndicator();
-  showTyping("image"); 
+const indicator = showTyping("image");
+setTimeout(() => {
+  try { setToAnalyzing(indicator); } catch(e) {}
+}, 1000); 
 
   try {
     if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
@@ -2957,8 +2960,11 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
     if (!fileOrUrl) return null;
 
     // 1. إظهار الأنيميشن مع تفعيل مؤقت التحول إلى "Analyzing"
-    clearIndicator();
-    showTyping("file");
+   clearIndicator();
+let fileIndicator = showTyping("file");
+setTimeout(() => {
+  try { setToAnalyzing(fileIndicator); } catch(e) {}
+}, 1000);
 
     // إذا كان رابط نصي
     if (typeof fileOrUrl === 'string') {
@@ -3381,18 +3387,15 @@ function setToAnalyzing(indicator) {
 function showTyping(type = "default") {
   clearIndicator();
 
-  // container
   const msg = document.createElement('div');
   msg.className = 'msg assistant typing-indicator show';
-  msg.dataset.indicatorType = type; // حفظ النوع (image/file/default)
+  msg.dataset.indicatorType = type;
 
-  // content + inner
   const content = document.createElement('div');
   content.className = 'content typing';
   const inner = document.createElement('div');
   inner.className = 'indicatorInner';
 
-  // bars layer
   const barsLayer = document.createElement('div');
   barsLayer.className = 'barsLayer';
   barsLayer.innerHTML = `
@@ -3404,12 +3407,10 @@ function showTyping(type = "default") {
       <span class="bar"></span>
     </div>`;
 
-  // dynamic label
   let analyzingLabel = 'Analyzing';
   if (type === 'image') analyzingLabel = 'Analyzing image';
   else if (type === 'file') analyzingLabel = 'Analyzing file';
 
-  // analyzing layer (text + led rect)
   const analyzingLayer = document.createElement('div');
   analyzingLayer.className = 'analyzingLayer';
   const gradId = 'ledGrad-' + Date.now();
@@ -3430,7 +3431,6 @@ function showTyping(type = "default") {
   content.appendChild(inner);
   msg.appendChild(content);
 
-  // append to correct container
   const container =
     (typeof messagesEl !== "undefined" && messagesEl)
       ? messagesEl
@@ -3438,16 +3438,14 @@ function showTyping(type = "default") {
 
   container.appendChild(msg);
 
-  // scroll to bottom safely
   if (typeof scrollToBottom === "function") {
-    scrollToBottom();
+    try { scrollToBottom(); } catch(e) {}
   } else {
-    try {
-      container.scrollTop = container.scrollHeight;
-    } catch (e) {
-      console.warn("scrollToBottom not defined and fallback failed:", e);
-    }
+    try { container.scrollTop = container.scrollHeight; } catch (e) {}
   }
+
+  // 🟢 الجديد: نُرجع العنصر
+  return msg;
 }
       // Safe fallback for simulatedAssistantReply if not defined elsewhere
       function simulatedAssistantReply(text){
@@ -3479,13 +3477,13 @@ async function sendMessage(text, parentIndex = null) {
         scheduleSync();
     });
 
-    // 1. إظهار حركة الأعمدة الجديدة
-    clearIndicator();
-   const indicator = showTyping(type); // type = "default" أو "image" أو "file"
+   // 1. إظهار حركة الأعمدة الجديدة
+clearIndicator();
+const indicator = showTyping("default");
 
-// 2. بعد ثانية: التحول إلى Analyzing
+// 🟢 جديد: بعد مهلة صغيرة نُحوّل للمؤشر "Analyzing"
 setTimeout(() => {
-  setToAnalyzing(indicator);
+  try { setToAnalyzing(indicator); } catch (e) {}
 }, 1000);
 
     const isUserAtBottomInitially = messagesEl.scrollHeight - messagesEl.clientHeight <= messagesEl.scrollTop + 20;
