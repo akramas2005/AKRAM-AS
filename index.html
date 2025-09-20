@@ -279,17 +279,34 @@ body.dark-mode .code-block-container.collapsed pre::after {
 .indicatorInner {
   position: absolute; top: 50%; left: 0; transform: translateY(-50%); height: 36px; pointer-events: none;
 }
-.barsLayer, .analyzingLayer {
-  position: absolute;
-  top: 50%;
-  left: 0;
-  right: 0;              /* 🟢 اجعل العرض متمدد */
+.indicatorInner {
+  position: relative;
+  width: 160px;   /* نفس عرض الـ SVG */
+  height: 44px;   /* نفس ارتفاع الـ SVG */
   display: flex;
   align-items: center;
-  justify-content: flex-start; /* يبقى عند نفس النقطة */
-  transform: translateY(-50%);
-  transition: opacity 260ms ease, transform 260ms ease;
+  justify-content: center;
 }
+
+.barsLayer,
+.analyzingLayer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 260ms ease;
+}
+
+.barsLayer { opacity: 1; }
+.analyzingLayer { opacity: 0; }
+
+/* لما يتحول المؤشر */
+.content.to-analyzing .barsLayer { opacity: 0; }
+.content.to-analyzing .analyzingLayer { opacity: 1; }
 
 /* Bouncing Bars Styles */
 .barsLayer {
