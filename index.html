@@ -3511,201 +3511,101 @@ async function sendMessage(text, parentIndex = null) {
 
 
 // Regenerate assistant reply for a given parent message index
-
 async function regenerateAssistantForParent(parentIdx){
-
-  try {
-
-    // 🔹 حماية ضد الضغط المتكرر
-
-    if (window._regenLock) {
-
-      console.warn("Regenerate in progress, ignoring extra click");
-
-      return;
-
-    }
-
-    window._regenLock = true;
-
-
-
-    if (typeof parentIdx !== 'number' || parentIdx < 0 || !messages[parentIdx]) {
-
-      window._regenLock = false;
-
-      return;
-
-    }
-
-    const userText = String(messages[parentIdx].content || '').trim();
-
-    if (!userText) {
-
-      window._regenLock = false;
-
-      return;
-
-    }
-
-
-
-    const assistantMessage = { id: genId(), role: 'assistant', content: '', parent: parentIdx, meta: {} };
-
-    messages.push(assistantMessage);
-
-    const assistantIdx = messages.length - 1;
-
-    saveSession();
-
-
-
-    // 🔹 إزالة أي typing قديم قبل إنشاء الجديد
-
-    const oldTyping = messagesEl.querySelector('.typing');
-
-    if (oldTyping && oldTyping.parentNode) {
-
-      oldTyping.parentNode.removeChild(oldTyping);
-
-    }
-
-
-
-    const typingEl = showTyping();
-
-    if (typeof messagesEl !== 'undefined' && messagesEl) {
-
-      messagesEl.scrollTop = messagesEl.scrollHeight;
-
-    }
-
-
-
-    if (typeof puter === 'undefined' || !puter.ai || typeof puter.ai.chat !== 'function') {
-
-      // fallback: simulated reply
-
-      setTimeout(()=>{
-
-        try { if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl); } catch(e){}
-
-        const reply = (typeof simulatedAssistantReply === 'function') ? simulatedAssistantReply(userText) : ('Reply: ' + userText.slice(0,200));
-
-        assistantMessage.content = reply;
-
-        if (typeof appendMessage === 'function') appendMessage(assistantMessage, assistantIdx);
-
-        saveSession();
-
-        window._regenLock = false;
-
-      }, 700 + Math.min(1500, userText.length * 18));
-
-      return;
-
-    }
-
-
-
-    let botMessageEl = null;
-
-    let bubbleEl = null;
-
-    let domAppended = false;
-
-    try {
-
-      const response = await puter.ai.chat(buildChatPrompt(messages, parentIdx), { model: 'gpt-5-nano', stream: true });
-
-      let buffer = '';
-
-
-
-      for await (const part of response) {
-
-        if (!part) continue;
-
-        const piece = part.text || (part.message && part.message.content) || '';
-
-        if (!piece) continue;
-
-
-
-        if (!domAppended) {
-
-          try { if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl); } catch(e){}
-
-          if (typeof appendMessage === 'function') appendMessage(assistantMessage, assistantIdx);
-
-          botMessageEl = (typeof messagesEl !== 'undefined' && messagesEl) ? 
-
-            (messagesEl.querySelector('.msg[data-id="'+assistantMessage.id+'"]') 
-
-            || messagesEl.querySelector('.msg[data-index="'+assistantIdx+'"]') 
-
-            || messagesEl.querySelector('.msg:last-child')) : null;
-
-          bubbleEl = botMessageEl ? botMessageEl.querySelector('.bubble') : null;
-
-          domAppended = true;
-
-        }
-
-
-
-        buffer += String(piece);
-
-        assistantMessage.content = buffer;
-
-        if (bubbleEl) bubbleEl.innerHTML = escapeHtml(assistantMessage.content).replace(/\n/g,'<br>');
-
-        if (typeof messagesEl !== 'undefined' && messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
-
-      }
-
-
-
-      if (!domAppended) {
-
-        try { if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl); } catch(e){}
-
-        if (typeof appendMessage === 'function') appendMessage(assistantMessage, assistantIdx);
-
-      }
-
-
-
-      saveSession();
-
-      window._regenLock = false;
-
-
-
-    } catch (error) {
-
-      console.error("regenerateAssistantForParent Error:", error);
-
-      try { if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl); } catch(e){}
-
-      if (typeof appendMessage === 'function') appendMessage(assistantMessage, assistantIdx);
-
-      assistantMessage.content = 'حدث خطأ. يرجى المحاولة مرة أخرى.';
-
-      saveSession();
-
-      window._regenLock = false;
-
-    }
-
-  } catch(e) {
-
-    console.error('regenerateAssistantForParent wrapper error', e);
-
-    window._regenLock = false;
-
-  }
-
+  try {
+    if (window._regenLock) {
+      console.warn("Regenerate in progress, ignoring extra click");
+      return;
+    }
+    window._regenLock = true;
+
+    if (typeof parentIdx !== 'number' || parentIdx < 0 || !messages[parentIdx]) {
+      window._regenLock = false;
+      return;
+    }
+
+    const assistantMessage = { id: genId(), role: 'assistant', content: '', parent: parentIdx, meta: {} };
+    messages.push(assistantMessage);
+    saveSession();
+
+    // --- START: New Animation Logic ---
+    clearIndicator();
+    showTyping(); // أظهر حركة الأعمدة
+    // --- END: New Animation Logic ---
+
+    // 🔹 إزالة أي typing قديم قبل إنشاء الجديد
+    const oldTyping = messagesEl.querySelector('.typing');
+    if (oldTyping && oldTyping.parentNode) {
+      oldTyping.parentNode.removeChild(oldTyping);
+    }
+
+    const typingEl = showTyping();
+    if (typeof messagesEl !== 'undefined' && messagesEl) {
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    if (typeof puter === 'undefined' || !puter.ai || typeof puter.ai.chat !== 'function') {
+      // fallback: simulated reply
+      setTimeout(()=>{
+        try { if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl); } catch(e){}
+        const reply = (typeof simulatedAssistantReply === 'function') ? simulatedAssistantReply(userText) : ('Reply: ' + userText.slice(0,200));
+        assistantMessage.content = reply;
+        if (typeof appendMessage === 'function') appendMessage(assistantMessage, assistantIdx);
+        saveSession();
+        window._regenLock = false;
+      }, 700 + Math.min(1500, userText.length * 18));
+      return;
+    }
+
+    let botMessageEl = null;
+    let bubbleEl = null;
+    let domAppended = false;
+    try {
+      const response = await puter.ai.chat(buildChatPrompt(messages, parentIdx), { model: 'gpt-5-nano', stream: true });
+      let buffer = '';
+
+      for await (const part of response) {
+        if (!part) continue;
+        const piece = part.text || (part.message && part.message.content) || '';
+        if (!piece) continue;
+
+        if (!domAppended) {
+          try { if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl); } catch(e){}
+          if (typeof appendMessage === 'function') appendMessage(assistantMessage, assistantIdx);
+          botMessageEl = (typeof messagesEl !== 'undefined' && messagesEl) ? 
+            (messagesEl.querySelector('.msg[data-id="'+assistantMessage.id+'"]') 
+            || messagesEl.querySelector('.msg[data-index="'+assistantIdx+'"]') 
+            || messagesEl.querySelector('.msg:last-child')) : null;
+          bubbleEl = botMessageEl ? botMessageEl.querySelector('.bubble') : null;
+          domAppended = true;
+        }
+
+        buffer += String(piece);
+        assistantMessage.content = buffer;
+        if (bubbleEl) bubbleEl.innerHTML = escapeHtml(assistantMessage.content).replace(/\n/g,'<br>');
+        if (typeof messagesEl !== 'undefined' && messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+
+      if (!domAppended) {
+        try { if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl); } catch(e){}
+        if (typeof appendMessage === 'function') appendMessage(assistantMessage, assistantIdx);
+      }
+
+      saveSession();
+      window._regenLock = false;
+
+    } catch (error) {
+      console.error("regenerateAssistantForParent Error:", error);
+      try { if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl); } catch(e){}
+      if (typeof appendMessage === 'function') appendMessage(assistantMessage, assistantIdx);
+      assistantMessage.content = 'حدث خطأ. يرجى المحاولة مرة أخرى.';
+      saveSession();
+      window._regenLock = false;
+    }
+  } catch(e) {
+    console.error('regenerateAssistantForParent wrapper error', e);
+    window._regenLock = false;
+  }
 }
 // OPEN/CLOSE CHAT (use history for back-button order)
       function openChatSimple(){
