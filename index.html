@@ -2953,9 +2953,10 @@ async function analyzeImageWithPuter(imageUrl, userPrompt = null) {
   // 1. إظهار الأنيميشن مع تفعيل مؤقت التحول إلى "Analyzing"
   clearIndicator();
 const indicator = showTyping("image");
+const delay = Math.floor(Math.random() * (5000 - 3000 + 1)) + 3000; 
 setTimeout(() => {
-  try { setToAnalyzing(indicator); } catch(e) {}
-}, 1000); 
+  setToAnalyzing(indicator);
+}, delay); 
 
   try {
     if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
@@ -2986,9 +2987,10 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
     // 1. إظهار الأنيميشن مع تفعيل مؤقت التحول إلى "Analyzing"
    clearIndicator();
 let fileIndicator = showTyping("file");
+const delay = Math.floor(Math.random() * (5000 - 3000 + 1)) + 3000; 
 setTimeout(() => {
-  try { setToAnalyzing(fileIndicator); } catch(e) {}
-}, 1000);
+  setToAnalyzing(indicator);
+}, delay);
 
     // إذا كان رابط نصي
     if (typeof fileOrUrl === 'string') {
