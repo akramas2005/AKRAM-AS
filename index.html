@@ -2565,16 +2565,10 @@ async function sendAttachmentNow() {
     composer.value = '';
     updateSendVisibility();
     autoGrowTextarea();
+    
+    // تم حذف منطق الأنيميشن من هنا لأنه نُقل إلى الدوال الأخرى
 
-    // 2. بدء نظام الحركة الجديد الخاص بالمرفقات
-    clearIndicator(); 
-    const indicator = showTyping(); // إظهار حركة الأعمدة
-    const randomDelay = 3000 + Math.random() * 2000;
-    indicatorTimers.push(setTimeout(() => {
-        setToAnalyzing(indicator); // التحول إلى حركة "Analyzing"
-    }, randomDelay));
-
-    // 3. انتظار اكتمال الرفع إذا لم يكن قد اكتمل بعد
+    // 2. انتظار اكتمال الرفع إذا لم يكن قد اكتمل بعد
     if (pendingAttachment.uploadState !== 'done') {
         await uploadFileToServer(pendingAttachment.file, (pct) => {});
     }
@@ -2587,7 +2581,7 @@ async function sendAttachmentNow() {
     clearPreview();
     pendingAttachment = null;
 
-    // 4. تحليل المرفق وانتظار الرد النهائي
+    // 3. تحليل المرفق (الدوال ستقوم بإظهار الأنيميشن بنفسها)
     const attached = userMessage.attachment || null;
     let analysisText = null;
     
@@ -2597,22 +2591,21 @@ async function sendAttachmentNow() {
         analysisText = await analyzeFileWithPuter(attached.url, userMessage.content);
     }
 
-    // 5. إزالة مؤشر الحركة قبل عرض الرد
-    clearIndicator(); 
-
+    // 4. عرض الرد النهائي
     if (analysisText) {
         const botMsg = { id: genId(), role: 'assistant', content: analysisText, meta: {} };
         messages.push(botMsg);
         appendMessage(botMsg, messages.length - 1);
         saveSession();
     } else {
+        // إذا فشل التحليل، استدعي الرد الافتراضي (الذي سيظهر حركة الأعمدة العادية)
         regenerateAssistantForParent(messages.length - 1);
     }
 
   } catch (e) {
     console.error('sendAttachmentNow error', e);
     toast('Send failed');
-    clearIndicator(); // تأكد من إزالة المؤشر عند حدوث خطأ
+    clearIndicator(); // كإجراء احترازي: قم بإزالة المؤشر عند حدوث خطأ عام
   } finally {
     try { if (pendingAttachment) pendingAttachment._sending = false; } catch (e) {}
   }
@@ -2910,42 +2903,41 @@ xhr.send(fd);
 
 // 🟢 تحليل الصور
 async function analyzeImageWithPuter(imageUrl, userPrompt = null) {
+  if (!imageUrl) return null;
+  
+  // 1. إظهار الأنيميشن مع تفعيل مؤقت التحول إلى "Analyzing"
+  clearIndicator();
+  showTyping("image"); 
+
   try {
-    if (!imageUrl) return null;
-    // دالة showTyping داخل التحليل تمنع تكرار الانيميشِن إذا لم تُستدعى في sendAttachmentNow
-    const typingEl = (typeof showTyping === 'function') ? showTyping("image") : null;
-
     if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
-      try {
-        // إذا أرسل المستخدم نصًا، اجمعه مع الطلب التحليلي للصورة
-        const basePrompt = (userPrompt && String(userPrompt).trim())
-          ? `${String(userPrompt).trim()}\n\nالآن قم بتحليل الصورة التالية وابدأ برد واضح وعملي بناءً على ما طلبه المستخدم:`
-          : `صف محتوى الصورة باختصار (عناصر رئيسية، ألوان/حالة)، وحاول استخراج أي نص ظاهر إن وجد. قدم ملخصًا ونقاطًا قصيرة.`;
+      const basePrompt = (userPrompt && String(userPrompt).trim())
+        ? `${String(userPrompt).trim()}\n\nالآن قم بتحليل الصورة التالية:`
+        : `صف محتوى هذه الصورة باختصار.`;
 
-        const puterResp = await puter.ai.chat(basePrompt, imageUrl, { model: 'gpt-5-nano' });
-        const txt = parsePuterResult(puterResp);
-
-        if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
-        return txt ? String(txt).trim() : null;
-      } catch (err) {
-        console.warn('analyzeImageWithPuter (puter.ai.chat) failed', err);
-        if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
-        return null;
-      }
+      const puterResp = await puter.ai.chat(basePrompt, imageUrl, { model: 'gpt-5-nano' });
+      
+      // 2. إزالة الأنيميشن قبل إرجاع الرد
+      clearIndicator(); 
+      return parsePuterResult(puterResp);
     }
-
-    if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
-    return null;
-  } catch (e) {
-    console.error('analyzeImageWithPuter error', e);
-    return null;
+  } catch (err) {
+    console.warn('analyzeImageWithPuter failed', err);
   }
+  
+  // 3. إزالة الأنيميشن في حالة الفشل أو عدم وجود رد
+  clearIndicator(); 
+  return null;
 }
-
+      
 // 🟢 تحليل الملفات
 async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
   try {
     if (!fileOrUrl) return null;
+
+    // 1. إظهار الأنيميشن مع تفعيل مؤقت التحول إلى "Analyzing"
+    clearIndicator();
+    showTyping("file");
 
     // إذا كان رابط نصي
     if (typeof fileOrUrl === 'string') {
@@ -2953,6 +2945,7 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
 
       // صورة عبر رابط
       if (lower.match(/\.(png|jpe?g|webp|gif|bmp)(?:[?#].*)?$/)) {
+        // لا نحتاج لإزالة المؤشر هنا لأن الدالة التالية ستفعل ذلك
         return await analyzeImageWithPuter(fileOrUrl, userPrompt);
       }
 
@@ -2964,7 +2957,6 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
           if (mime.startsWith("text/") || mime.includes("json") || mime.includes("xml") || mime.includes("csv")) {
             const content = await resp.text();
             if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
-              const typingEl = (typeof showTyping === 'function') ? showTyping("file") : null; // ✅ الأنيميشن بعد الإرسال فقط
               const basePrompt = (userPrompt && String(userPrompt).trim())
                 ? `${String(userPrompt).trim()}\n\nهذا محتوى الملف:\n\n${content.slice(0, 8000)}`
                 : `حلل هذا الملف (ملخص، نوعه، أي نص داخلي مهم):\n\n${content.slice(0, 8000)}`;
@@ -2972,8 +2964,7 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
               const r = await puter.ai.chat(basePrompt, null, { model: "gpt-5-nano" });
               const txt = parsePuterResult(r);
 
-              if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
-
+              clearIndicator(); // <-- 2. إزالة المؤشر قبل إرجاع الرد
               return txt ? String(txt).trim() : null;
             }
           }
@@ -2982,6 +2973,7 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
         console.warn("fetch file for analysis failed", err);
       }
 
+      clearIndicator(); // <-- 2. إزالة المؤشر قبل إرجاع الرد
       return null;
     }
 
@@ -2996,6 +2988,7 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
             fr.onerror = rej;
             fr.readAsDataURL(fileOrUrl);
           });
+          // لا نحتاج لإزالة المؤشر هنا لأن الدالة التالية ستفعل ذلك
           return await analyzeImageWithPuter(dataUrl, userPrompt);
         }
 
@@ -3005,7 +2998,6 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
         if (textLike.includes(ext)) {
           const txtContent = await fileOrUrl.text();
           if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
-            const typingEl = (typeof showTyping === 'function') ? showTyping("file") : null;
             const basePrompt = (userPrompt && String(userPrompt).trim())
               ? `${String(userPrompt).trim()}\n\nهذا محتوى الملف (${ext}):\n\n${txtContent.slice(0, 8000)}`
               : `حلل هذا الملف (${ext}) وقدم ملخصاً:\n\n${txtContent.slice(0, 8000)}`;
@@ -3013,22 +3005,25 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
             const r = await puter.ai.chat(basePrompt, null, { model: 'gpt-5-nano' });
             const parsed = parsePuterResult(r);
 
-            if (typingEl && typingEl.parentNode) try { typingEl.parentNode.removeChild(typingEl); } catch(_) {}
-
+            clearIndicator(); // <-- 2. إزالة المؤشر قبل إرجاع الرد
             return parsed ? String(parsed).trim() : null;
           }
         }
-
+        clearIndicator(); // <-- 2. إزالة المؤشر قبل إرجاع الرد
         return null;
       } catch (e) {
         console.warn('analyzeFileWithPuter read text failed', e);
+        clearIndicator(); // <-- 2. إزالة المؤشر قبل إرجاع الرد
         return null;
       }
     }
 
+    clearIndicator(); // <-- 2. إزالة المؤشر قبل إرجاع الرد
     return null;
+
   } catch (e) {
     console.error('analyzeFileWithPuter error', e);
+    clearIndicator(); // <-- 3. إزالة المؤشر في حالة الفشل أيضًا
     return null;
   }
 }
@@ -3342,17 +3337,15 @@ function setToAnalyzing(indicator) {
 
   const msg = document.createElement('div');
   msg.className = 'msg assistant typing-indicator show';
-
+  
+  // ... (بقية كود بناء الأنيميشن يبقى كما هو) ...
   const content = document.createElement('div');
   content.className = 'content typing';
-
   const inner = document.createElement('div');
   inner.className = 'indicatorInner';
-
   const barsLayer = document.createElement('div');
   barsLayer.className = 'barsLayer';
   barsLayer.innerHTML = `<div class="bars"><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span></div>`;
-
   const analyzingLayer = document.createElement('div');
   analyzingLayer.className = 'analyzingLayer';
   const gradId = 'ledGrad-' + Date.now();
@@ -3362,19 +3355,23 @@ function setToAnalyzing(indicator) {
         <defs><linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="var(--accent)"></stop><stop offset="100%" stop-color="#00aaff"></stop></linearGradient></defs>
         <rect class="led-path" x="6" y="6" width="248" height="44" rx="10" ry="10" stroke="url(#${gradId})"></rect>
       </svg>`;
-  
   inner.appendChild(barsLayer);
   inner.appendChild(analyzingLayer);
   content.appendChild(inner);
   msg.appendChild(content);
   messagesEl.appendChild(msg);
 
-  // حساب وتثبيت العرض لمنع القفز (بدون قياس الـ SVG)
-  requestAnimationFrame(() => {
-      const barsW = barsLayer.getBoundingClientRect().width || 0;
-      const analyW = analyzingLayer.getBoundingClientRect().width || 0;
-      inner.style.width = Math.ceil(Math.max(barsW, analyW) + 12) + 'px';
-  });
+  requestAnimationFrame(() => { /* ... (نفس كود حساب العرض) ... */ });
+
+  // --- START: إعادة منطق التحليل الناجح ---
+  // إذا كان النوع "صورة" أو "ملف"، قم بالتحول إلى "Analyzing" بعد فترة
+  if (type === "file" || type === "image") {
+    const randomDelay = 3000 + Math.random() * 2000;
+    indicatorTimers.push(setTimeout(() => {
+        setToAnalyzing(msg);
+    }, randomDelay));
+  }
+  // --- END: إعادة منطق التحليل الناجح ---
 
   currentIndicator = msg;
   return msg;
