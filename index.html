@@ -280,11 +280,14 @@ body.dark-mode .code-block-container.collapsed pre::after {
   position: absolute; top: 50%; left: 0; transform: translateY(-50%); height: 36px; pointer-events: none;
 }
 .barsLayer, .analyzingLayer {
-  position: absolute; top: 50%; left: 0; transform: translateY(-50%); display: inline-flex;
-  align-items: center; gap: 12px; white-space: nowrap;
+  position: absolute; top: 50%; left: 0; transform: translateY(-50%);
   transition: opacity 260ms ease, transform 260ms ease;
 }
+
 /* Bouncing Bars Styles */
+.barsLayer {
+  display: inline-flex; align-items: center;
+}
 .barsLayer .bars { display: inline-flex; align-items: flex-end; gap: 6px; height: 20px; }
 .barsLayer .bar {
   width: 4px; height: 14px; background: #aab5c0; border-radius: 3px;
@@ -301,22 +304,25 @@ body.dark-mode .barsLayer .bar { background: #6e7681; }
   40% { transform: scaleY(1); opacity: 1; }
   80% { transform: scaleY(.78); opacity: .85; }
 }
-/* Analyzing Layer Styles - CORRECTED LAYOUT */
+
+/* Analyzing Layer Styles (Using Grid for perfect centering) */
 .analyzingLayer {
   opacity: 0;
   transform: translateY(-50%) translateY(4px) scale(.98);
-  /* تعديل مهم: سنجعلها حاوية نسبية لتوسيط العناصر بداخلها */
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 160px; /* عرض أكبر قليلًا ليناسب النص الأطول */
+  display: grid;
+  place-items: center; /* Center everything perfectly */
+  width: 170px;
   height: 44px;
 }
+/* Place both text and SVG in the same grid cell to stack them */
+.analyzingText, .led-svg {
+  grid-column: 1 / 1;
+  grid-row: 1 / 1;
+}
 .analyzingText {
-  font-weight: 700;
-  font-size: 14px;
-  /* بقية الخصائص كما هي */
+  font-weight: 700; font-size: 14px;
+  z-index: 2; /* Ensure text is on top */
+  position: relative;
   background: linear-gradient(90deg, #6e7681 20%, #b0b8c0 50%, #6e7681 80%);
   background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
   animation: waveMoveText 2.5s linear infinite;
@@ -326,16 +332,8 @@ body.dark-mode .analyzingText {
   background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
 }
 @keyframes waveMoveText { to { background-position: -200% center; } }
-
 .led-svg {
-  /* تعديل مهم: نجعله مطلقًا ليكون خلف النص */
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 100%;
-  height: 100%;
-  overflow: visible;
+  width: 100%; height: 100%; overflow: visible; z-index: 1;
 }
 .led-path {
   fill: none; stroke-width: 3; stroke-linecap: round;
@@ -348,6 +346,7 @@ body.dark-mode .analyzingText {
   0%{stroke-dashoffset:var(--pathLen);opacity:0} 3%{opacity:1} 30%{stroke-dashoffset:0;opacity:1}
   45%{opacity:1} 50%{opacity:0} 100%{stroke-dashoffset:var(--pathLen);opacity:0}
 }
+
 /* Transition Classes */
 .content.to-analyzing .barsLayer { opacity: 0; transform: translateY(-50%) translateY(-6px) scale(.98); }
 .content.to-analyzing .analyzingLayer { opacity: 1; transform: translateY(-50%) translateY(0) scale(1); }
