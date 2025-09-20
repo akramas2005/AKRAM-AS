@@ -280,7 +280,14 @@ body.dark-mode .code-block-container.collapsed pre::after {
   position: absolute; top: 50%; left: 0; transform: translateY(-50%); height: 36px; pointer-events: none;
 }
 .barsLayer, .analyzingLayer {
-  position: absolute; top: 50%; left: 0; transform: translateY(-50%);
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;              /* 🟢 اجعل العرض متمدد */
+  display: flex;
+  align-items: center;
+  justify-content: flex-start; /* يبقى عند نفس النقطة */
+  transform: translateY(-50%);
   transition: opacity 260ms ease, transform 260ms ease;
 }
 
@@ -3479,12 +3486,9 @@ async function sendMessage(text, parentIndex = null) {
 
    // 1. إظهار حركة الأعمدة الجديدة
 clearIndicator();
+// 🟢 عند الرسائل النصية نعرض فقط الأعمدة بدون تحليل
 const indicator = showTyping("default");
 
-// 🟢 جديد: بعد مهلة صغيرة نُحوّل للمؤشر "Analyzing"
-setTimeout(() => {
-  try { setToAnalyzing(indicator); } catch (e) {}
-}, 1000);
 
     const isUserAtBottomInitially = messagesEl.scrollHeight - messagesEl.clientHeight <= messagesEl.scrollTop + 20;
 
