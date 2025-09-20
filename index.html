@@ -3332,24 +3332,38 @@ function clearIndicator() {
 function setToAnalyzing(indicator) {
     if (!indicator) return;
     const content = indicator.querySelector('.content.typing');
-    if (!content) return;
+    const analyzingLayer = indicator.querySelector('.analyzingLayer');
+    const path = indicator.querySelector('.led-path');
+    if (!content || !path || !analyzingLayer) return;
 
-    // 1. أضف الكلاس لبدء حركة التحول في CSS
-    content.classList.add('to-analyzing');
+    // --- START: الحل النهائي لقياس العنصر المخفي ---
 
-    // 2. استخدم مؤقتًا زمنيًا مضمونًا لتفعيل حركة الـ SVG
-    setTimeout(() => {
-        const path = indicator.querySelector('.led-path');
-        if (path && typeof path.getTotalLength === 'function') {
-            try {
-                const pathLen = Math.round(path.getTotalLength());
-                path.style.setProperty('--pathLen', pathLen);
-                path.style.strokeDashoffset = pathLen;
-            } catch (e) {
-                console.warn("SVG path measurement failed inside setTimeout:", e);
-            }
-        }
-    }, 300); // 300ms is a safe delay
+    // 1. نجبر العنصر على أن يكون قابلاً للقياس عن طريق جعله مرئيًا ولكن خارج الشاشة
+    analyzingLayer.style.transition = 'none'; // أوقف الحركة مؤقتًا
+    analyzingLayer.style.opacity = '1';
+    analyzingLayer.style.position = 'absolute';
+    analyzingLayer.style.left = '-9999px'; // أرسله بعيدًا جدًا
+
+    // 2. قم بالقياس الآن بعد أن أصبح العنصر مرئيًا (خارج الشاشة)
+    try {
+        const pathLen = Math.round(path.getTotalLength());
+        path.style.setProperty('--pathLen', pathLen);
+        path.style.strokeDashoffset = pathLen;
+    } catch (e) {
+        console.warn("SVG path measurement failed:", e);
+    }
+
+    // 3. أعد كل شيء إلى وضعه الطبيعي استعدادًا لبدء الأنيميشن المرئي
+    analyzingLayer.style.transition = '';
+    analyzingLayer.style.opacity = '';
+    analyzingLayer.style.position = '';
+    analyzingLayer.style.left = '';
+
+    // 4. استخدم requestAnimationFrame لبدء حركة الظهور بسلاسة
+    requestAnimationFrame(() => {
+        content.classList.add('to-analyzing');
+    });
+    // --- END: الحل النهائي ---
 }
 
       // Typing indicator (supports text like "Analyzing file..." or "Analyzing image...")
