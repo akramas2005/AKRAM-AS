@@ -3414,17 +3414,16 @@ function showTyping(type = "default"){
 
   messagesEl.appendChild(typing);
 
-  // إذا كان هذا النوع من المؤشر مخصصًا للتحليل (سنستخدمه لاحقًا)
+  // هذا الجزء جاهز للاستخدام في الخطوات القادمة
   if (type === "analyzing") {
     const content = typing.querySelector('.content.typing');
     if (content) {
-        // سنضيف المنطق هنا في الخطوة التالية
+        // سنضيف المنطق هنا لاحقًا
     }
   }
 
   return typing;
 }
-
  // ✅ لو المرفق صورة أو ملف: نغير بعد وقت قصير
 if(type === "file" || type === "image"){
   const delay = 3000 + Math.random()*2000; // 3-5 ثواني
