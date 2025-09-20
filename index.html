@@ -3316,13 +3316,28 @@ function clearIndicator() {
 function setToAnalyzing(indicator) {
     if (!indicator) return;
     const content = indicator.querySelector('.content.typing');
-    if (content) {
-        content.classList.add('to-analyzing');
-    }
+    if (!content) return;
+
+    // 1. أضف الكلاس لبدء حركة التحول
+    content.classList.add('to-analyzing');
+
+    // 2. الآن وبعد أن أصبح العنصر على وشك الظهور، قم بقياس الـ SVG
+    const path = indicator.querySelector('.led-path');
+    requestAnimationFrame(() => {
+        if (path && typeof path.getTotalLength === 'function') {
+            try {
+                const pathLen = Math.round(path.getTotalLength());
+                path.style.setProperty('--pathLen', pathLen);
+                path.style.strokeDashoffset = pathLen;
+            } catch (e) {
+                console.warn("Could not measure SVG path, it might still be non-rendered.", e);
+            }
+        }
+    });
 }
 
       // Typing indicator (supports text like "Analyzing file..." or "Analyzing image...")
-      function showTyping(type = "default"){
+     function showTyping(type = "default"){
   clearIndicator();
 
   const msg = document.createElement('div');
@@ -3334,12 +3349,10 @@ function setToAnalyzing(indicator) {
   const inner = document.createElement('div');
   inner.className = 'indicatorInner';
 
-  // طبقة الأعمدة
   const barsLayer = document.createElement('div');
   barsLayer.className = 'barsLayer';
   barsLayer.innerHTML = `<div class="bars"><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span></div>`;
 
-  // طبقة التحليل
   const analyzingLayer = document.createElement('div');
   analyzingLayer.className = 'analyzingLayer';
   const gradId = 'ledGrad-' + Date.now();
@@ -3349,25 +3362,18 @@ function setToAnalyzing(indicator) {
         <defs><linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="var(--accent)"></stop><stop offset="100%" stop-color="#00aaff"></stop></linearGradient></defs>
         <rect class="led-path" x="6" y="6" width="248" height="44" rx="10" ry="10" stroke="url(#${gradId})"></rect>
       </svg>`;
-
+  
   inner.appendChild(barsLayer);
   inner.appendChild(analyzingLayer);
   content.appendChild(inner);
   msg.appendChild(content);
   messagesEl.appendChild(msg);
 
-  // حساب وتثبيت العرض لمنع القفز
+  // حساب وتثبيت العرض لمنع القفز (بدون قياس الـ SVG)
   requestAnimationFrame(() => {
       const barsW = barsLayer.getBoundingClientRect().width || 0;
       const analyW = analyzingLayer.getBoundingClientRect().width || 0;
       inner.style.width = Math.ceil(Math.max(barsW, analyW) + 12) + 'px';
-
-      const path = msg.querySelector('.led-path');
-      if (path && typeof path.getTotalLength === 'function') {
-          const pathLen = Math.round(path.getTotalLength());
-          path.style.setProperty('--pathLen', pathLen);
-          path.style.strokeDashoffset = pathLen;
-      }
   });
 
   currentIndicator = msg;
