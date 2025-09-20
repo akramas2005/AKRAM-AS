@@ -3481,7 +3481,12 @@ async function sendMessage(text, parentIndex = null) {
 
     // 1. إظهار حركة الأعمدة الجديدة
     clearIndicator();
-    showTyping(); 
+   const indicator = showTyping(type); // type = "default" أو "image" أو "file"
+
+// 2. بعد ثانية: التحول إلى Analyzing
+setTimeout(() => {
+  setToAnalyzing(indicator);
+}, 1000);
 
     const isUserAtBottomInitially = messagesEl.scrollHeight - messagesEl.clientHeight <= messagesEl.scrollTop + 20;
 
