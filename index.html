@@ -3322,7 +3322,6 @@ function setToAnalyzing(indicator) {
     content.classList.add('to-analyzing');
 
     // 2. استخدم مؤقتًا زمنيًا مضمونًا لتفعيل حركة الـ SVG
-    //    بعد مدة أطول قليلاً من مدة حركة الظهور (260ms)
     setTimeout(() => {
         const path = indicator.querySelector('.led-path');
         if (path && typeof path.getTotalLength === 'function') {
@@ -3335,13 +3334,6 @@ function setToAnalyzing(indicator) {
             }
         }
     }, 300); // 300ms is a safe delay
-}
-
-    // استمع لحدث انتهاء الحركة مرة واحدة فقط
-    analyzingLayer.addEventListener('transitionend', setupSVGPath, { once: true });
-
-    // الآن، أضف الكلاس لبدء حركة الظهور
-    content.classList.add('to-analyzing');
 }
 
       // Typing indicator (supports text like "Analyzing file..." or "Analyzing image...")
