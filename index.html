@@ -268,52 +268,29 @@ body.dark-mode .code-block-container.collapsed pre::after {
 }
 /* --- END: Collapsible Code Block Styles --- */
 
-  /* --- START: New Bouncing Bars Animation --- */
+  /* --- START: New Typing & Analyzing Animations --- */
 .msg.typing-indicator .bubble {
-  background: transparent !important; /* No bubble for the indicator */
+  background: transparent !important;
   box-shadow: none !important;
 }
 .content.typing {
-  display: block;
-  padding: 6px 0;
-  margin: 0;
-  position: relative;
-  min-height: 36px;
+  display: block; padding: 6px 0; margin: 0; position: relative; min-height: 40px;
 }
 .indicatorInner {
-  position: absolute;
-  top: 50%;
-  left: 0; /* محاذاة لليسار لتناسب رسائل المساعد */
-  transform: translateY(-50%);
-  height: 36px;
-  pointer-events: none;
+  position: absolute; top: 50%; left: 0; transform: translateY(-50%); height: 36px; pointer-events: none;
 }
-.barsLayer {
-  position: absolute;
-  top: 50%;
-  left: 0; /* محاذاة لليسار لتناسب رسائل المساعد */
-  transform: translateY(-50%);
-  display: inline-flex;
-  align-items: center;
+.barsLayer, .analyzingLayer {
+  position: absolute; top: 50%; left: 0; transform: translateY(-50%); display: inline-flex;
+  align-items: center; gap: 12px; white-space: nowrap;
+  transition: opacity 260ms ease, transform 260ms ease;
 }
-.barsLayer .bars {
-  display: inline-flex;
-  align-items: flex-end;
-  gap: 6px;
-  height: 20px;
-}
+/* Bouncing Bars Styles */
+.barsLayer .bars { display: inline-flex; align-items: flex-end; gap: 6px; height: 20px; }
 .barsLayer .bar {
-  width: 4px;
-  height: 14px;
-  background: #aab5c0; /* لون رمادي فاتح يناسب الوضعين */
-  border-radius: 3px;
-  transform-origin: bottom;
-  animation: bounce 1s infinite ease-in-out;
+  width: 4px; height: 14px; background: #aab5c0; border-radius: 3px;
+  transform-origin: bottom; animation: bounce 1s infinite ease-in-out;
 }
-/* لون الأعمدة في الوضع الداكن */
-body.dark-mode .barsLayer .bar {
-  background: #6e7681;
-}
+body.dark-mode .barsLayer .bar { background: #6e7681; }
 .barsLayer .bar:nth-child(1) { animation-delay: -0.9s; }
 .barsLayer .bar:nth-child(2) { animation-delay: -0.7s; }
 .barsLayer .bar:nth-child(3) { animation-delay: -0.5s; }
@@ -324,7 +301,35 @@ body.dark-mode .barsLayer .bar {
   40% { transform: scaleY(1); opacity: 1; }
   80% { transform: scaleY(.78); opacity: .85; }
 }
-/* --- END: New Bouncing Bars Animation --- */
+/* Analyzing Layer Styles */
+.analyzingLayer { opacity: 0; transform: translateY(-50%) translateY(4px) scale(.98); }
+.analyzingText {
+  font-weight: 700; font-size: 14px;
+  background: linear-gradient(90deg, #6e7681 20%, #b0b8c0 50%, #6e7681 80%);
+  background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  animation: waveMoveText 2.5s linear infinite;
+}
+body.dark-mode .analyzingText {
+  background: linear-gradient(90deg, #e6edf3 20%, #8b949e 50%, #e6edf3 80%);
+  background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+}
+@keyframes waveMoveText { to { background-position: -200% center; } }
+.led-svg { width: 140px; height: 28px; overflow: visible; }
+.led-path {
+  fill: none; stroke-width: 3; stroke-linecap: round;
+  filter: drop-shadow(0 0 8px rgba(0, 120, 255, 0.32));
+  stroke-dasharray: 8 600; /* سيتم تحديثه بـ JS */
+  stroke-dashoffset: 600; /* سيتم تحديثه بـ JS */
+  animation: ledSweep 4s linear infinite;
+}
+@keyframes ledSweep {
+  0%{stroke-dashoffset:var(--pathLen);opacity:0} 3%{opacity:1} 30%{stroke-dashoffset:0;opacity:1}
+  45%{opacity:1} 50%{opacity:0} 100%{stroke-dashoffset:var(--pathLen);opacity:0}
+}
+/* Transition Classes */
+.content.to-analyzing .barsLayer { opacity: 0; transform: translateY(-50%) translateY(-6px) scale(.98); }
+.content.to-analyzing .analyzingLayer { opacity: 1; transform: translateY(-50%) translateY(0) scale(1); }
+/* --- END: New Typing & Analyzing Animations --- */
   
   /* make image preview reasonably large and clear */
 .att-image {
@@ -2531,80 +2536,87 @@ function parsePuterResult(res) {
   }
 }
       
-       // === sendAttachmentNow (fixed clean) ===
+      // === sendAttachmentNow (FINAL VERSION WITH NEW ANIMATIONS) ===
 async function sendAttachmentNow() {
   try {
     if (!pendingAttachment) return;
     if (pendingAttachment._sending) return;
 
-    // If upload already finished and we have remote URL -> send immediately
-    if (pendingAttachment.uploadState === 'done' && pendingAttachment.url) {
-      const text = (composer.value || '').trim();
-      const userMessage = {
-        id: genId(),
-        role: 'user',
-        content: text || '',
-        attachment: {
-          id: pendingAttachment.id,
-          url: pendingAttachment.url,
-          filename: pendingAttachment.filename || pendingAttachment.name,
-          mime_type: pendingAttachment.mime_type || pendingAttachment.type || ''
-        },
-        conversation_id: currentConversationId || null,
-        meta: {}
-      };
+    const text = (composer.value || '').trim();
+    const userMessage = {
+      id: genId(),
+      role: 'user',
+      content: text || '',
+      attachment: {
+        id: pendingAttachment.id,
+        url: pendingAttachment.url || pendingAttachment.src,
+        filename: pendingAttachment.filename || pendingAttachment.name,
+        mime_type: pendingAttachment.mime_type || pendingAttachment.type || ''
+      },
+      conversation_id: currentConversationId || null,
+      meta: {}
+    };
 
-      // append locally
-      messages.push(userMessage);
-      appendMessage(userMessage, messages.length - 1);
-      saveSession();
-      updateWelcomeVisibility(); // <-- هذا هو السطر الجديد والمهم
+    // 1. عرض رسالة المستخدم ومسح حقل الكتابة
+    messages.push(userMessage);
+    appendMessage(userMessage, messages.length - 1);
+    saveSession();
+    updateWelcomeVisibility();
+    composer.value = '';
+    updateSendVisibility();
+    autoGrowTextarea();
 
-      // clear composer & preview
-      composer.value = '';
-      updateSendVisibility();
-      autoGrowTextarea();
-      try { if (pendingAttachment && pendingAttachment._objectUrl) URL.revokeObjectURL(pendingAttachment._objectUrl); } catch(e){}
+    // 2. بدء نظام الحركة الجديد الخاص بالمرفقات
+    clearIndicator(); 
+    const indicator = showTyping(); // إظهار حركة الأعمدة
+    const randomDelay = 3000 + Math.random() * 2000;
+    indicatorTimers.push(setTimeout(() => {
+        setToAnalyzing(indicator); // التحول إلى حركة "Analyzing"
+    }, randomDelay));
 
-      // send to backend
-      postMessageToServer(userMessage).catch(err => {
+    // 3. انتظار اكتمال الرفع إذا لم يكن قد اكتمل بعد
+    if (pendingAttachment.uploadState !== 'done') {
+        await uploadFileToServer(pendingAttachment.file, (pct) => {});
+    }
+    
+    postMessageToServer(userMessage).catch(err => {
         console.warn('postMessageToServer failed for attachment message', err);
         scheduleSync();
-      });
+    });
+    
+    clearPreview();
+    pendingAttachment = null;
 
-      // clear preview + reset
-      clearPreview();
-      pendingAttachment = null;
-
-      // === تحليل المرفق بعد الإرسال ===
-      const attached = userMessage.attachment || null;
-      try {
-        const userText = (userMessage.content && String(userMessage.content).trim()) ? String(userMessage.content).trim() : null;
-        let analysisText = null;
-
-        if (attached && attached.mime_type && attached.mime_type.startsWith('image/')) {
-          analysisText = await analyzeImageWithPuter(attached.url || attached.src || attached.filename || attached.id, userText);
-        } else if (attached) {
-          analysisText = await analyzeFileWithPuter(attached.url || attached.src || attached.filename || attached.id, userText);
-        }
-
-        if (analysisText) {
-          // append assistant message once، نص نظيف
-          const botMsg = { id: genId(), role: 'assistant', content: String(analysisText).slice(0,15000), meta: {} };
-          messages.push(botMsg);
-          appendMessage(botMsg, messages.length - 1);
-          try { saveSession(); } catch(_) {}
-        } else {
-          // لا توجد نتيجة من المحلل — استعمل مولد الرد الافتراضي
-          regenerateAssistantForParent(messages.length - 1);
-        }
-      } catch (err) {
-        console.warn('attachment analysis failed', err);
-        regenerateAssistantForParent(messages.length - 1);
-      }
-
-      return;
+    // 4. تحليل المرفق وانتظار الرد النهائي
+    const attached = userMessage.attachment || null;
+    let analysisText = null;
+    
+    if (attached && attached.mime_type && attached.mime_type.startsWith('image/')) {
+        analysisText = await analyzeImageWithPuter(attached.url, userMessage.content);
+    } else if (attached) {
+        analysisText = await analyzeFileWithPuter(attached.url, userMessage.content);
     }
+
+    // 5. إزالة مؤشر الحركة قبل عرض الرد
+    clearIndicator(); 
+
+    if (analysisText) {
+        const botMsg = { id: genId(), role: 'assistant', content: analysisText, meta: {} };
+        messages.push(botMsg);
+        appendMessage(botMsg, messages.length - 1);
+        saveSession();
+    } else {
+        regenerateAssistantForParent(messages.length - 1);
+    }
+
+  } catch (e) {
+    console.error('sendAttachmentNow error', e);
+    toast('Send failed');
+    clearIndicator(); // تأكد من إزالة المؤشر عند حدوث خطأ
+  } finally {
+    try { if (pendingAttachment) pendingAttachment._sending = false; } catch (e) {}
+  }
+}
 
     // If still uploading -> mark sendOnComplete and ask user to wait
     if (pendingAttachment.uploadState === 'uploading' || pendingAttachment.uploadState === 'pending') {
@@ -3412,46 +3424,79 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
         messagesEl.scrollTop = messagesEl.scrollHeight;
       }
 
+      let currentIndicator = null;
+let indicatorTimers = [];
+
+function clearIndicator() {
+    indicatorTimers.forEach(id => clearTimeout(id));
+    indicatorTimers = [];
+    const indicator = messagesEl.querySelector('.typing-indicator');
+    if (indicator) {
+        indicator.remove();
+    }
+    currentIndicator = null;
+}
+
+function setToAnalyzing(indicator) {
+    if (!indicator) return;
+    const content = indicator.querySelector('.content.typing');
+    if (content) {
+        content.classList.add('to-analyzing');
+    }
+}
+
       // Typing indicator (supports text like "Analyzing file..." or "Analyzing image...")
       function showTyping(type = "default"){
-        // ابحث عن أي مؤشر قديم واحذفه
-        const oldTyping = messagesEl.querySelector('.typing-indicator');
-        if (oldTyping) oldTyping.remove();
+  clearIndicator();
 
-        // أنشئ الحاوية الرئيسية للمؤشر
-        const typing = document.createElement('div');
-        typing.className = 'msg assistant typing-indicator show';
+  const msg = document.createElement('div');
+  msg.className = 'msg assistant typing-indicator show';
 
-        // أدخل الـ HTML الجديد الخاص بحركة الأعمدة
-        typing.innerHTML = `
-          <div class="bubble">
-            <div class="content typing">
-              <div class="indicatorInner">
-                <div class="barsLayer">
-                  <div class="bars">
-                    <span class="bar"></span>
-                    <span class="bar"></span>
-                    <span class="bar"></span>
-                    <span class="bar"></span>
-                    <span class="bar"></span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>`;
+  const content = document.createElement('div');
+  content.className = 'content typing';
 
-        messagesEl.appendChild(typing);
-        
-        // هذا الجزء جاهز للاستخدام في الخطوات القادمة
-        if (type === "analyzing") {
-          const content = typing.querySelector('.content.typing');
-          if (content) {
-              // سنضيف المنطق هنا لاحقًا
-          }
-        }
+  const inner = document.createElement('div');
+  inner.className = 'indicatorInner';
 
-        return typing;
+  // طبقة الأعمدة
+  const barsLayer = document.createElement('div');
+  barsLayer.className = 'barsLayer';
+  barsLayer.innerHTML = `<div class="bars"><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span></div>`;
+
+  // طبقة التحليل
+  const analyzingLayer = document.createElement('div');
+  analyzingLayer.className = 'analyzingLayer';
+  const gradId = 'ledGrad-' + Date.now();
+  analyzingLayer.innerHTML = `
+      <span class="analyzingText">Analyzing</span>
+      <svg class="led-svg" viewBox="0 0 260 56">
+        <defs><linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="var(--accent)"></stop><stop offset="100%" stop-color="#00aaff"></stop></linearGradient></defs>
+        <rect class="led-path" x="6" y="6" width="248" height="44" rx="10" ry="10" stroke="url(#${gradId})"></rect>
+      </svg>`;
+
+  inner.appendChild(barsLayer);
+  inner.appendChild(analyzingLayer);
+  content.appendChild(inner);
+  msg.appendChild(content);
+  messagesEl.appendChild(msg);
+
+  // حساب وتثبيت العرض لمنع القفز
+  requestAnimationFrame(() => {
+      const barsW = barsLayer.getBoundingClientRect().width || 0;
+      const analyW = analyzingLayer.getBoundingClientRect().width || 0;
+      inner.style.width = Math.ceil(Math.max(barsW, analyW) + 12) + 'px';
+
+      const path = msg.querySelector('.led-path');
+      if (path && typeof path.getTotalLength === 'function') {
+          const pathLen = Math.round(path.getTotalLength());
+          path.style.setProperty('--pathLen', pathLen);
+          path.style.strokeDashoffset = pathLen;
       }
+  });
+
+  currentIndicator = msg;
+  return msg;
+}
 
       // Safe fallback for simulatedAssistantReply if not defined elsewhere
       function simulatedAssistantReply(text){
@@ -3483,8 +3528,11 @@ async function sendMessage(text, parentIndex = null) {
         scheduleSync();
     });
 
-    const typingEl = showTyping();
-    messagesEl.scrollTop = messagesEl.scrollHeight;
+    // 1. إظهار حركة الأعمدة الجديدة
+    clearIndicator();
+    showTyping(); 
+
+    const isUserAtBottomInitially = messagesEl.scrollHeight - messagesEl.clientHeight <= messagesEl.scrollTop + 20;
 
     let assistantEl = null;
     let bubbleEl = null;
@@ -3498,13 +3546,8 @@ async function sendMessage(text, parentIndex = null) {
             const piece = part.text || (part.message && part.message.content) || '';
             if (!piece) continue;
 
-            // --- START: تعديل التمرير الحر ---
-            // 1. تحقق من موضع التمرير داخل الحلقة باستمرار
-            const isUserAtBottom = messagesEl.scrollHeight - messagesEl.clientHeight <= messagesEl.scrollTop + 20;
-            // --- END: تعديل التمرير الحر ---
-
             if (isFirstChunk) {
-                if (typingEl) typingEl.remove();
+                clearIndicator(); // 2. إزالة المؤشر عند وصول أول جزء من الرد
                 assistantMessage = { id: genId(), role: 'assistant', content: '', parent: messages.length - 1, meta: {} };
                 messages.push(assistantMessage);
                 assistantEl = createMessageElement(assistantMessage, messages.length - 1);
@@ -3519,13 +3562,11 @@ async function sendMessage(text, parentIndex = null) {
                 bubbleEl.innerHTML = marked.parse(assistantMessage.content);
                 enhanceCodeBlocks(bubbleEl);
             }
-
-            // --- START: تعديل التمرير الحر ---
-            // 2. قم بالتمرير للأسفل فقط إذا كان المستخدم في الأسفل
-            if (isUserAtBottom) {
+            
+            // 3. التمرير للأسفل فقط إذا كان المستخدم قد بدأ من الأسفل
+            if (isUserAtBottomInitially) {
                 messagesEl.scrollTop = messagesEl.scrollHeight;
             }
-            // --- END: تعديل التمرير الحر ---
         }
 
         if (assistantEl) {
@@ -3536,7 +3577,7 @@ async function sendMessage(text, parentIndex = null) {
 
     } catch (error) {
         console.error("Puter.js Error:", error);
-        if (typingEl) typingEl.remove();
+        clearIndicator(); // 4. إزالة المؤشر عند حدوث خطأ
         const errorMsg = { id: genId(), role: 'assistant', content: 'عذرًا، حدث خطأ ما.', meta: {} };
         appendMessage(errorMsg, messages.length);
     }
