@@ -107,7 +107,10 @@ body.dark-mode .chat-header { background: linear-gradient(90deg, rgba(47,129,247
 body.dark-mode .persona-name, body.dark-mode .small, body.dark-mode .kebab-btn, body.dark-mode .back-btn { color: #e6edf3; }
 body.dark-mode .persona-desc { color: #8b949e; }
 body.dark-mode .messages { background: linear-gradient(180deg, rgba(31,36,44,0), rgba(31,36,44,0.4)); }
-body.dark-mode .msg.assistant { background: #2a3038; }
+body.dark-mode .msg.assistant {
+  background: transparent; /* <--- التأكد من أنها شفافة دائمًا */
+  color: #e6edf3; /* الحفاظ على لون النص الفاتح */
+}
 body.dark-mode .msg .bubble { color: #e6edf3; }
 body.dark-mode .composer { background: #161b22; border-top: 1px solid #30363d; box-shadow: 0 -6px 18px rgba(0,0,0,0.2); }
 body.dark-mode .input-field { background: #21262d; color: #e6edf3; border-color: rgba(139,148,158,0.2); box-shadow: inset 0 2px 8px rgba(0,0,0,0.2); }
@@ -690,14 +693,39 @@ body.dark-mode .barsLayer .bar {
     max-width: 100%;
   }
   .msg.show{ opacity:1; transform:translateY(0); }
-  .msg.user{ width: fit-content; /* <-- هذا هو السطر الجديد والمهم */ align-self:flex-end; background:linear-gradient(90deg,var(--accent),#00aaff); color:white; border-bottom-right-radius:6px; z-index: 14030; }
+  /* تصميم فقاعة المستخدم الجديدة */
+.msg.user {
+  width: fit-content;
+  align-self: flex-end;
+  /* اللون الجديد: رمادي فاتح */
+  background: #eef2f5; 
+  /* لون نص داكن ليناسب الخلفية الفاتحة */
+  color: #1f2328; 
+  border-bottom-right-radius: 6px;
+  z-index: 14030;
+}
+
+/* تصميم فقاعة المستخدم في الوضع الداكن */
+body.dark-mode .msg.user {
+  /* لون رمادي داكن للوضع المظلم */
+  background: #2a3038;
+  /* لون نص فاتح كالمعتاد */
+  color: #e6edf3;
+}
   /* Fix for user bubble width with Markdown */
 .msg.user .bubble p {
   margin: 0;
   display: inline-block;
   text-align: left; /* To ensure text inside aligns correctly */
 }
-  .msg.assistant{ align-self:flex-start; background: #fff; color:#0b2633; border-bottom-left-radius:6px; z-index: 1; }
+  .msg.assistant{ 
+  align-self:flex-start; 
+  background: transparent; /* <--- جعل الخلفية شفافة */
+  box-shadow: none; /* <--- إزالة الظل */
+  color:#0b2633; 
+  border-bottom-left-radius:6px; 
+  z-index: 1; 
+}
   .msg-actions{
     display:flex; align-items:center; gap:6px; margin-top:6px; opacity:.95;
   }
