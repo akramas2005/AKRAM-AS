@@ -301,10 +301,22 @@ body.dark-mode .barsLayer .bar { background: #6e7681; }
   40% { transform: scaleY(1); opacity: 1; }
   80% { transform: scaleY(.78); opacity: .85; }
 }
-/* Analyzing Layer Styles */
-.analyzingLayer { opacity: 0; transform: translateY(-50%) translateY(4px) scale(.98); }
+/* Analyzing Layer Styles - CORRECTED LAYOUT */
+.analyzingLayer {
+  opacity: 0;
+  transform: translateY(-50%) translateY(4px) scale(.98);
+  /* تعديل مهم: سنجعلها حاوية نسبية لتوسيط العناصر بداخلها */
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 160px; /* عرض أكبر قليلًا ليناسب النص الأطول */
+  height: 44px;
+}
 .analyzingText {
-  font-weight: 700; font-size: 14px;
+  font-weight: 700;
+  font-size: 14px;
+  /* بقية الخصائص كما هي */
   background: linear-gradient(90deg, #6e7681 20%, #b0b8c0 50%, #6e7681 80%);
   background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
   animation: waveMoveText 2.5s linear infinite;
@@ -314,12 +326,22 @@ body.dark-mode .analyzingText {
   background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
 }
 @keyframes waveMoveText { to { background-position: -200% center; } }
-.led-svg { width: 140px; height: 28px; overflow: visible; }
+
+.led-svg {
+  /* تعديل مهم: نجعله مطلقًا ليكون خلف النص */
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
 .led-path {
   fill: none; stroke-width: 3; stroke-linecap: round;
   filter: drop-shadow(0 0 8px rgba(0, 120, 255, 0.32));
-  stroke-dasharray: 8 600; /* سيتم تحديثه بـ JS */
-  stroke-dashoffset: 600; /* سيتم تحديثه بـ JS */
+  stroke-dasharray: 8 600;
+  stroke-dashoffset: 600;
   animation: ledSweep 4s linear infinite;
 }
 @keyframes ledSweep {
@@ -3337,40 +3359,50 @@ function setToAnalyzing(indicator) {
 
   const msg = document.createElement('div');
   msg.className = 'msg assistant typing-indicator show';
-  
-  // ... (بقية كود بناء الأنيميشن يبقى كما هو) ...
   const content = document.createElement('div');
   content.className = 'content typing';
   const inner = document.createElement('div');
   inner.className = 'indicatorInner';
+
   const barsLayer = document.createElement('div');
   barsLayer.className = 'barsLayer';
   barsLayer.innerHTML = `<div class="bars"><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span></div>`;
+
+  // --- START: Dynamic Text Logic ---
+  let analyzingLabel = 'Analyzing'; // النص الافتراضي
+  if (type === 'image') {
+      analyzingLabel = 'Analyzing Image';
+  } else if (type === 'file') {
+      analyzingLabel = 'Analyzing File';
+  }
+  // --- END: Dynamic Text Logic ---
+
   const analyzingLayer = document.createElement('div');
   analyzingLayer.className = 'analyzingLayer';
   const gradId = 'ledGrad-' + Date.now();
+  // استخدام النص الديناميكي الجديد هنا
   analyzingLayer.innerHTML = `
-      <span class="analyzingText">Analyzing</span>
-      <svg class="led-svg" viewBox="0 0 260 56">
+      <span class="analyzingText">${analyzingLabel}</span>
+      <svg class="led-svg" viewBox="0 0 160 44">
         <defs><linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="var(--accent)"></stop><stop offset="100%" stop-color="#00aaff"></stop></linearGradient></defs>
-        <rect class="led-path" x="6" y="6" width="248" height="44" rx="10" ry="10" stroke="url(#${gradId})"></rect>
+        <rect class="led-path" x="2" y="2" width="156" height="40" rx="10" ry="10" stroke="url(#${gradId})"></rect>
       </svg>`;
+
   inner.appendChild(barsLayer);
   inner.appendChild(analyzingLayer);
   content.appendChild(inner);
   msg.appendChild(content);
   messagesEl.appendChild(msg);
 
-  requestAnimationFrame(() => { /* ... (نفس كود حساب العرض) ... */ });
+  requestAnimationFrame(() => {
+      const barsW = barsLayer.getBoundingClientRect().width || 0;
+      const analyW = analyzingLayer.getBoundingClientRect().width || 0;
+      inner.style.width = Math.ceil(Math.max(barsW, analyW) + 24) + 'px'; // زيادة المساحة قليلًا
+  });
 
-  // --- START: إعادة منطق التحليل الناجح ---
-  // إذا كان النوع "صورة" أو "ملف"، قم بالتحول إلى "Analyzing" بعد فترة
-  if (type === "file" || type === "image") {
-    const randomDelay = 3000 + Math.random() * 2000;
-    indicatorTimers.push(setTimeout(() => {
-        setToAnalyzing(msg);
-    }, randomDelay));
-  }
+  currentIndicator = msg;
+  return msg;
+}
   // --- END: إعادة منطق التحليل الناجح ---
 
   currentIndicator = msg;
