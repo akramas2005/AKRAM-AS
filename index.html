@@ -279,6 +279,83 @@ body.dark-mode .code-block-container.collapsed pre::after {
   cursor: pointer;
 }
 
+  /* Adjust action icon positions for bubble-less design */
+.msg-actions {
+    margin-top: 0;
+    margin-left: -6px; /* تقريب الأيقونات من النص */
+}
+.user-actions {
+    bottom: 0px; /* ضبط الموضع العمودي */
+}
+.msg.user .bubble p {
+    /* التأكد من أن نص المستخدم يبقى على اليمين */
+    text-align: right;
+}
+
+  /* --- START: New Typing & Analyzing Animations --- */
+.msg .content.typing {
+    padding: 6px 0;
+    margin: 0;
+    position: relative;
+    min-height: 40px; /* ارتفاع لضمان عدم القفز */
+}
+.indicatorInner {
+    position: absolute;
+    top: 50%;
+    left: 0; /* سيبدأ من اليسار لرسائل المساعد */
+    transform: translateY(-50%);
+    height: 36px;
+    pointer-events: none;
+    overflow: visible;
+}
+.msg.user .indicatorInner { /* لا ينطبق حاليًا ولكن للاستخدام المستقبلي */
+    left: auto;
+    right: 0;
+}
+.barsLayer, .analyzingLayer {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    white-space: nowrap;
+    transition: opacity 260ms ease, transform 260ms ease;
+}
+.barsLayer .bars { display:inline-flex; align-items:flex-end; gap:6px; height:20px; }
+.barsLayer .bar { width:4px; height:14px; background: #aab5c0; border-radius:3px; transform-origin:bottom; animation:bounce 1s infinite ease-in-out; }
+body.dark-mode .barsLayer .bar { background: #6e7681; }
+.barsLayer .bar:nth-child(1){ animation-delay:-0.9s }
+.barsLayer .bar:nth-child(2){ animation-delay:-0.7s }
+.barsLayer .bar:nth-child(3){ animation-delay:-0.5s }
+.barsLayer .bar:nth-child(4){ animation-delay:-0.3s }
+.barsLayer .bar:nth-child(5){ animation-delay:-0.1s }
+@keyframes bounce { 0%,100%{ transform:scaleY(.38); opacity:.6 } 40%{ transform:scaleY(1); opacity:1 } 80%{ transform:scaleY(.78); opacity:.85 } }
+.analyzingLayer { opacity: 0; transform: translateY(-50%) translateY(4px) scale(.98); }
+.analyzingText {
+  font-weight: 700; font-size: 14px;
+  background: linear-gradient(90deg, #aab5c0 20%, #6e7681 50%, #aab5c0 80%);
+  background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  animation: waveMoveText 2.5s linear infinite;
+}
+body.dark-mode .analyzingText {
+  background: linear-gradient(90deg, #e6edf3 20%, #8b949e 50%, #e6edf3 80%);
+  background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+}
+@keyframes waveMoveText { to { background-position: -200% center; } }
+.led-svg { width: 140px; height: 28px; overflow: visible; }
+.led-path {
+  fill: none; stroke-width: 3; stroke-linecap: round;
+  stroke-dasharray: 8 600; /* سيتم تحديثه بـ JS */
+  stroke-dashoffset: 600; /* سيتم تحديثه بـ JS */
+  animation: ledSweep 4s linear infinite;
+}
+@keyframes ledSweep { 0%{stroke-dashoffset:var(--pathLen);opacity:0} 3%{opacity:1} 30%{stroke-dashoffset:0;opacity:1} 45%{opacity:1} 50%{opacity:0} 100%{stroke-dashoffset:var(--pathLen);opacity:0} }
+.content.to-analyzing .barsLayer { opacity: 0; transform: translateY(-50%) translateY(-6px) scale(.98); }
+.content.to-analyzing .analyzingLayer { opacity: 1; transform: translateY(-50%) translateY(0) scale(1); }
+/* --- END: New Typing & Analyzing Animations --- */
+
 /* file icon extension label */
 .file-icon {
   display:flex;
@@ -625,21 +702,22 @@ body.dark-mode .code-block-container.collapsed pre::after {
     will-change: transform, opacity;
   }
   .msg .bubble{
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-    word-break: break-word;
-    hyphens: auto;
-    max-width: 100%;
-  }
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  hyphens: auto;
+  max-width: 100%;
+  padding: 4px 0; /* تعديل الهوامش العمودية */
+}
   .msg.show{ opacity:1; transform:translateY(0); }
-  .msg.user{ width: fit-content; /* <-- هذا هو السطر الجديد والمهم */ align-self:flex-end; background:linear-gradient(90deg,var(--accent),#00aaff); color:white; border-bottom-right-radius:6px; z-index: 14030; }
+  .msg.user{ width: fit-content; /* <-- هذا هو السطر الجديد والمهم */ align-self:flex-end; }
   /* Fix for user bubble width with Markdown */
 .msg.user .bubble p {
   margin: 0;
   display: inline-block;
   text-align: left; /* To ensure text inside aligns correctly */
 }
-  .msg.assistant{ align-self:flex-start; background: #fff; color:#0b2633; border-bottom-left-radius:6px; z-index: 1; }
+  .msg.assistant{ align-self:flex-start; }
   .msg-actions{
     display:flex; align-items:center; gap:6px; margin-top:6px; opacity:.95;
   }
@@ -2445,203 +2523,89 @@ function parsePuterResult(res) {
   }
 }
       
-       // === sendAttachmentNow (fixed clean) ===
+      // === sendAttachmentNow (FINAL VERSION WITH NEW ANIMATIONS) ===
 async function sendAttachmentNow() {
-  try {
-    if (!pendingAttachment) return;
-    if (pendingAttachment._sending) return;
+    try {
+        if (!pendingAttachment) return;
+        if (pendingAttachment._sending) return;
 
-    // If upload already finished and we have remote URL -> send immediately
-    if (pendingAttachment.uploadState === 'done' && pendingAttachment.url) {
-      const text = (composer.value || '').trim();
-      const userMessage = {
-        id: genId(),
-        role: 'user',
-        content: text || '',
-        attachment: {
-          id: pendingAttachment.id,
-          url: pendingAttachment.url,
-          filename: pendingAttachment.filename || pendingAttachment.name,
-          mime_type: pendingAttachment.mime_type || pendingAttachment.type || ''
-        },
-        conversation_id: currentConversationId || null,
-        meta: {}
-      };
+        // Combine the logic for both uploaded and non-uploaded files
+        const text = (composer.value || '').trim();
+        const userMessage = {
+            id: genId(),
+            role: 'user',
+            content: text || '',
+            attachment: {
+                id: pendingAttachment.id,
+                url: pendingAttachment.url || pendingAttachment.src,
+                filename: pendingAttachment.filename || pendingAttachment.name,
+                mime_type: pendingAttachment.mime_type || pendingAttachment.type || ''
+            },
+            conversation_id: currentConversationId || null,
+            meta: {}
+        };
 
-      // append locally
-      messages.push(userMessage);
-      appendMessage(userMessage, messages.length - 1);
-      saveSession();
-      updateWelcomeVisibility(); // <-- هذا هو السطر الجديد والمهم
+        // Append user message and clear the composer
+        messages.push(userMessage);
+        appendMessage(userMessage, messages.length - 1);
+        saveSession();
+        updateWelcomeVisibility();
+        composer.value = '';
+        updateSendVisibility();
+        autoGrowTextarea();
 
-      // clear composer & preview
-      composer.value = '';
-      updateSendVisibility();
-      autoGrowTextarea();
-      try { if (pendingAttachment && pendingAttachment._objectUrl) URL.revokeObjectURL(pendingAttachment._objectUrl); } catch(e){}
+        // --- START: New Animation Logic ---
+        clearIndicator(); // امسح أي مؤشر قديم
+        const indicator = showTyping(); // 1. إظهار حركة الأعمدة
+        const randomDelay = 3000 + Math.random() * 2000; // 2. حساب تأخير عشوائي
+        indicatorTimers.push(setTimeout(() => {
+            setToAnalyzing(indicator); // 3. التحول إلى حركة التحليل
+        }, randomDelay));
+        // --- END: New Animation Logic ---
 
-      // send to backend
-      postMessageToServer(userMessage).catch(err => {
-        console.warn('postMessageToServer failed for attachment message', err);
-        scheduleSync();
-      });
-
-      // clear preview + reset
-      clearPreview();
-      pendingAttachment = null;
-
-      // === تحليل المرفق بعد الإرسال ===
-      const attached = userMessage.attachment || null;
-      try {
-        const userText = (userMessage.content && String(userMessage.content).trim()) ? String(userMessage.content).trim() : null;
-        let analysisText = null;
-
-        if (attached && attached.mime_type && attached.mime_type.startsWith('image/')) {
-          analysisText = await analyzeImageWithPuter(attached.url || attached.src || attached.filename || attached.id, userText);
-        } else if (attached) {
-          analysisText = await analyzeFileWithPuter(attached.url || attached.src || attached.filename || attached.id, userText);
+        // Wait for upload if it's not done yet
+        if (pendingAttachment.uploadState !== 'done') {
+            await uploadFileToServer(pendingAttachment.file, (pct) => {
+                // You can update a progress bar here if you want in the future
+            });
         }
-
-        if (analysisText) {
-          // append assistant message once، نص نظيف
-          const botMsg = { id: genId(), role: 'assistant', content: String(analysisText).slice(0,15000), meta: {} };
-          messages.push(botMsg);
-          appendMessage(botMsg, messages.length - 1);
-          try { saveSession(); } catch(_) {}
-        } else {
-          // لا توجد نتيجة من المحلل — استعمل مولد الرد الافتراضي
-          regenerateAssistantForParent(messages.length - 1);
-        }
-      } catch (err) {
-        console.warn('attachment analysis failed', err);
-        regenerateAssistantForParent(messages.length - 1);
-      }
-
-      return;
-    }
-
-    // If still uploading -> mark sendOnComplete and ask user to wait
-    if (pendingAttachment.uploadState === 'uploading' || pendingAttachment.uploadState === 'pending') {
-      pendingAttachment.sendOnComplete = true;
-      toast('Waiting for upload to complete...');
-      return;
-    }
-
-    if (pendingAttachment.uploadState === 'failed') {
-      toast('Upload failed — please retry or remove the attachment');
-      return;
-    }
-
-    // Otherwise — perform the upload now (fallback).
-    pendingAttachment._sending = true;
-    let uploadResult = null;
-
-    if (pendingAttachment && pendingAttachment.file) {
-      try {
-        toast('Uploading file...');
-        try { if (pendingAttachment._uploadInterval) { clearInterval(pendingAttachment._uploadInterval); pendingAttachment._uploadInterval = null; } } catch(e){}
-        const rectEl = pendingAttachment._rect || null;
-        const outerEl = pendingAttachment._outer || null;
-        if (outerEl) { outerEl.classList.remove('upload-failed','upload-complete'); outerEl.classList.add('uploading'); }
-
-        uploadResult = await uploadFileToServer(pendingAttachment.file, (pct, loaded, total) => {
-          try {
-            pendingAttachment.progress = pct;
-            pendingAttachment.uploadState = 'uploading';
-            if (rectEl && typeof rectEl.getTotalLength === 'function') {
-              const len = rectEl.getTotalLength();
-              const draw = Math.max(0, Math.round(len * (1 - (pct/100))));
-              rectEl.style.strokeDashoffset = draw;
-            }
-          } catch(e){}
+        
+        postMessageToServer(userMessage).catch(err => {
+            console.warn('postMessageToServer failed for attachment message', err);
+            scheduleSync();
         });
-      } catch (err) {
-        console.warn('uploadFileToServer failed', err);
-        pendingAttachment.uploadState = 'failed';
-        pendingAttachment.progress = 0;
-        try { if (pendingAttachment._outer) { pendingAttachment._outer.classList.remove('uploading'); pendingAttachment._outer.classList.add('upload-failed'); } } catch(e){}
-        toast('Upload failed — message will be queued locally and retried');
-      }
-    }
 
-    // After upload: build message + send
-    if (uploadResult || (pendingAttachment.uploadState === 'done' && pendingAttachment.url)) {
-      const res = uploadResult || pendingAttachment._uploadResult || {};
-      pendingAttachment.uploadState = 'done';
-      pendingAttachment.progress = 100;
-      pendingAttachment.id = pendingAttachment.id || res.id;
-      pendingAttachment.url = pendingAttachment.url || res.url;
-      pendingAttachment.filename = pendingAttachment.filename || res.filename || pendingAttachment.name;
-      pendingAttachment.mime_type = pendingAttachment.mime_type || res.mime_type || pendingAttachment.type;
-
-      const text = (composer.value || '').trim();
-      const userMessage = {
-        id: genId(),
-        role: 'user',
-        content: text || '',
-        attachment: {
-          id: pendingAttachment.id,
-          url: pendingAttachment.url,
-          filename: pendingAttachment.filename,
-          mime_type: pendingAttachment.mime_type
-        },
-        meta: {}
-      };
-
-     // append locally
-      messages.push(userMessage);
-      appendMessage(userMessage, messages.length - 1);
-      saveSession();
-      updateWelcomeVisibility(); // <-- هذا هو السطر الجديد والمهم
-
-      // clear composer & preview
-      composer.value = '';
-      updateSendVisibility();
-      autoGrowTextarea();
-      try { if (pendingAttachment && pendingAttachment._objectUrl) URL.revokeObjectURL(pendingAttachment._objectUrl); } catch(e){}
-
-      // persist to server
-      postMessageToServer(userMessage).catch(err => {
-        console.warn('postMessageToServer failed for attachment message', err);
-        scheduleSync();
-      });
-
-      // cleanup
-      clearPreview();
-      pendingAttachment = null;
-
-      // assistant reply (same logic as above) - pass user text
-      try {
-        const userText = (userMessage.content && String(userMessage.content).trim()) ? String(userMessage.content).trim() : null;
-        let analysisText = null;
+        // Clear the file preview
+        clearPreview();
+        pendingAttachment = null;
+        
+        // Analyze the attachment and get the bot's response
         const attached = userMessage.attachment || null;
-
+        let analysisText = null;
         if (attached && attached.mime_type && attached.mime_type.startsWith('image/')) {
-          analysisText = await analyzeImageWithPuter(attached.url || attached.src || attached.filename || attached.id, userText);
+            analysisText = await analyzeImageWithPuter(attached.url, userMessage.content);
         } else if (attached) {
-          analysisText = await analyzeFileWithPuter(attached.url || attached.src || attached.filename || attached.id, userText);
+            analysisText = await analyzeFileWithPuter(attached.url, userMessage.content);
         }
+
+        clearIndicator(); // <-- إزالة المؤشر قبل عرض الرد
 
         if (analysisText) {
-          const botMsg = { id: genId(), role: 'assistant', content: String(analysisText).slice(0,15000), meta: {} };
-          messages.push(botMsg);
-          appendMessage(botMsg, messages.length - 1);
-          try { saveSession(); } catch(_) {}
+            const botMsg = { id: genId(), role: 'assistant', content: analysisText, meta: {} };
+            messages.push(botMsg);
+            appendMessage(botMsg, messages.length - 1);
+            saveSession();
         } else {
-          regenerateAssistantForParent(messages.length - 1);
+            regenerateAssistantForParent(messages.length - 1);
         }
-      } catch (err) {
-        console.warn('attachment analysis failed', err);
-        regenerateAssistantForParent(messages.length - 1);
-      }
-    }
 
-  } catch (e) {
-    console.error('sendAttachmentNow error', e);
-    toast('Send failed');
-  } finally {
-    try { if (pendingAttachment) pendingAttachment._sending = false; } catch(e){}
-  }
+    } catch (e) {
+        console.error('sendAttachmentNow error', e);
+        toast('Send failed');
+        clearIndicator(); // تأكد من إزالة المؤشر عند حدوث خطأ
+    } finally {
+        try { if (pendingAttachment) pendingAttachment._sending = false; } catch (e) {}
+    }
 }
       document.addEventListener('click', (e)=>{ if(attachPanel.classList.contains('open') && !attachPanel.contains(e.target) && !attachBtn.contains(e.target)) closeAttach(); }, true);
 
@@ -3327,40 +3291,53 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
       }
 
       // Typing indicator (supports text like "Analyzing file..." or "Analyzing image...")
-function showTyping(type = "default"){
-  // 🔹 احذف أي مؤشر كتابة قديم
-  const oldTyping = messagesEl.querySelector('.typing');
-  if (oldTyping && oldTyping.parentNode) {
-    oldTyping.parentNode.removeChild(oldTyping);
-  }
+function showTyping(type = "default") {
+    clearIndicator(); // امسح أي مؤشر قديم
 
-  const typing = document.createElement('div');
-  typing.className = 'typing msg assistant show';
-  typing.setAttribute("dir","auto"); // ✅ يخلي النصوص المختلطة عربية+إنجليزية منظمة
+    const msg = document.createElement('div');
+    msg.className = 'msg assistant typing-indicator'; // كلاس جديد للتعرف عليه
 
-  // الوضع العادي (النقاط)
-  typing.innerHTML = `<div class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>`;
-  messagesEl.appendChild(typing);
+    const content = document.createElement('div');
+    content.className = 'content typing';
 
-  try {
-    if (typeof autoScrollEnabled === 'undefined' || autoScrollEnabled) {
-      messagesEl.scrollTop = messagesEl.scrollHeight;
-    }
-  } catch(e){}
+    const inner = document.createElement('div');
+    inner.className = 'indicatorInner';
 
- // ✅ لو المرفق صورة أو ملف: نغير بعد وقت قصير
-if(type === "file" || type === "image"){
-  const delay = 3000 + Math.random()*2000; // 3-5 ثواني
-  setTimeout(()=>{
-    if(type === "file"){
-      typing.innerHTML = `<div class="analyzing">Analyzing file...</div>`;
-    } else if(type === "image"){
-      typing.innerHTML = `<div class="analyzing">Analyzing image...</div>`;
-    }
-  }, delay);
-}
+    const barsLayer = document.createElement('div');
+    barsLayer.className = 'barsLayer';
+    barsLayer.innerHTML = `<div class="bars"><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span></div>`;
 
-return typing;
+    const analyzingLayer = document.createElement('div');
+    analyzingLayer.className = 'analyzingLayer';
+    const gradId = 'ledGrad-' + Date.now();
+    analyzingLayer.innerHTML = `
+        <span class="analyzingText">Analyzing...</span>
+        <svg class="led-svg" viewBox="0 0 260 56">
+          <defs><linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="var(--accent)"></stop><stop offset="100%" stop-color="#00aaff"></stop></linearGradient></defs>
+          <rect class="led-path" x="6" y="6" width="248" height="44" rx="10" ry="10" stroke="url(#${gradId})"></rect>
+        </svg>`;
+
+    inner.appendChild(barsLayer);
+    inner.appendChild(analyzingLayer);
+    content.appendChild(inner);
+    msg.appendChild(content);
+    messagesEl.appendChild(msg);
+
+    requestAnimationFrame(() => {
+        const barsW = barsLayer.getBoundingClientRect().width || 0;
+        const analyW = analyzingLayer.getBoundingClientRect().width || 0;
+        inner.style.width = Math.ceil(Math.max(barsW, analyW) + 12) + 'px';
+
+        const path = msg.querySelector('.led-path');
+        if (path && typeof path.getTotalLength === 'function') {
+            const pathLen = Math.round(path.getTotalLength());
+            path.style.setProperty('--pathLen', pathLen);
+            path.style.strokeDashoffset = pathLen;
+        }
+    });
+
+    currentIndicator = msg;
+    return msg;
 }
 
 // Safe fallback for simulatedAssistantReply if not defined elsewhere
@@ -3374,183 +3351,361 @@ function simulatedAssistantReply(text){
   }
 }
 async function sendMessage(text, parentIndex = null) {
-    let textToUse = (text || '').trim();
-    if (!textToUse && !pendingAttachment) return;
 
-    if (pendingAttachment) {
-        sendAttachmentNow();
-        return;
-    }
+    let textToUse = (text || '').trim();
 
-    const userMessage = { id: genId(), role: 'user', content: textToUse, parent: parentIndex, meta: {} };
-    messages.push(userMessage);
-    appendMessage(userMessage, messages.length - 1);
-    saveSession();
-    localStorage.removeItem(DRAFT_KEY);
-    updateWelcomeVisibility();
-    postMessageToServer(userMessage).catch((err) => {
-        console.warn('postMessageToServer failed (will retry):', err);
-        scheduleSync();
-    });
+    if (!textToUse && !pendingAttachment) return;
 
-    const typingEl = showTyping();
-    messagesEl.scrollTop = messagesEl.scrollHeight;
 
-    let assistantEl = null;
-    let bubbleEl = null;
-    let assistantMessage = null;
-    let isFirstChunk = true;
 
-    try {
-        const response = await puter.ai.chat(buildChatPrompt(messages), { model: 'gpt-5-nano', stream: true });
+    if (pendingAttachment) {
 
-        for await (const part of response) {
-            const piece = part.text || (part.message && part.message.content) || '';
-            if (!piece) continue;
+        sendAttachmentNow();
 
-            // --- START: تعديل التمرير الحر ---
-            // 1. تحقق من موضع التمرير داخل الحلقة باستمرار
-            const isUserAtBottom = messagesEl.scrollHeight - messagesEl.clientHeight <= messagesEl.scrollTop + 20;
-            // --- END: تعديل التمرير الحر ---
+        return;
 
-            if (isFirstChunk) {
-                if (typingEl) typingEl.remove();
-                assistantMessage = { id: genId(), role: 'assistant', content: '', parent: messages.length - 1, meta: {} };
-                messages.push(assistantMessage);
-                assistantEl = createMessageElement(assistantMessage, messages.length - 1);
-                messagesEl.appendChild(assistantEl);
-                requestAnimationFrame(() => setTimeout(() => assistantEl.classList.add('show'), 20));
-                bubbleEl = assistantEl.querySelector('.bubble');
-                isFirstChunk = false;
-            }
+    }
 
-            assistantMessage.content += piece;
-            if (bubbleEl) {
-                bubbleEl.innerHTML = marked.parse(assistantMessage.content);
-                enhanceCodeBlocks(bubbleEl);
-            }
 
-            // --- START: تعديل التمرير الحر ---
-            // 2. قم بالتمرير للأسفل فقط إذا كان المستخدم في الأسفل
-            if (isUserAtBottom) {
-                messagesEl.scrollTop = messagesEl.scrollHeight;
-            }
-            // --- END: تعديل التمرير الحر ---
-        }
 
-        if (assistantEl) {
-            const codeBlocksToHighlight = assistantEl.querySelectorAll('pre code');
-            codeBlocksToHighlight.forEach(block => { hljs.highlightElement(block); });
-        }
-        saveSession();
+    const userMessage = { id: genId(), role: 'user', content: textToUse, parent: parentIndex, meta: {} };
 
-    } catch (error) {
-        console.error("Puter.js Error:", error);
-        if (typingEl) typingEl.remove();
-        const errorMsg = { id: genId(), role: 'assistant', content: 'عذرًا، حدث خطأ ما.', meta: {} };
-        appendMessage(errorMsg, messages.length);
-    }
+    messages.push(userMessage);
+
+    appendMessage(userMessage, messages.length - 1);
+
+    saveSession();
+
+    localStorage.removeItem(DRAFT_KEY);
+
+    updateWelcomeVisibility();
+
+    postMessageToServer(userMessage).catch((err) => {
+
+        console.warn('postMessageToServer failed (will retry):', err);
+
+        scheduleSync();
+
+    });
+
+
+
+    const typingEl = showTyping();
+
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+
+
+
+    let assistantEl = null;
+
+    let bubbleEl = null;
+
+    let assistantMessage = null;
+
+    let isFirstChunk = true;
+
+
+
+    try {
+
+        const response = await puter.ai.chat(buildChatPrompt(messages), { model: 'gpt-5-nano', stream: true });
+
+
+
+        for await (const part of response) {
+
+            const piece = part.text || (part.message && part.message.content) || '';
+
+            if (!piece) continue;
+
+
+
+            // --- START: تعديل التمرير الحر ---
+
+            // 1. تحقق من موضع التمرير داخل الحلقة باستمرار
+
+            const isUserAtBottom = messagesEl.scrollHeight - messagesEl.clientHeight <= messagesEl.scrollTop + 20;
+
+            // --- END: تعديل التمرير الحر ---
+
+
+
+            if (isFirstChunk) {
+
+                if (typingEl) typingEl.remove();
+
+                assistantMessage = { id: genId(), role: 'assistant', content: '', parent: messages.length - 1, meta: {} };
+
+                messages.push(assistantMessage);
+
+                assistantEl = createMessageElement(assistantMessage, messages.length - 1);
+
+                messagesEl.appendChild(assistantEl);
+
+                requestAnimationFrame(() => setTimeout(() => assistantEl.classList.add('show'), 20));
+
+                bubbleEl = assistantEl.querySelector('.bubble');
+
+                isFirstChunk = false;
+
+            }
+
+
+
+            assistantMessage.content += piece;
+
+            if (bubbleEl) {
+
+                bubbleEl.innerHTML = marked.parse(assistantMessage.content);
+
+                enhanceCodeBlocks(bubbleEl);
+
+            }
+
+
+
+            // --- START: تعديل التمرير الحر ---
+
+            // 2. قم بالتمرير للأسفل فقط إذا كان المستخدم في الأسفل
+
+            if (isUserAtBottom) {
+
+                messagesEl.scrollTop = messagesEl.scrollHeight;
+
+            }
+
+            // --- END: تعديل التمرير الحر ---
+
+        }
+
+
+
+        if (assistantEl) {
+
+            const codeBlocksToHighlight = assistantEl.querySelectorAll('pre code');
+
+            codeBlocksToHighlight.forEach(block => { hljs.highlightElement(block); });
+
+        }
+
+        saveSession();
+
+
+
+    } catch (error) {
+
+        console.error("Puter.js Error:", error);
+
+        if (typingEl) typingEl.remove();
+
+        const errorMsg = { id: genId(), role: 'assistant', content: 'عذرًا، حدث خطأ ما.', meta: {} };
+
+        appendMessage(errorMsg, messages.length);
+
+    }
+
 }
-      
+
+      
+
+
 
 // Regenerate assistant reply for a given parent message index
+
 async function regenerateAssistantForParent(parentIdx){
-  try {
-    // 🔹 حماية ضد الضغط المتكرر
-    if (window._regenLock) {
-      console.warn("Regenerate in progress, ignoring extra click");
-      return;
-    }
-    window._regenLock = true;
 
-    if (typeof parentIdx !== 'number' || parentIdx < 0 || !messages[parentIdx]) {
-      window._regenLock = false;
-      return;
-    }
-    const userText = String(messages[parentIdx].content || '').trim();
-    if (!userText) {
-      window._regenLock = false;
-      return;
-    }
+  try {
 
-    const assistantMessage = { id: genId(), role: 'assistant', content: '', parent: parentIdx, meta: {} };
-    messages.push(assistantMessage);
-    const assistantIdx = messages.length - 1;
-    saveSession();
+    // 🔹 حماية ضد الضغط المتكرر
 
-    // 🔹 إزالة أي typing قديم قبل إنشاء الجديد
-    const oldTyping = messagesEl.querySelector('.typing');
-    if (oldTyping && oldTyping.parentNode) {
-      oldTyping.parentNode.removeChild(oldTyping);
-    }
+    if (window._regenLock) {
 
-    const typingEl = showTyping();
-    if (typeof messagesEl !== 'undefined' && messagesEl) {
-      messagesEl.scrollTop = messagesEl.scrollHeight;
-    }
+      console.warn("Regenerate in progress, ignoring extra click");
 
-    if (typeof puter === 'undefined' || !puter.ai || typeof puter.ai.chat !== 'function') {
-      // fallback: simulated reply
-      setTimeout(()=>{
-        try { if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl); } catch(e){}
-        const reply = (typeof simulatedAssistantReply === 'function') ? simulatedAssistantReply(userText) : ('Reply: ' + userText.slice(0,200));
-        assistantMessage.content = reply;
-        if (typeof appendMessage === 'function') appendMessage(assistantMessage, assistantIdx);
-        saveSession();
-        window._regenLock = false;
-      }, 700 + Math.min(1500, userText.length * 18));
-      return;
-    }
+      return;
 
-    let botMessageEl = null;
-    let bubbleEl = null;
-    let domAppended = false;
-    try {
-      const response = await puter.ai.chat(buildChatPrompt(messages, parentIdx), { model: 'gpt-5-nano', stream: true });
-      let buffer = '';
+    }
 
-      for await (const part of response) {
-        if (!part) continue;
-        const piece = part.text || (part.message && part.message.content) || '';
-        if (!piece) continue;
+    window._regenLock = true;
 
-        if (!domAppended) {
-          try { if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl); } catch(e){}
-          if (typeof appendMessage === 'function') appendMessage(assistantMessage, assistantIdx);
-          botMessageEl = (typeof messagesEl !== 'undefined' && messagesEl) ? 
-            (messagesEl.querySelector('.msg[data-id="'+assistantMessage.id+'"]') 
-            || messagesEl.querySelector('.msg[data-index="'+assistantIdx+'"]') 
-            || messagesEl.querySelector('.msg:last-child')) : null;
-          bubbleEl = botMessageEl ? botMessageEl.querySelector('.bubble') : null;
-          domAppended = true;
-        }
 
-        buffer += String(piece);
-        assistantMessage.content = buffer;
-        if (bubbleEl) bubbleEl.innerHTML = escapeHtml(assistantMessage.content).replace(/\n/g,'<br>');
-        if (typeof messagesEl !== 'undefined' && messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
-      }
 
-      if (!domAppended) {
-        try { if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl); } catch(e){}
-        if (typeof appendMessage === 'function') appendMessage(assistantMessage, assistantIdx);
-      }
+    if (typeof parentIdx !== 'number' || parentIdx < 0 || !messages[parentIdx]) {
 
-      saveSession();
-      window._regenLock = false;
+      window._regenLock = false;
 
-    } catch (error) {
-      console.error("regenerateAssistantForParent Error:", error);
-      try { if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl); } catch(e){}
-      if (typeof appendMessage === 'function') appendMessage(assistantMessage, assistantIdx);
-      assistantMessage.content = 'حدث خطأ. يرجى المحاولة مرة أخرى.';
-      saveSession();
-      window._regenLock = false;
-    }
-  } catch(e) {
-    console.error('regenerateAssistantForParent wrapper error', e);
-    window._regenLock = false;
-  }
+      return;
+
+    }
+
+    const userText = String(messages[parentIdx].content || '').trim();
+
+    if (!userText) {
+
+      window._regenLock = false;
+
+      return;
+
+    }
+
+
+
+    const assistantMessage = { id: genId(), role: 'assistant', content: '', parent: parentIdx, meta: {} };
+
+    messages.push(assistantMessage);
+
+    const assistantIdx = messages.length - 1;
+
+    saveSession();
+
+
+
+    // 🔹 إزالة أي typing قديم قبل إنشاء الجديد
+
+    const oldTyping = messagesEl.querySelector('.typing');
+
+    if (oldTyping && oldTyping.parentNode) {
+
+      oldTyping.parentNode.removeChild(oldTyping);
+
+    }
+
+
+
+    const typingEl = showTyping();
+
+    if (typeof messagesEl !== 'undefined' && messagesEl) {
+
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+
+    }
+
+
+
+    if (typeof puter === 'undefined' || !puter.ai || typeof puter.ai.chat !== 'function') {
+
+      // fallback: simulated reply
+
+      setTimeout(()=>{
+
+        try { if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl); } catch(e){}
+
+        const reply = (typeof simulatedAssistantReply === 'function') ? simulatedAssistantReply(userText) : ('Reply: ' + userText.slice(0,200));
+
+        assistantMessage.content = reply;
+
+        if (typeof appendMessage === 'function') appendMessage(assistantMessage, assistantIdx);
+
+        saveSession();
+
+        window._regenLock = false;
+
+      }, 700 + Math.min(1500, userText.length * 18));
+
+      return;
+
+    }
+
+
+
+    let botMessageEl = null;
+
+    let bubbleEl = null;
+
+    let domAppended = false;
+
+    try {
+
+      const response = await puter.ai.chat(buildChatPrompt(messages, parentIdx), { model: 'gpt-5-nano', stream: true });
+
+      let buffer = '';
+
+
+
+      for await (const part of response) {
+
+        if (!part) continue;
+
+        const piece = part.text || (part.message && part.message.content) || '';
+
+        if (!piece) continue;
+
+
+
+        if (!domAppended) {
+
+          try { if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl); } catch(e){}
+
+          if (typeof appendMessage === 'function') appendMessage(assistantMessage, assistantIdx);
+
+          botMessageEl = (typeof messagesEl !== 'undefined' && messagesEl) ? 
+
+            (messagesEl.querySelector('.msg[data-id="'+assistantMessage.id+'"]') 
+
+            || messagesEl.querySelector('.msg[data-index="'+assistantIdx+'"]') 
+
+            || messagesEl.querySelector('.msg:last-child')) : null;
+
+          bubbleEl = botMessageEl ? botMessageEl.querySelector('.bubble') : null;
+
+          domAppended = true;
+
+        }
+
+
+
+        buffer += String(piece);
+
+        assistantMessage.content = buffer;
+
+        if (bubbleEl) bubbleEl.innerHTML = escapeHtml(assistantMessage.content).replace(/\n/g,'<br>');
+
+        if (typeof messagesEl !== 'undefined' && messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
+
+      }
+
+
+
+      if (!domAppended) {
+
+        try { if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl); } catch(e){}
+
+        if (typeof appendMessage === 'function') appendMessage(assistantMessage, assistantIdx);
+
+      }
+
+
+
+      saveSession();
+
+      window._regenLock = false;
+
+
+
+    } catch (error) {
+
+      console.error("regenerateAssistantForParent Error:", error);
+
+      try { if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl); } catch(e){}
+
+      if (typeof appendMessage === 'function') appendMessage(assistantMessage, assistantIdx);
+
+      assistantMessage.content = 'حدث خطأ. يرجى المحاولة مرة أخرى.';
+
+      saveSession();
+
+      window._regenLock = false;
+
+    }
+
+  } catch(e) {
+
+    console.error('regenerateAssistantForParent wrapper error', e);
+
+    window._regenLock = false;
+
+  }
+
 }
 // OPEN/CLOSE CHAT (use history for back-button order)
       function openChatSimple(){
@@ -4844,6 +4999,26 @@ renameSaveBtn.addEventListener('click', () => {
   newChatBtnEl.addEventListener('mouseleave', ()=> newChatBtnEl.classList.remove('touched'));
 })();
 
+      let currentIndicator = null;
+let indicatorTimers = [];
+
+function clearIndicator() {
+    indicatorTimers.forEach(id => clearTimeout(id));
+    indicatorTimers = [];
+    if (currentIndicator && currentIndicator.parentNode) {
+        currentIndicator.remove();
+    }
+    currentIndicator = null;
+}
+
+function setToAnalyzing(indicator) {
+    if (!indicator) return;
+    const content = indicator.querySelector('.content.typing');
+    if (content) {
+        content.classList.add('to-analyzing');
+    }
+}
+
       // update popstate handling to close lightbox -> convoPanel -> chatPanel (ordered)
       window.addEventListener('popstate', (event) => {
         try {
@@ -4874,6 +5049,7 @@ renameSaveBtn.addEventListener('click', () => {
           if(chatPanel.classList.contains('show')){ closeChatSimple(); return; }
         }
       });
+    
 
       // ensure history and savedConvos are up-to-date on load
       loadHistory();
