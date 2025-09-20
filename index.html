@@ -3385,8 +3385,8 @@ function setToAnalyzing(indicator) {
   });
 }
 
-      // Typing indicator (supports text like "Analyzing file..." or "Analyzing image...")
-     function showTyping(type = "default"){
+     // Typing indicator (supports text like "Analyzing file..." or "Analyzing image...")
+function showTyping(type = "default") {
   clearIndicator();
 
   // container
@@ -3403,7 +3403,14 @@ function setToAnalyzing(indicator) {
   // bars layer
   const barsLayer = document.createElement('div');
   barsLayer.className = 'barsLayer';
-  barsLayer.innerHTML = `<div class="bars"><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span></div>`;
+  barsLayer.innerHTML = `
+    <div class="bars">
+      <span class="bar"></span>
+      <span class="bar"></span>
+      <span class="bar"></span>
+      <span class="bar"></span>
+      <span class="bar"></span>
+    </div>`;
 
   // dynamic label
   let analyzingLabel = 'Analyzing';
@@ -3431,35 +3438,24 @@ function setToAnalyzing(indicator) {
   content.appendChild(inner);
   msg.appendChild(content);
 
-  // append to correct container (fallback to document.querySelector('.messages') if messagesEl undefined)
-  const container = (typeof messagesEl !== 'undefined' && messagesEl) ? messagesEl : document.querySelector('.messages') || document.body;
+  // append to correct container
+  const container =
+    (typeof messagesEl !== "undefined" && messagesEl)
+      ? messagesEl
+      : document.querySelector(".messages") || document.body;
+
   container.appendChild(msg);
-  scrollToBottom?.();
 
-  // measure widths & SVG path once (store results as data attributes to avoid re-measure)
-  requestAnimationFrame(() => {
+  // scroll to bottom safely
+  if (typeof scrollToBottom === "function") {
+    scrollToBottom();
+  } else {
     try {
-      const barsW = barsLayer.getBoundingClientRect().width || 0;
-      const analyW = analyzingLayer.getBoundingClientRect().width || 0;
-      inner.style.width = Math.ceil(Math.max(barsW, analyW) + 24) + 'px';
-
-      const path = msg.querySelector('.led-path');
-      if (path && typeof path.getTotalLength === 'function') {
-        const pathLen = Math.round(path.getTotalLength());
-        path.style.setProperty('--pathLen', pathLen);
-        path.style.strokeDasharray = `8 ${pathLen}`;
-        path.style.strokeDashoffset = pathLen;
-        // store measurement so setToAnalyzing يمكنه الاعتماد عليها
-        path.dataset.measured = '1';
-        path.dataset.pathLen = String(pathLen);
-      }
+      container.scrollTop = container.scrollHeight;
     } catch (e) {
-      console.warn('showTyping measurement error', e);
+      console.warn("scrollToBottom not defined and fallback failed:", e);
     }
-  });
-
-  currentIndicator = msg;
-  return msg;
+  }
 }
       // Safe fallback for simulatedAssistantReply if not defined elsewhere
       function simulatedAssistantReply(text){
