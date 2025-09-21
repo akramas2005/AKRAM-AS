@@ -780,12 +780,13 @@ body.dark-mode .msg.user {
 
   /* === Position fix for typing indicator === */
 .msg.assistant.typing-indicator {
-  align-self: flex-start;   /* خليها جهة اليسار */
-  margin-left: 6px;         /* قربه من الحافة اليسرى */
-  margin-top: 14px;         /* مسافة من الرسالة اللي فوق */
-  background: transparent;  /* بدون خلفية */
-  box-shadow: none;         /* بدون ظل */
-  max-width: fit-content;   /* لا يتمدد لنص الشاشة */
+  max-width: none;        /* ألغِ الحد الأقصى */
+  width: auto;            /* ياخذ عرض المحتوى فقط */
+  padding: 0;             /* بدون padding */
+  margin-left: 0;         /* ألصقه بالحافة */
+  background: transparent;
+  box-shadow: none;
+  align-self: flex-start; /* لصق يسار */
 }
   .msg-actions{
     display:flex; align-items:center; gap:6px; margin-top:6px; opacity:.95;
