@@ -277,16 +277,17 @@ body.dark-mode .code-block-container.collapsed pre::after {
   display: block; padding: 6px 0; margin: 0; position: relative; min-height: 40px;
 }
 .indicatorInner {
-  position: absolute; top: 50%; left: 0; transform: translateY(-50%); height: 36px; pointer-events: none;
-}
-.indicatorInner {
   position: relative;
-  width: 160px;   /* نفس عرض الـ SVG */
-  height: 44px;   /* نفس ارتفاع الـ SVG */
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;  /* التصاق لليسار */
+  width: auto;   /* لا تجبره على عرض ثابت */
+  min-width: 120px; /* عرض أدنى عشان ما يضغط الأعمدة */
+  height: 44px; 
+  margin-left: 6px;  /* قربه أكثر من الحافة اليسرى */
+  margin-top: 6px;   /* أضف مسافة عن الرسالة اللي فوق */
 }
+
 
 .barsLayer,
 .analyzingLayer {
