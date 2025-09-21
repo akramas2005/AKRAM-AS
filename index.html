@@ -776,6 +776,15 @@ body.dark-mode .msg.user {
   border-bottom-left-radius:6px; 
   z-index: 1; 
 }
+
+  /* === Position fix for typing indicator === */
+.msg.assistant.typing-indicator {
+  align-self: flex-start;   /* يخليه على يسار الشاشة */
+  margin-left: 6px;         /* قرّبه أكثر لليسار */
+  margin-top: 14px;         /* يضيف مسافة من الرسالة السابقة */
+  background: transparent;  /* بدون خلفية */
+  box-shadow: none;         /* بدون ظل */
+}
   .msg-actions{
     display:flex; align-items:center; gap:6px; margin-top:6px; opacity:.95;
   }
@@ -3442,15 +3451,6 @@ function showTyping(type = "default") {
   const gradId = 'ledGrad-' + Date.now();
   analyzingLayer.innerHTML = `
     <span class="analyzingText">${analyzingLabel}</span>
-    <svg class="led-svg" viewBox="0 0 160 44" aria-hidden="true" focusable="false">
-      <defs>
-        <linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stop-color="var(--accent)"></stop>
-          <stop offset="100%" stop-color="#00aaff"></stop>
-        </linearGradient>
-      </defs>
-      <rect class="led-path" x="2" y="2" width="156" height="40" rx="10" ry="10" stroke="url(#${gradId})"></rect>
-    </svg>`;
 
   inner.appendChild(barsLayer);
   inner.appendChild(analyzingLayer);
