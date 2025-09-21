@@ -280,12 +280,12 @@ body.dark-mode .code-block-container.collapsed pre::after {
   position: relative;
   display: flex;
   align-items: center;
-  justify-content: flex-start;  /* التصاق لليسار */
-  width: auto;   /* لا تجبره على عرض ثابت */
-  min-width: 120px; /* عرض أدنى عشان ما يضغط الأعمدة */
+  justify-content: flex-start;  /* لصق المحتوى لليسار */
+  width: auto;                  /* بدون عرض ثابت */
+  min-width: 120px;              /* عرض أدنى عشان الأعمدة ما تنضغط */
   height: 44px; 
-  margin-left: 6px;  /* قربه أكثر من الحافة اليسرى */
-  margin-top: 6px;   /* أضف مسافة عن الرسالة اللي فوق */
+  margin-left: 0;                /* صفر لأنه صار باليسار فعليًا */
+  margin-top: 0;                 /* خليه يتبع المسافة من العنصر الأب */
 }
 
 
@@ -780,11 +780,12 @@ body.dark-mode .msg.user {
 
   /* === Position fix for typing indicator === */
 .msg.assistant.typing-indicator {
-  align-self: flex-start;   /* يخليه على يسار الشاشة */
-  margin-left: 6px;         /* قرّبه أكثر لليسار */
-  margin-top: 14px;         /* يضيف مسافة من الرسالة السابقة */
+  align-self: flex-start;   /* خليها جهة اليسار */
+  margin-left: 6px;         /* قربه من الحافة اليسرى */
+  margin-top: 14px;         /* مسافة من الرسالة اللي فوق */
   background: transparent;  /* بدون خلفية */
   box-shadow: none;         /* بدون ظل */
+  max-width: fit-content;   /* لا يتمدد لنص الشاشة */
 }
   .msg-actions{
     display:flex; align-items:center; gap:6px; margin-top:6px; opacity:.95;
