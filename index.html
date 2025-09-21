@@ -776,6 +776,15 @@ body.dark-mode .msg.user {
   border-bottom-left-radius:6px; 
   z-index: 1; 
 }
+
+  /* === Position fix for typing indicator === */
+.msg.assistant.typing-indicator {
+  align-self: flex-start;   /* يخليه على يسار الشاشة */
+  margin-left: 6px;         /* قرّبه أكثر لليسار */
+  margin-top: 14px;         /* يضيف مسافة من الرسالة السابقة */
+  background: transparent;  /* بدون خلفية */
+  box-shadow: none;         /* بدون ظل */
+}
   .msg-actions{
     display:flex; align-items:center; gap:6px; margin-top:6px; opacity:.95;
   }
@@ -3438,15 +3447,16 @@ function showTyping(type = "default") {
   else if (type === 'file') analyzingLabel = 'Analyzing file';
 
   const analyzingLayer = document.createElement('div');
-  analyzingLayer.className = 'analyzingLayer';
-  const gradId = 'ledGrad-' + Date.now();
-  analyzingLayer.innerHTML = `
-    <span class="analyzingText">${analyzingLabel}</span>
+analyzingLayer.className = 'analyzingLayer';
+analyzingLayer.innerHTML = `
+  <span class="analyzingText">${analyzingLabel}</span>
+`;
 
-  inner.appendChild(barsLayer);
-  inner.appendChild(analyzingLayer);
-  content.appendChild(inner);
-  msg.appendChild(content);
+// أضف الـ layers بشكل صحيح
+inner.appendChild(barsLayer);
+inner.appendChild(analyzingLayer);
+content.appendChild(inner);
+msg.appendChild(content);
 
   const container =
     (typeof messagesEl !== "undefined" && messagesEl)
