@@ -3026,6 +3026,7 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null, indicator = nu
   try {
     if (!fileOrUrl) return null;
 
+    // إظهار المؤشر إذا مش موجود
     if (!indicator) {
       clearIndicator();
       indicator = showTyping('file');
@@ -3036,58 +3037,24 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null, indicator = nu
       try { setToAnalyzing(indicator); } catch(e) {}
     }, delay);
 
+    // ✅ حالة الرابط (URL)
     if (typeof fileOrUrl === 'string') {
       const lower = fileOrUrl.toLowerCase();
 
+      // رابط صورة
       if (lower.match(/\.(png|jpe?g|webp|gif|bmp)(?:[?#].*)?$/)) {
         clearTimeout(toAnalyzingTimer);
         return await analyzeImageWithPuter(fileOrUrl, userPrompt, indicator);
       }
 
+      // رابط نصي
       try {
         const resp = await fetch(fileOrUrl);
         if (resp.ok) {
           const mime = resp.headers.get("content-type") || "";
           if (mime.startsWith("text/") || mime.includes("json") || mime.includes("xml") || mime.includes("csv")) {
             const content = await resp.text();
-            if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
-              const basePrompt = (userPrompt && String(userPrompt).trim())
-                ? `${String(userPrompt).trim()}\n\nهذا محتوى الملف:\n\n${content.slice(0, 8000)}`
-                : `حلل هذا الملف (ملخص، نوعه، أي نص داخلي مهم):\n\n${content.slice(0, 8000)}`;
-
-              const response = await puter.ai.chat(basePrompt, null, { model: "gpt-5-nano", stream: true });
-
-              let botMsg = null;
-              let botEl = null;
-              let isFirstChunk = true;
-
-              clearTimeout(toAnalyzingTimer);
-
-              for await (const part of response) {
-                const piece = part.text || (part.message && part.message.content) || '';
-                if (!piece) continue;
-
-                if (isFirstChunk) {
-                  clearIndicator();
-                  botMsg = { id: genId(), role: 'assistant', content: '', meta: {} };
-                  messages.push(botMsg);
-                  appendMessage(botMsg, messages.length - 1);
-                  const botIndex = messages.length - 1;
-                  botEl = messagesEl.querySelector(`.msg[data-index="${botIndex}"] .bubble`);
-                  isFirstChunk = false;
-                }
-
-                botMsg.content += piece;
-                if (botEl) {
-                  botEl.innerHTML = marked.parse(botMsg.content);
-                  enhanceCodeBlocks(botEl);
-                }
-                messagesEl.scrollTop = messagesEl.scrollHeight;
-              }
-
-              saveSession();
-              return botMsg ? botMsg.content : null;
-            }
+            return await genericFileAnalysis(content, userPrompt, mime.split("/")[1] || "text");
           }
         }
       } catch (err) {
@@ -3099,108 +3066,60 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null, indicator = nu
       return null;
     }
 
+    // ✅ حالة ملف محلي (File)
     if (fileOrUrl instanceof File) {
-      try {
-        if (fileOrUrl.type && fileOrUrl.type.startsWith('image/')) {
-          const dataUrl = await new Promise((res, rej) => {
-            const fr = new FileReader();
-            fr.onload = () => res(fr.result);
-            fr.onerror = rej;
-            fr.readAsDataURL(fileOrUrl);
-          });
+      const ext = (fileOrUrl.name || '').split('.').pop().toLowerCase();
+
+      // 1. ملفات PDF
+      if (ext === 'pdf') {
+        try {
+          const pdfText = await extractPdfText(fileOrUrl);
+          return await genericFileAnalysis(pdfText, userPrompt, "PDF");
+        } catch (e) {
+          console.warn("PDF parsing failed", e);
           clearTimeout(toAnalyzingTimer);
-          return await analyzeImageWithPuter(dataUrl, userPrompt, indicator);
+          clearIndicator();
+          return null;
         }
+      }
 
-        const ext = (fileOrUrl.name || '').split('.').pop().toLowerCase();
-        const textLike = ['txt','json','js','html','htm','css','py','md','xml','csv','pdf'];
-        if (textLike.includes(ext)) {
-          const txtContent = await fileOrUrl.text();
-          if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
-            const basePrompt = (userPrompt && String(userPrompt).trim())
-              ? `${String(userPrompt).trim()}\n\nهذا محتوى الملف (${ext}):\n\n${txtContent.slice(0, 8000)}`
-              : `حلل هذا الملف (${ext}) وقدم ملخصاً:\n\n${txtContent.slice(0, 8000)}`;
-
-            const response = await puter.ai.chat(basePrompt, null, { model: 'gpt-5-nano', stream: true });
-
-            let botMsg = null;
-            let botEl = null;
-            let isFirstChunk = true;
-
-            clearTimeout(toAnalyzingTimer);
-
-            for await (const part of response) {
-              const piece = part.text || (part.message && part.message.content) || '';
-              if (!piece) continue;
-
-              if (isFirstChunk) {
-                clearIndicator();
-                botMsg = { id: genId(), role: 'assistant', content: '', meta: {} };
-                messages.push(botMsg);
-                appendMessage(botMsg, messages.length - 1);
-                const botIndex = messages.length - 1;
-                botEl = messagesEl.querySelector(`.msg[data-index="${botIndex}"] .bubble`);
-                isFirstChunk = false;
-              }
-              if (ext === 'pdf') {
-  const pdfText = await extractPdfText(fileOrUrl);
-  if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
-    const basePrompt = (userPrompt && String(userPrompt).trim())
-      ? `${String(userPrompt).trim()}\n\nهذا محتوى ملف PDF:\n\n${pdfText.slice(0, 8000)}`
-      : `حلل هذا الملف PDF وقدّم ملخصاً:\n\n${pdfText.slice(0, 8000)}`;
-
-    const response = await puter.ai.chat(basePrompt, null, { model: 'gpt-5-nano', stream: true });
-    clearIndicator();
-    return parsePuterResult(response);
-  }
-}
-
-              // 1. ملفات PDF
-if (ext === 'pdf') {
-  return await genericFileAnalysis(fileOrUrl, userPrompt, "PDF");
-}
-
-// 2. ملفات Word
-if (['doc', 'docx'].includes(ext)) {
-  return await genericFileAnalysis(fileOrUrl, userPrompt, "Word Document");
-}
-
-// 3. ملفات Excel
-if (['xls', 'xlsx', 'ods', 'csv'].includes(ext)) {
-  return await genericFileAnalysis(fileOrUrl, userPrompt, "Spreadsheet / Excel file");
-}
-
-// 4. ملفات PowerPoint
-if (['ppt', 'pptx'].includes(ext)) {
-  return await genericFileAnalysis(fileOrUrl, userPrompt, "PowerPoint Presentation");
-}
-
-// 5. ملفات مضغوطة
-if (['zip', 'rar', '7z'].includes(ext)) {
-  return await genericFileAnalysis(fileOrUrl, userPrompt, "Compressed Archive (ZIP/RAR)");
-}
-
-              botMsg.content += piece;
-              if (botEl) {
-                botEl.innerHTML = marked.parse(botMsg.content);
-                enhanceCodeBlocks(botEl);
-              }
-              messagesEl.scrollTop = messagesEl.scrollHeight;
-            }
-
-            saveSession();
-            return botMsg ? botMsg.content : null;
-          }
-        }
-
+      // 2. صور محلية
+      if (fileOrUrl.type && fileOrUrl.type.startsWith('image/')) {
+        const dataUrl = await new Promise((res, rej) => {
+          const fr = new FileReader();
+          fr.onload = () => res(fr.result);
+          fr.onerror = rej;
+          fr.readAsDataURL(fileOrUrl);
+        });
         clearTimeout(toAnalyzingTimer);
-        clearIndicator();
-        return null;
-      } catch (e) {
-        console.warn('analyzeFileWithPuter read text failed', e);
-        clearTimeout(toAnalyzingTimer);
-        clearIndicator();
-        return null;
+        return await analyzeImageWithPuter(dataUrl, userPrompt, indicator);
+      }
+
+      // 3. ملفات نصية معروفة
+      const textLike = ['txt','json','js','html','htm','css','py','md','xml','csv'];
+      if (textLike.includes(ext)) {
+        const txtContent = await fileOrUrl.text();
+        return await genericFileAnalysis(txtContent, userPrompt, ext.toUpperCase());
+      }
+
+      // 4. ملفات Word
+      if (['doc','docx'].includes(ext)) {
+        return await genericFileAnalysis(fileOrUrl, userPrompt, "Word Document");
+      }
+
+      // 5. ملفات Excel
+      if (['xls','xlsx','ods','csv'].includes(ext)) {
+        return await genericFileAnalysis(fileOrUrl, userPrompt, "Spreadsheet / Excel file");
+      }
+
+      // 6. ملفات PowerPoint
+      if (['ppt','pptx'].includes(ext)) {
+        return await genericFileAnalysis(fileOrUrl, userPrompt, "PowerPoint Presentation");
+      }
+
+      // 7. ملفات مضغوطة
+      if (['zip','rar','7z'].includes(ext)) {
+        return await genericFileAnalysis(fileOrUrl, userPrompt, "Compressed Archive");
       }
     }
 
