@@ -2651,16 +2651,13 @@ const attachmentIndicator = showTyping(attType); // سيعطي العنصر ال
     analysisText = await analyzeFileWithPuter(attached.url, userMessage.content, attachmentIndicator);
 }
 
-    // 4. عرض الرد النهائي
-    if (analysisText) {
-        const botMsg = { id: genId(), role: 'assistant', content: analysisText, meta: {} };
-        messages.push(botMsg);
-        appendMessage(botMsg, messages.length - 1);
-        saveSession();
-    } else {
-        // إذا فشل التحليل، استدعي الرد الافتراضي (الذي سيظهر حركة الأعمدة العادية)
-        regenerateAssistantForParent(messages.length - 1);
-    }
+   // 4. عرض الرد النهائي
+// 🟢 لا نضيف رسالة جديدة هنا، لأن analyzeImageWithPuter / analyzeFileWithPuter 
+// هما اللي يتكفلوا بإضافة الرسالة عبر stream.
+// إذا ما طلع أي رد → fallback
+if (!analysisText) {
+    regenerateAssistantForParent(messages.length - 1);
+}
 
   } catch (e) {
     console.error('sendAttachmentNow error', e);
