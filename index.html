@@ -277,15 +277,12 @@ body.dark-mode .code-block-container.collapsed pre::after {
   display: block; padding: 6px 0; margin: 0; position: relative; min-height: 40px;
 }
 .indicatorInner {
-  position: relative;
-  display: flex;
+  display: flex !important;
+  justify-content: flex-start !important; /* خلي الأعمدة/النص باليسار */
   align-items: center;
-  justify-content: flex-start;  /* لصق المحتوى لليسار */
-  width: auto;                  /* بدون عرض ثابت */
-  min-width: 120px;              /* عرض أدنى عشان الأعمدة ما تنضغط */
-  height: 44px; 
-  margin-left: 0;                /* صفر لأنه صار باليسار فعليًا */
-  margin-top: 0;                 /* خليه يتبع المسافة من العنصر الأب */
+  width: auto !important;
+  min-width: 120px;
+  height: 44px;
 }
 
 
@@ -779,7 +776,16 @@ body.dark-mode .msg.user {
 }
 
   /* === Position fix for typing indicator === */
-.msg.assistant.typing-indicator { background: rgba(255,0,0,0.1); }
+.msg.assistant.typing-indicator {
+  align-self: flex-start !important;  /* التصاق لليسار */
+  justify-content: flex-start !important;
+  text-align: left !important;
+  margin-left: 0 !important;
+  padding-left: 0 !important;
+  width: auto !important;
+  max-width: none !important;
+}
+
   .msg-actions{
     display:flex; align-items:center; gap:6px; margin-top:6px; opacity:.95;
   }
