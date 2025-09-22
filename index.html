@@ -2969,13 +2969,33 @@ async function analyzeImageWithPuter(imageUrl, userPrompt = null, indicator = nu
         ? `${String(userPrompt).trim()}\n\nالآن قم بتحليل الصورة التالية:`
         : `صف محتوى هذه الصورة باختصار.`;
 
-      // إذا دعم puter.ai.chat البث (stream) يمكنك تفعيل stream: true
-      const puterResp = await puter.ai.chat(basePrompt, imageUrl, { model: 'gpt-5-nano' });
-      clearTimeout(toAnalyzingTimer);
+      // 2. أنشئ رسالة assistant فارغة
+const botMsg = { id: genId(), role: 'assistant', content: '', meta: {} };
+messages.push(botMsg);
+appendMessage(botMsg, messages.length - 1);
+const botIndex = messages.length - 1;
+const botEl = messagesEl.querySelector(`.msg[data-index="${botIndex}"] .bubble`);
 
-      // إزالة المؤشر بعد الحصول على الرد النهائي
-      clearIndicator();
-      return parsePuterResult(puterResp);
+// 3. stream من puter
+const response = await puter.ai.chat(basePrompt, imageUrl, { model: 'gpt-5-nano', stream: true });
+
+clearTimeout(toAnalyzingTimer);
+
+for await (const part of response) {
+  const piece = part.text || (part.message && part.message.content) || '';
+  if (piece) {
+    botMsg.content += piece;
+    if (botEl) {
+      botEl.innerHTML = marked.parse(botMsg.content);
+      enhanceCodeBlocks(botEl);
+    }
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+}
+
+// 4. إزالة المؤشر عند الانتهاء
+clearIndicator();
+return botMsg.content;
     }
   } catch (err) {
     console.warn('analyzeImageWithPuter failed', err);
@@ -3025,10 +3045,30 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null, indicator = nu
                 ? `${String(userPrompt).trim()}\n\nهذا محتوى الملف:\n\n${content.slice(0, 8000)}`
                 : `حلل هذا الملف (ملخص، نوعه، أي نص داخلي مهم):\n\n${content.slice(0, 8000)}`;
 
-              const r = await puter.ai.chat(basePrompt, null, { model: "gpt-5-nano" });
-              clearTimeout(toAnalyzingTimer);
-              clearIndicator();
-              return parsePuterResult(r);
+              const botMsg = { id: genId(), role: 'assistant', content: '', meta: {} };
+messages.push(botMsg);
+appendMessage(botMsg, messages.length - 1);
+const botIndex = messages.length - 1;
+const botEl = messagesEl.querySelector(`.msg[data-index="${botIndex}"] .bubble`);
+
+const response = await puter.ai.chat(basePrompt, null, { model: "gpt-5-nano", stream: true });
+
+clearTimeout(toAnalyzingTimer);
+
+for await (const part of response) {
+  const piece = part.text || (part.message && part.message.content) || '';
+  if (piece) {
+    botMsg.content += piece;
+    if (botEl) {
+      botEl.innerHTML = marked.parse(botMsg.content);
+      enhanceCodeBlocks(botEl);
+    }
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+}
+
+clearIndicator();
+return botMsg.content;
             }
           }
         }
