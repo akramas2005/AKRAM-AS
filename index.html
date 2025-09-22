@@ -2591,10 +2591,21 @@ async function sendAttachmentNow() {
       conversation_id: currentConversationId || null,
       meta: {}
     };
+    // helper: returns 'image' | 'file' | 'default'
+function getAttachmentType(att) {
+  if (!att) return 'default';
+  const mime = (att.mime_type || att.type || '').toLowerCase();
+  if (mime.startsWith('image/')) return 'image';
+  return 'file';
+}
 
     // 1. عرض رسالة المستخدم ومسح حقل الكتابة
     messages.push(userMessage);
     appendMessage(userMessage, messages.length - 1);
+    // show typing/analyzing indicator immediately for the attachment
+clearIndicator();
+const attType = getAttachmentType(pendingAttachment || userMessage.attachment);
+const attachmentIndicator = showTyping(attType); // سيعطي العنصر المرجعي
     saveSession();
     updateWelcomeVisibility();
     composer.value = '';
@@ -2621,10 +2632,10 @@ async function sendAttachmentNow() {
     let analysisText = null;
     
     if (attached && attached.mime_type && attached.mime_type.startsWith('image/')) {
-        analysisText = await analyzeImageWithPuter(attached.url, userMessage.content);
-    } else if (attached) {
-        analysisText = await analyzeFileWithPuter(attached.url, userMessage.content);
-    }
+    analysisText = await analyzeImageWithPuter(attached.url, userMessage.content, attachmentIndicator);
+} else if (attached) {
+    analysisText = await analyzeFileWithPuter(attached.url, userMessage.content, attachmentIndicator);
+}
 
     // 4. عرض الرد النهائي
     if (analysisText) {
@@ -2937,16 +2948,20 @@ xhr.send(fd);
 }
 
 // 🟢 تحليل الصور
-async function analyzeImageWithPuter(imageUrl, userPrompt = null) {
+async function analyzeImageWithPuter(imageUrl, userPrompt = null, indicator = null) {
   if (!imageUrl) return null;
-  
-  // 1. إظهار الأنيميشن مع تفعيل مؤقت التحول إلى "Analyzing"
-  clearIndicator();
-const indicator = showTyping("image");
-const delay = Math.floor(Math.random() * (5000 - 3000 + 1)) + 3000; 
-setTimeout(() => {
-  setToAnalyzing(indicator);
-}, delay); 
+
+  // إذا لم يُمرّر indicator من الخارج، أنشئ واحدًا مؤقتًا
+  if (!indicator) {
+    clearIndicator();
+    indicator = showTyping('image');
+  }
+
+  // مدة عشوائية للتحول إلى Analyzing (3-5s) كما طلبت
+  const delay = Math.floor(Math.random() * (5000 - 3000 + 1)) + 3000;
+  const toAnalyzingTimer = setTimeout(() => {
+    try { setToAnalyzing(indicator); } catch(e) {}
+  }, delay);
 
   try {
     if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
@@ -2954,45 +2969,51 @@ setTimeout(() => {
         ? `${String(userPrompt).trim()}\n\nالآن قم بتحليل الصورة التالية:`
         : `صف محتوى هذه الصورة باختصار.`;
 
+      // إذا دعم puter.ai.chat البث (stream) يمكنك تفعيل stream: true
       const puterResp = await puter.ai.chat(basePrompt, imageUrl, { model: 'gpt-5-nano' });
-      
-      // 2. إزالة الأنيميشن قبل إرجاع الرد
-      clearIndicator(); 
+      clearTimeout(toAnalyzingTimer);
+
+      // إزالة المؤشر بعد الحصول على الرد النهائي
+      clearIndicator();
       return parsePuterResult(puterResp);
     }
   } catch (err) {
     console.warn('analyzeImageWithPuter failed', err);
   }
-  
-  // 3. إزالة الأنيميشن في حالة الفشل أو عدم وجود رد
-  clearIndicator(); 
+
+  // fallback: إزالة المؤشر في حالة الفشل
+  clearTimeout(toAnalyzingTimer);
+  clearIndicator();
   return null;
 }
       
 // 🟢 تحليل الملفات
-async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
+async function analyzeFileWithPuter(fileOrUrl, userPrompt = null, indicator = null) {
   try {
     if (!fileOrUrl) return null;
 
-    // 1. إظهار الأنيميشن مع تفعيل مؤقت التحول إلى "Analyzing"
-   clearIndicator();
-let fileIndicator = showTyping("file");
-const delay = Math.floor(Math.random() * (5000 - 3000 + 1)) + 3000; 
-setTimeout(() => {
-  setToAnalyzing(indicator);
-}, delay);
+    // إذا لم يُمرّر indicator من الخارج، أنشئ واحدًا
+    if (!indicator) {
+      clearIndicator();
+      indicator = showTyping('file');
+    }
 
-    // إذا كان رابط نصي
+    const delay = Math.floor(Math.random() * (5000 - 3000 + 1)) + 3000;
+    const toAnalyzingTimer = setTimeout(() => {
+      try { setToAnalyzing(indicator); } catch(e) {}
+    }, delay);
+
+    // رابط ملف نصي أو ملف عادي
     if (typeof fileOrUrl === 'string') {
       const lower = fileOrUrl.toLowerCase();
 
-      // صورة عبر رابط
+      // حالة: الرابط يشير لصورة -> مرر للمعالجة بالصورة
       if (lower.match(/\.(png|jpe?g|webp|gif|bmp)(?:[?#].*)?$/)) {
-        // لا نحتاج لإزالة المؤشر هنا لأن الدالة التالية ستفعل ذلك
-        return await analyzeImageWithPuter(fileOrUrl, userPrompt);
+        clearTimeout(toAnalyzingTimer);
+        return await analyzeImageWithPuter(fileOrUrl, userPrompt, indicator);
       }
 
-      // محاولة جلب محتوى الملف النصي من الرابط
+      // حاول جلب النص من الرابط إذا أمكن
       try {
         const resp = await fetch(fileOrUrl);
         if (resp.ok) {
@@ -3005,10 +3026,9 @@ setTimeout(() => {
                 : `حلل هذا الملف (ملخص، نوعه، أي نص داخلي مهم):\n\n${content.slice(0, 8000)}`;
 
               const r = await puter.ai.chat(basePrompt, null, { model: "gpt-5-nano" });
-              const txt = parsePuterResult(r);
-
-              clearIndicator(); // <-- 2. إزالة المؤشر قبل إرجاع الرد
-              return txt ? String(txt).trim() : null;
+              clearTimeout(toAnalyzingTimer);
+              clearIndicator();
+              return parsePuterResult(r);
             }
           }
         }
@@ -3016,14 +3036,15 @@ setTimeout(() => {
         console.warn("fetch file for analysis failed", err);
       }
 
-      clearIndicator(); // <-- 2. إزالة المؤشر قبل إرجاع الرد
+      clearTimeout(toAnalyzingTimer);
+      clearIndicator();
       return null;
     }
 
     // إذا كان كائن File محلي
     if (fileOrUrl instanceof File) {
       try {
-        // صورة محلية
+        // صورة محلية -> استخدم تحليل الصورة
         if (fileOrUrl.type && fileOrUrl.type.startsWith('image/')) {
           const dataUrl = await new Promise((res, rej) => {
             const fr = new FileReader();
@@ -3031,11 +3052,11 @@ setTimeout(() => {
             fr.onerror = rej;
             fr.readAsDataURL(fileOrUrl);
           });
-          // لا نحتاج لإزالة المؤشر هنا لأن الدالة التالية ستفعل ذلك
-          return await analyzeImageWithPuter(dataUrl, userPrompt);
+          clearTimeout(toAnalyzingTimer);
+          return await analyzeImageWithPuter(dataUrl, userPrompt, indicator);
         }
 
-        // ملفات نصية معروفة
+        // ملفات نصية
         const ext = (fileOrUrl.name || '').split('.').pop().toLowerCase();
         const textLike = ['txt','json','js','html','htm','css','py','md','xml','csv'];
         if (textLike.includes(ext)) {
@@ -3046,27 +3067,30 @@ setTimeout(() => {
               : `حلل هذا الملف (${ext}) وقدم ملخصاً:\n\n${txtContent.slice(0, 8000)}`;
 
             const r = await puter.ai.chat(basePrompt, null, { model: 'gpt-5-nano' });
-            const parsed = parsePuterResult(r);
-
-            clearIndicator(); // <-- 2. إزالة المؤشر قبل إرجاع الرد
-            return parsed ? String(parsed).trim() : null;
+            clearTimeout(toAnalyzingTimer);
+            clearIndicator();
+            return parsePuterResult(r);
           }
         }
-        clearIndicator(); // <-- 2. إزالة المؤشر قبل إرجاع الرد
+
+        clearTimeout(toAnalyzingTimer);
+        clearIndicator();
         return null;
       } catch (e) {
         console.warn('analyzeFileWithPuter read text failed', e);
-        clearIndicator(); // <-- 2. إزالة المؤشر قبل إرجاع الرد
+        clearTimeout(toAnalyzingTimer);
+        clearIndicator();
         return null;
       }
     }
 
-    clearIndicator(); // <-- 2. إزالة المؤشر قبل إرجاع الرد
+    clearTimeout(toAnalyzingTimer);
+    clearIndicator();
     return null;
 
   } catch (e) {
     console.error('analyzeFileWithPuter error', e);
-    clearIndicator(); // <-- 3. إزالة المؤشر في حالة الفشل أيضًا
+    clearIndicator();
     return null;
   }
 }
