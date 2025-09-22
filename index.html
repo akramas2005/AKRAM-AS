@@ -765,6 +765,20 @@ body.dark-mode .msg.user {
   z-index: 1; 
 }
 
+  /* لا تجعل المؤشر يأخذ ستايل الفقاعة */
+.msg.assistant.typing-indicator {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  padding: 0 !important;
+  max-width: none !important;
+}
+
+/* لا يظهر معه الأزرار أو الريأكشن */
+.msg.assistant.typing-indicator .msg-actions,
+.msg.assistant.typing-indicator .feedback-row {
+  display: none !important;
+}
 
   .msg-actions{
     display:flex; align-items:center; gap:6px; margin-top:6px; opacity:.95;
@@ -2951,13 +2965,11 @@ xhr.send(fd);
 async function analyzeImageWithPuter(imageUrl, userPrompt = null, indicator = null) {
   if (!imageUrl) return null;
 
-  // إذا لم يُمرّر indicator من الخارج، أنشئ واحدًا مؤقتًا
   if (!indicator) {
     clearIndicator();
     indicator = showTyping('image');
   }
 
-  // مدة عشوائية للتحول إلى Analyzing (3-5s) كما طلبت
   const delay = Math.floor(Math.random() * (5000 - 3000 + 1)) + 3000;
   const toAnalyzingTimer = setTimeout(() => {
     try { setToAnalyzing(indicator); } catch(e) {}
@@ -2969,39 +2981,43 @@ async function analyzeImageWithPuter(imageUrl, userPrompt = null, indicator = nu
         ? `${String(userPrompt).trim()}\n\nالآن قم بتحليل الصورة التالية:`
         : `صف محتوى هذه الصورة باختصار.`;
 
-      // 2. أنشئ رسالة assistant فارغة
-const botMsg = { id: genId(), role: 'assistant', content: '', meta: {} };
-messages.push(botMsg);
-appendMessage(botMsg, messages.length - 1);
-const botIndex = messages.length - 1;
-const botEl = messagesEl.querySelector(`.msg[data-index="${botIndex}"] .bubble`);
+      const response = await puter.ai.chat(basePrompt, imageUrl, { model: 'gpt-5-nano', stream: true });
 
-// 3. stream من puter
-const response = await puter.ai.chat(basePrompt, imageUrl, { model: 'gpt-5-nano', stream: true });
+      let botMsg = null;
+      let botEl = null;
+      let isFirstChunk = true;
 
-clearTimeout(toAnalyzingTimer);
+      clearTimeout(toAnalyzingTimer);
 
-for await (const part of response) {
-  const piece = part.text || (part.message && part.message.content) || '';
-  if (piece) {
-    botMsg.content += piece;
-    if (botEl) {
-      botEl.innerHTML = marked.parse(botMsg.content);
-      enhanceCodeBlocks(botEl);
-    }
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-  }
-}
+      for await (const part of response) {
+        const piece = part.text || (part.message && part.message.content) || '';
+        if (!piece) continue;
 
-// 4. إزالة المؤشر عند الانتهاء
-clearIndicator();
-return botMsg.content;
+        if (isFirstChunk) {
+          clearIndicator(); // 🟢 إزالة المؤشر
+          botMsg = { id: genId(), role: 'assistant', content: '', meta: {} };
+          messages.push(botMsg);
+          appendMessage(botMsg, messages.length - 1);
+          const botIndex = messages.length - 1;
+          botEl = messagesEl.querySelector(`.msg[data-index="${botIndex}"] .bubble`);
+          isFirstChunk = false;
+        }
+
+        botMsg.content += piece;
+        if (botEl) {
+          botEl.innerHTML = marked.parse(botMsg.content);
+          enhanceCodeBlocks(botEl);
+        }
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+
+      saveSession();
+      return botMsg ? botMsg.content : null;
     }
   } catch (err) {
     console.warn('analyzeImageWithPuter failed', err);
   }
 
-  // fallback: إزالة المؤشر في حالة الفشل
   clearTimeout(toAnalyzingTimer);
   clearIndicator();
   return null;
@@ -3012,7 +3028,6 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null, indicator = nu
   try {
     if (!fileOrUrl) return null;
 
-    // إذا لم يُمرّر indicator من الخارج، أنشئ واحدًا
     if (!indicator) {
       clearIndicator();
       indicator = showTyping('file');
@@ -3023,17 +3038,14 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null, indicator = nu
       try { setToAnalyzing(indicator); } catch(e) {}
     }, delay);
 
-    // رابط ملف نصي أو ملف عادي
     if (typeof fileOrUrl === 'string') {
       const lower = fileOrUrl.toLowerCase();
 
-      // حالة: الرابط يشير لصورة -> مرر للمعالجة بالصورة
       if (lower.match(/\.(png|jpe?g|webp|gif|bmp)(?:[?#].*)?$/)) {
         clearTimeout(toAnalyzingTimer);
         return await analyzeImageWithPuter(fileOrUrl, userPrompt, indicator);
       }
 
-      // حاول جلب النص من الرابط إذا أمكن
       try {
         const resp = await fetch(fileOrUrl);
         if (resp.ok) {
@@ -3045,30 +3057,38 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null, indicator = nu
                 ? `${String(userPrompt).trim()}\n\nهذا محتوى الملف:\n\n${content.slice(0, 8000)}`
                 : `حلل هذا الملف (ملخص، نوعه، أي نص داخلي مهم):\n\n${content.slice(0, 8000)}`;
 
-              const botMsg = { id: genId(), role: 'assistant', content: '', meta: {} };
-messages.push(botMsg);
-appendMessage(botMsg, messages.length - 1);
-const botIndex = messages.length - 1;
-const botEl = messagesEl.querySelector(`.msg[data-index="${botIndex}"] .bubble`);
+              const response = await puter.ai.chat(basePrompt, null, { model: "gpt-5-nano", stream: true });
 
-const response = await puter.ai.chat(basePrompt, null, { model: "gpt-5-nano", stream: true });
+              let botMsg = null;
+              let botEl = null;
+              let isFirstChunk = true;
 
-clearTimeout(toAnalyzingTimer);
+              clearTimeout(toAnalyzingTimer);
 
-for await (const part of response) {
-  const piece = part.text || (part.message && part.message.content) || '';
-  if (piece) {
-    botMsg.content += piece;
-    if (botEl) {
-      botEl.innerHTML = marked.parse(botMsg.content);
-      enhanceCodeBlocks(botEl);
-    }
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-  }
-}
+              for await (const part of response) {
+                const piece = part.text || (part.message && part.message.content) || '';
+                if (!piece) continue;
 
-clearIndicator();
-return botMsg.content;
+                if (isFirstChunk) {
+                  clearIndicator();
+                  botMsg = { id: genId(), role: 'assistant', content: '', meta: {} };
+                  messages.push(botMsg);
+                  appendMessage(botMsg, messages.length - 1);
+                  const botIndex = messages.length - 1;
+                  botEl = messagesEl.querySelector(`.msg[data-index="${botIndex}"] .bubble`);
+                  isFirstChunk = false;
+                }
+
+                botMsg.content += piece;
+                if (botEl) {
+                  botEl.innerHTML = marked.parse(botMsg.content);
+                  enhanceCodeBlocks(botEl);
+                }
+                messagesEl.scrollTop = messagesEl.scrollHeight;
+              }
+
+              saveSession();
+              return botMsg ? botMsg.content : null;
             }
           }
         }
@@ -3081,10 +3101,8 @@ return botMsg.content;
       return null;
     }
 
-    // إذا كان كائن File محلي
     if (fileOrUrl instanceof File) {
       try {
-        // صورة محلية -> استخدم تحليل الصورة
         if (fileOrUrl.type && fileOrUrl.type.startsWith('image/')) {
           const dataUrl = await new Promise((res, rej) => {
             const fr = new FileReader();
@@ -3096,7 +3114,6 @@ return botMsg.content;
           return await analyzeImageWithPuter(dataUrl, userPrompt, indicator);
         }
 
-        // ملفات نصية
         const ext = (fileOrUrl.name || '').split('.').pop().toLowerCase();
         const textLike = ['txt','json','js','html','htm','css','py','md','xml','csv'];
         if (textLike.includes(ext)) {
@@ -3106,10 +3123,38 @@ return botMsg.content;
               ? `${String(userPrompt).trim()}\n\nهذا محتوى الملف (${ext}):\n\n${txtContent.slice(0, 8000)}`
               : `حلل هذا الملف (${ext}) وقدم ملخصاً:\n\n${txtContent.slice(0, 8000)}`;
 
-            const r = await puter.ai.chat(basePrompt, null, { model: 'gpt-5-nano' });
+            const response = await puter.ai.chat(basePrompt, null, { model: 'gpt-5-nano', stream: true });
+
+            let botMsg = null;
+            let botEl = null;
+            let isFirstChunk = true;
+
             clearTimeout(toAnalyzingTimer);
-            clearIndicator();
-            return parsePuterResult(r);
+
+            for await (const part of response) {
+              const piece = part.text || (part.message && part.message.content) || '';
+              if (!piece) continue;
+
+              if (isFirstChunk) {
+                clearIndicator();
+                botMsg = { id: genId(), role: 'assistant', content: '', meta: {} };
+                messages.push(botMsg);
+                appendMessage(botMsg, messages.length - 1);
+                const botIndex = messages.length - 1;
+                botEl = messagesEl.querySelector(`.msg[data-index="${botIndex}"] .bubble`);
+                isFirstChunk = false;
+              }
+
+              botMsg.content += piece;
+              if (botEl) {
+                botEl.innerHTML = marked.parse(botMsg.content);
+                enhanceCodeBlocks(botEl);
+              }
+              messagesEl.scrollTop = messagesEl.scrollHeight;
+            }
+
+            saveSession();
+            return botMsg ? botMsg.content : null;
           }
         }
 
