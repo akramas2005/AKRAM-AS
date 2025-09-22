@@ -3212,7 +3212,7 @@ if (['zip', 'rar', '7z'].includes(ext)) {
     messages.push(botMsg);
     appendMessage(botMsg, messages.length - 1);
     const botIndex = messages.length - 1;
-    const botEl = messagesEl.querySelector(\`.msg[data-index="\${botIndex}"] .bubble\`);
+    const botEl = messagesEl.querySelector(`.msg[data-index="${botIndex}"] .bubble`);
 
     const response = await puter.ai.chat(basePrompt, null, { model: 'gpt-5-nano', stream: true });
 
