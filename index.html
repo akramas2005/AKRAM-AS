@@ -779,15 +779,7 @@ body.dark-mode .msg.user {
 }
 
   /* === Position fix for typing indicator === */
-.msg.assistant.typing-indicator {
-  max-width: none;        /* ألغِ الحد الأقصى */
-  width: auto;            /* ياخذ عرض المحتوى فقط */
-  padding: 0;             /* بدون padding */
-  margin-left: 0;         /* ألصقه بالحافة */
-  background: transparent;
-  box-shadow: none;
-  align-self: flex-start; /* لصق يسار */
-}
+.msg.assistant.typing-indicator { background: rgba(255,0,0,0.1); }
   .msg-actions{
     display:flex; align-items:center; gap:6px; margin-top:6px; opacity:.95;
   }
