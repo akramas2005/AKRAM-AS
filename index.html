@@ -3015,29 +3015,47 @@ async function analyzeImageWithPuter(imageUrl, userPrompt = null, indicator = nu
       clearTimeout(toAnalyzingTimer);
 
       for await (const part of response) {
-        const piece = part.text || (part.message && part.message.content) || '';
-        if (!piece) continue;
+  const piece = part.text || (part.message && part.message.content) || '';
+  if (!piece) continue;
 
-        if (isFirstChunk) {
-          clearIndicator(); // 🟢 إزالة المؤشر
-          botMsg = { id: genId(), role: 'assistant', content: '', meta: {} };
-          messages.push(botMsg);
-          appendMessage(botMsg, messages.length - 1);
-          const botIndex = messages.length - 1;
-          botEl = messagesEl.querySelector(`.msg[data-index="${botIndex}"] .bubble`);
-          isFirstChunk = false;
-        }
+  if (isFirstChunk) {
+    clearIndicator(); // 🟢 إزالة المؤشر
+    botMsg = { id: genId(), role: 'assistant', content: '', meta: {} };
+    messages.push(botMsg);
+    appendMessage(botMsg, messages.length - 1);
+    const botIndex = messages.length - 1;
+    botEl = messagesEl.querySelector(`.msg[data-index="${botIndex}"] .bubble`);
+    isFirstChunk = false;
+  }
 
-        botMsg.content += piece;
-        if (botEl) {
-          botEl.innerHTML = marked.parse(botMsg.content);
-          enhanceCodeBlocks(botEl);
-        }
-        messagesEl.scrollTop = messagesEl.scrollHeight;
-      }
+  botMsg.content += piece;
 
-      saveSession();
-      return botMsg ? botMsg.content : null;
+  if (botEl) {
+    const html = marked.parse(botMsg.content);
+
+    const txt = document.createElement('div');
+    txt.innerHTML = html;
+
+    // RTL للغة العربية، LTR لباقي اللغات
+    if (/[\u0600-\u06FF]/.test(botMsg.content)) {
+      txt.dir = "rtl";
+      txt.style.textAlign = "right";
+    } else {
+      txt.dir = "ltr";
+      txt.style.textAlign = "left";
+    }
+
+    botEl.innerHTML = "";
+    botEl.appendChild(txt);
+
+    enhanceCodeBlocks(botEl);
+  }
+
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+saveSession();
+return botMsg ? botMsg.content : null;
     }
   } catch (err) {
     console.warn('analyzeImageWithPuter failed', err);
