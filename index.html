@@ -3142,35 +3142,29 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null, indicator = nu
                 isFirstChunk = false;
               }
 
-             // 1. ملفات PDF
+              // 1. ملفات PDF
 if (ext === 'pdf') {
-  // نمرّر المرجع indicator ونُحرّك المؤشر فوراً إلى وضع "Analyzing" حتى يظهر الـ label بالنسبة لـ PDF
-  try { if (indicator) setToAnalyzing(indicator); } catch(e) {}
-  return await genericFileAnalysis(fileOrUrl, userPrompt, "PDF", indicator);
+  return await genericFileAnalysis(fileOrUrl, userPrompt, "PDF");
 }
 
 // 2. ملفات Word
 if (['doc', 'docx'].includes(ext)) {
-  try { if (indicator) setToAnalyzing(indicator); } catch(e) {}
-  return await genericFileAnalysis(fileOrUrl, userPrompt, "Word Document", indicator);
+  return await genericFileAnalysis(fileOrUrl, userPrompt, "Word Document");
 }
 
 // 3. ملفات Excel
 if (['xls', 'xlsx', 'ods', 'csv'].includes(ext)) {
-  try { if (indicator) setToAnalyzing(indicator); } catch(e) {}
-  return await genericFileAnalysis(fileOrUrl, userPrompt, "Spreadsheet / Excel file", indicator);
+  return await genericFileAnalysis(fileOrUrl, userPrompt, "Spreadsheet / Excel file");
 }
 
 // 4. ملفات PowerPoint
 if (['ppt', 'pptx'].includes(ext)) {
-  try { if (indicator) setToAnalyzing(indicator); } catch(e) {}
-  return await genericFileAnalysis(fileOrUrl, userPrompt, "PowerPoint Presentation", indicator);
+  return await genericFileAnalysis(fileOrUrl, userPrompt, "PowerPoint Presentation");
 }
 
 // 5. ملفات مضغوطة
 if (['zip', 'rar', '7z'].includes(ext)) {
-  try { if (indicator) setToAnalyzing(indicator); } catch(e) {}
-  return await genericFileAnalysis(fileOrUrl, userPrompt, "Compressed Archive (ZIP/RAR)", indicator);
+  return await genericFileAnalysis(fileOrUrl, userPrompt, "Compressed Archive (ZIP/RAR)");
 }
 
               botMsg.content += piece;
@@ -3209,13 +3203,6 @@ if (['zip', 'rar', '7z'].includes(ext)) {
 }
 
       async function genericFileAnalysis(file, userPrompt, fileType = "file") {
-
-        try {
-    // تأكد أن هناك مؤشرًا للعمل عليه — إن لم يكن مرّراً، أنشئ واحدًا (fallback)
-    if (!indicator) {
-      try { clearIndicator(); } catch(e) {}
-      try { indicator = showTyping('file'); } catch(e) {}
-    }
   try {
     const basePrompt = (userPrompt && String(userPrompt).trim())
       ? `${String(userPrompt).trim()}\n\nهذا ملف من نوع ${fileType}. حاول تلخيص أو وصف محتواه بناءً على النوع.`
