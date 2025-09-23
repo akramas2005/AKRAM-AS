@@ -3289,30 +3289,35 @@ return botMsg ? botMsg.content : null;
     const response = await puter.ai.chat(basePrompt, null, { model: 'gpt-5-nano', stream: true });
 
     for await (const part of response) {
-  const piece = part.text || (part.message && part.message.content) || '';
-  if (!piece) continue;
+      const piece = part.text || (part.message && part.message.content) || '';
+      if (!piece) continue;
 
-  botMsg.content += piece;
-  if (botEl) {
-    botEl.innerHTML = marked.parse(botMsg.content);
-    enhanceCodeBlocks(botEl);
+      botMsg.content += piece;
+      if (botEl) {
+        botEl.innerHTML = marked.parse(botMsg.content);
+        enhanceCodeBlocks(botEl);
 
-    // 🟢 تحديد الاتجاه
-    if (/[\u0600-\u06FF]/.test(botMsg.content)) {
-      botEl.dir = "rtl";
-      botEl.style.textAlign = "right";
-    } else {
-      botEl.dir = "ltr";
-      botEl.style.textAlign = "left";
+        // 🟢 تحديد الاتجاه
+        if (/[\u0600-\u06FF]/.test(botMsg.content)) {
+          botEl.dir = "rtl";
+          botEl.style.textAlign = "right";
+        } else {
+          botEl.dir = "ltr";
+          botEl.style.textAlign = "left";
+        }
+      }
+
+      messagesEl.scrollTop = messagesEl.scrollHeight;
     }
-  }
 
-  messagesEl.scrollTop = messagesEl.scrollHeight;
-}
+    // ✅ بعد انتهاء الحلقة
+    clearIndicator();
+    return botMsg.content;
 
-// بعد ما تخلص الحلقة
-clearIndicator();
-return botMsg.content;
+  } catch (e) {
+    console.warn("genericFileAnalysis failed", e);
+    clearIndicator();
+    return null;
   }
 }
       function appendAssistantText(text) {
