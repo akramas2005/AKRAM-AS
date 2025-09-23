@@ -3133,13 +3133,6 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null, indicator = nu
   botEl.dir = "ltr";
   botEl.style.textAlign = "left";
 }
-                if (/[\u0600-\u06FF]/.test(botMsg.content)) {
-  botEl.dir = "rtl";
-  botEl.style.textAlign = "right";
-} else {
-  botEl.dir = "ltr";
-  botEl.style.textAlign = "left";
-}
                 messagesEl.scrollTop = messagesEl.scrollHeight;
               }
 
