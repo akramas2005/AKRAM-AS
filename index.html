@@ -3289,14 +3289,15 @@ return botMsg ? botMsg.content : null;
     const response = await puter.ai.chat(basePrompt, null, { model: 'gpt-5-nano', stream: true });
 
     for await (const part of response) {
-      const piece = part.text || (part.message && part.message.content) || '';
-      if (piece) {
-        botMsg.content += piece;
+  const piece = part.text || (part.message && part.message.content) || '';
+  if (!piece) continue;
+
+  botMsg.content += piece;
   if (botEl) {
     botEl.innerHTML = marked.parse(botMsg.content);
     enhanceCodeBlocks(botEl);
 
-    // 🟢 نفس الشيء: تحديد الاتجاه
+    // 🟢 تحديد الاتجاه
     if (/[\u0600-\u06FF]/.test(botMsg.content)) {
       botEl.dir = "rtl";
       botEl.style.textAlign = "right";
@@ -3309,6 +3310,7 @@ return botMsg ? botMsg.content : null;
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
+// بعد ما تخلص الحلقة
 clearIndicator();
 return botMsg.content;
   }
