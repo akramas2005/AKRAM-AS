@@ -765,26 +765,6 @@ body.dark-mode .msg.user {
   z-index: 1; 
 }
 
-  /* أثناء البث (streaming) نخفي الأزرار و feedback-row حتى ينتهي البث */
-.msg.streaming .msg-actions,
-.msg.streaming .feedback-row {
-  display: none !important;
-}
-
-/* لتجنّب الفقاعة الضخمة أثناء البث */
-.msg.streaming .bubble {
-  min-height: 36px;
-  max-width: 56%;
-  white-space: pre-wrap;
-  overflow-wrap: break-word;
-}
-
-/* تأكد أن رسالة المساعد تبقى على اليسار أثناء البث */
-.msg.streaming {
-  align-self: flex-start;
-  margin-left: 8px;
-}
-
   /* لا تجعل المؤشر يأخذ ستايل الفقاعة */
 .msg.assistant.typing-indicator {
   background: transparent !important;
@@ -2718,23 +2698,6 @@ function scheduleDeletionOnServer(url, opts = {}) {
   });
 }
 
-      function finalizeStreaming(botMsg, botIndex) {
-  try {
-    if (!botMsg) return;
-    botMsg.meta = botMsg.meta || {};
-    botMsg.meta.streaming = false;
-    try { saveSession(); } catch(_) {}
-    // استبدال عنصر DOM الحالي بعنصر جديد يعكس الحالة النهائية
-    const oldNode = messagesEl.querySelector(`.msg[data-index="${botIndex}"]`);
-    if (!oldNode) return;
-    const newNode = createMessageElement(botMsg, botIndex);
-    oldNode.replaceWith(newNode);
-    requestAnimationFrame(() => setTimeout(() => newNode.classList.add('show'), 20));
-  } catch (e) {
-    console.warn('finalizeStreaming error', e);
-  }
-}
-
 async function flushPendingDeletions() {
   try {
     const key = 'pendingDeletions';
@@ -3031,22 +2994,15 @@ async function analyzeImageWithPuter(imageUrl, userPrompt = null, indicator = nu
         const piece = part.text || (part.message && part.message.content) || '';
         if (!piece) continue;
 
-        // أعلى الحلقة: تأكد أن botIndex معرف خارج الحلقة
-let botMsg = null;
-let botEl = null;
-let botIndex = -1;
-let isFirstChunk = true;
-
-// داخل الحلقة عندما نلتقي أول chunk:
-if (isFirstChunk) {
-  clearIndicator(); // إزالة المؤشر الظاهر فوق
-  botMsg = { id: genId(), role: 'assistant', content: '', meta: { streaming: true } };
-  messages.push(botMsg);
-  appendMessage(botMsg, messages.length - 1);
-  botIndex = messages.length - 1;
-  botEl = messagesEl.querySelector(`.msg[data-index="${botIndex}"] .bubble`);
-  isFirstChunk = false;
-}
+        if (isFirstChunk) {
+          clearIndicator(); // 🟢 إزالة المؤشر
+          botMsg = { id: genId(), role: 'assistant', content: '', meta: {} };
+          messages.push(botMsg);
+          appendMessage(botMsg, messages.length - 1);
+          const botIndex = messages.length - 1;
+          botEl = messagesEl.querySelector(`.msg[data-index="${botIndex}"] .bubble`);
+          isFirstChunk = false;
+        }
 
         botMsg.content += piece;
         if (botEl) {
@@ -3055,17 +3011,6 @@ if (isFirstChunk) {
         }
         messagesEl.scrollTop = messagesEl.scrollHeight;
       }
-
-      // بعد انتهاء استقبال كل chunks:
-if (botMsg && botIndex >= 0) {
-  try {
-    // استبدال العرض ليظهر الأزرار/الفيدباك (وإزالة وضع streaming)
-    finalizeStreaming(botMsg, botIndex);
-  } catch(e) { console.warn('finalize streaming failed', e); }
-}
-clearIndicator();
-saveSession();
-return botMsg ? botMsg.content : null;
 
       saveSession();
       return botMsg ? botMsg.content : null;
@@ -3169,35 +3114,30 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null, indicator = nu
               : `حلل هذا الملف (ملخص، نوعه، نقاط مهمة):\n\n${content.slice(0, 8000)}`;
 
             // بدء البث (stream)
-            let botMsg = { id: genId(), role: 'assistant', content: '', meta: { streaming: true } };
-messages.push(botMsg);
-appendMessage(botMsg, messages.length - 1);
-const botIndex = messages.length - 1;
-let botEl = messagesEl.querySelector(`.msg[data-index="${botIndex}"] .bubble`);
-clearTimeout(toAnalyzingTimer);
+            const botMsg = { id: genId(), role: 'assistant', content: '', meta: {} };
+            messages.push(botMsg);
+            appendMessage(botMsg, messages.length - 1);
+            const botIndex = messages.length - 1;
+            const botEl = messagesEl.querySelector(`.msg[data-index="${botIndex}"] .bubble`);
+            clearTimeout(toAnalyzingTimer);
 
-const response = await puter.ai.chat(basePrompt, null, { model: "gpt-5-nano", stream: true });
+            const response = await puter.ai.chat(basePrompt, null, { model: 'gpt-5-nano', stream: true });
 
-for await (const part of response) {
-  const piece = part.text || (part.message && part.message.content) || '';
-  if (!piece) continue;
-  botMsg.content += piece;
-  if (botEl) {
-    botEl.innerHTML = marked.parse(botMsg.content);
-    enhanceCodeBlocks(botEl);
-  } else {
-    // If botEl isn't found yet (rare), try to query again
-    botEl = messagesEl.querySelector(`.msg[data-index="${botIndex}"] .bubble`);
-  }
-  messagesEl.scrollTop = messagesEl.scrollHeight;
-}
+            for await (const part of response) {
+              const piece = part.text || (part.message && part.message.content) || '';
+              if (!piece) continue;
+              botMsg.content += piece;
+              if (botEl) {
+                botEl.innerHTML = marked.parse(botMsg.content);
+                enhanceCodeBlocks(botEl);
+              }
+              messagesEl.scrollTop = messagesEl.scrollHeight;
+            }
 
-// finalize: remove streaming flag and replace DOM so actions تظهر
-finalizeStreaming(botMsg, botIndex);
-clearIndicator();
-saveSession();
-return botMsg.content;
-             }
+            clearIndicator();
+            saveSession();
+            return botMsg.content;
+          }
         }
 
         // إذا كان ملف PDF عبر رابط
@@ -3483,150 +3423,148 @@ return botMsg.content;
         if(d){ composer.value = d; updateSendVisibility(); autoGrowTextarea(); }
       }
 
-     function createMessageElement(m, idx) {
-  const div = document.createElement("div");
-  div.className = "msg " + (m.role === "user" ? "user" : "assistant");
-  div.dataset.index = idx;
+      function createMessageElement(m, idx) {
+        const div = document.createElement('div');
+        div.className = 'msg ' + (m.role==='user' ? 'user' : 'assistant');
+        div.dataset.index = idx;
 
-  const bubble = document.createElement("div");
-  bubble.className = "bubble";
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble';
 
-  if (m.content && typeof m.content === "string" && String(m.content || "").trim()) {
-    const txt = document.createElement("div");
-    txt.innerHTML = marked.parse(m.content || "");
-    bubble.appendChild(txt);
-    enhanceCodeBlocks(bubble);
-  }
-
-  if (m.attachment) {
-    const att = m.attachment;
-    const mime = att.mime_type || att.attachment_type || att.type || "";
-    const name = att.filename || att.name || "file";
-    let url = att.url || att.src || null;
-
-    const isImage = mime && mime.startsWith("image/");
-
-    if (isImage && url) {
-      const img = document.createElement("img");
-      img.className = "att-image";
-      img.alt = name;
-      img.src = url;
-      bubble.appendChild(img);
-    } else {
-      const elWrap = document.createElement("div");
-      elWrap.className = "file-card";
-
-      const icon = document.createElement("div");
-      icon.className = "file-icon";
-      icon.textContent = (mime.split("/")[1] || mime || "FILE").toUpperCase();
-      elWrap.appendChild(icon);
-
-      const info = document.createElement("div");
-      info.className = "file-info";
-      const title = document.createElement("div");
-      title.className = "file-name";
-      title.textContent = name;
-      info.appendChild(title);
-      elWrap.appendChild(info);
-
-      if (url) {
-        elWrap.addEventListener("click", () => {
-          try {
-            window.open(url, "_blank", "noopener");
-          } catch (e) {}
-        });
-        elWrap.style.cursor = "pointer";
-      }
-
-      bubble.appendChild(elWrap);
-    }
-  }
-
-  if (!m.attachment && m.content) {
-    // النص أضيف أعلاه
-  }
-
-  div.appendChild(bubble);
-
-  if (m.role === "user") {
-    const uacts = document.createElement("div");
-    uacts.className = "user-actions";
-    uacts.innerHTML = `
-      <button class="act-btn" data-act="user-edit" data-tip="Edit"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0b2633" stroke-width="2"><path d="M3 21v-3.6l11.1-11.1 3.6 3.6L6.6 21H3z"/><path d="M14.1 6.9l3 3"/></svg></button>
-      <button class="act-btn" data-act="user-delete" data-tip="Delete"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0b2633" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg></button>
-    `;
-    div.appendChild(uacts);
-  }
-
-  if (m.role === "assistant") {
-    const meta = m.meta || {};
-
-    // 🟢 أثناء البث: لا نضيف أزرار ولا feedback
-    if (meta.streaming) {
-      div.classList.add("streaming");
-    } else {
-      const actions = document.createElement("div");
-      actions.className = "msg-actions";
-      actions.dataset.index = idx;
-
-      const locked = !!meta.locked;
-      const hideReactionButtons = !!meta.hideReactionButtons;
-      const liked = !!meta.liked;
-      const disliked = !!meta.disliked;
-      const tempDisliked = !!meta.tempDisliked;
-      const hideDislike = !!meta.hideDislike;
-
-      let html = `<button class="act-btn" data-act="regen" data-tip="Regenerate" title="Regenerate"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0b2633" stroke-width="2"><path d="M21 12a9 9 0 1 1-3-6.7"/><polyline points="21 3 21 9 15 9"/></svg></button><span class="divider"></span>`;
-
-      if (!hideReactionButtons) {
-        if (!locked || liked) {
-          const likeActive = liked ? 'data-active="true"' : '';
-          const likeLockedAttr = locked ? 'data-locked="true"' : '';
-          html += `<button class="act-btn" data-act="like" data-tip="Like" title="Like" ${likeActive} ${likeLockedAttr}>
-              <svg width="16" height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="2" stroke="${liked ? '#0b80ff' : '#0b2633'}" stroke-linecap="round" stroke-linejoin="round" fill="${liked ? '#0b80ff' : 'none'}">
-              <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
-              </svg>
-          </button>`;
-        }
-        if (!hideDislike && (!locked || tempDisliked || disliked)) {
-          const discActive = (tempDisliked || disliked) ? 'data-active="true"' : '';
-          html += `<button class="act-btn" data-act="dislike" data-tip="Dislike" title="Dislike" ${discActive}>
-              <svg width="16" height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="2" stroke="${disliked ? '#ff4d4f' : '#0b2633'}" stroke-linecap="round" stroke-linejoin="round" fill="${disliked ? '#ff4d4f' : 'none'}">
-              <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zM17 2h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"></path>
-              </svg>
-          </button>`;
-        }
-      }
-
-      html += `<span class="divider"></span>
-        <button class="act-btn" data-act="copy" data-tip="Copy" title="Copy"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0b2633" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
-        <button class="act-btn" data-act="share" data-tip="Share" title="Share">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0b2633" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-                <polyline points="15 3 21 3 21 9"></polyline>
-                <line x1="10" y1="14" x2="21" y2="3"></line>
-            </svg>
-        </button>`;
-
-      actions.innerHTML = html;
-      div.appendChild(actions);
-
-      const fr = document.createElement("div");
-      fr.className = "feedback-row";
-      fr.innerHTML = `
-        <input class="feedback-input" type="text" placeholder="Tell us why you disliked this reply to help us improve" value="${meta.feedback ? escapeHtml(meta.feedback) : ''}">
-        <div class="feedback-actions">
-          <button class="mini-btn send" data-act="sendFeedback">Send</button>
-          <button class="mini-btn cancel" data-act="cancelFeedback">Cancel</button>
-        </div>
-      `;
-      if ((meta.awaitingFeedback) || tempDisliked) fr.style.display = "flex";
-      div.appendChild(fr);
-    }
-  }
-
-  return div;
+        if (m.content && typeof m.content === 'string' && String(m.content||'').trim()) {
+  const txt = document.createElement('div');
+  txt.innerHTML = marked.parse(m.content || '');
+  bubble.appendChild(txt);
+  enhanceCodeBlocks(bubble);
 }
+
+        
+         if (m.attachment) {
+  const att = m.attachment;
+  const mime = att.mime_type || att.attachment_type || att.type || '';
+  const name = att.filename || att.name || 'file';
+  let url = att.url || att.src || null;
+
+  const isImage = mime && mime.startsWith('image/');
+
+  if (isImage && url) {
+    // 🟢 للصور: اعرضها مباشرة بشكل أوضح
+    const img = document.createElement('img');
+    img.className = 'att-image';
+    img.alt = name;
+    img.src = url;
+    bubble.appendChild(img);
+  } else {
+    // 🟢 للملفات الأخرى: عرض البطاقة مع الأيقونة + الاسم + النوع
+    const elWrap = document.createElement('div');
+    elWrap.className = 'file-card';
+
+    const icon = document.createElement('div');
+    icon.className = 'file-icon';
+    // ضع نوع الملف داخل الأيقونة (مثلاً PDF أو HTML)
+    icon.textContent = (mime.split('/')[1] || mime || 'FILE').toUpperCase();
+    elWrap.appendChild(icon);
+
+
+    const info = document.createElement('div');
+    info.className = 'file-info';
+    const title = document.createElement('div');
+    title.className = 'file-name';
+    title.textContent = name;
+    info.appendChild(title);
+    elWrap.appendChild(info);
+
+    if (url) {
+  // instead of textual "Open" link, show download by clicking the whole card (keeps layout)
+  elWrap.addEventListener('click', (ev) => {
+    // open in new tab
+    try { window.open(url, '_blank', 'noopener'); } catch(e){}
+  });
+
+  // ensure cursor pointer
+  elWrap.style.cursor = 'pointer';
+}
+
+    bubble.appendChild(elWrap);
+  }
+}
+
+
+        if(!m.attachment && m.content){
+          // already added above
+        }
+
+        div.appendChild(bubble);
+
+        if(m.role === 'user'){
+            const uacts = document.createElement('div');
+            uacts.className = 'user-actions';
+            uacts.innerHTML = `
+              <button class="act-btn" data-act="user-edit" data-tip="Edit"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0b2633" stroke-width="2"><path d="M3 21v-3.6l11.1-11.1 3.6 3.6L6.6 21H3z"/><path d="M14.1 6.9l3 3"/></svg></button>
+              <button class="act-btn" data-act="user-delete" data-tip="Delete"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0b2633" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg></button>
+            `;
+            div.appendChild(uacts);
+        }
+        if(m.role === 'assistant'){
+            const actions = document.createElement('div');
+            actions.className = 'msg-actions';
+            actions.dataset.index = idx;
+            const meta = m.meta || {};
+            const locked = !!meta.locked;
+            const hideReactionButtons = !!meta.hideReactionButtons;
+            const liked = !!meta.liked;
+            const disliked = !!meta.disliked;
+            const tempDisliked = !!meta.tempDisliked;
+            const hideDislike = !!meta.hideDislike;
+            let html = `<button class="act-btn" data-act="regen" data-tip="Regenerate" title="Regenerate"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0b2633" stroke-width="2"><path d="M21 12a9 9 0 1 1-3-6.7"/><polyline points="21 3 21 9 15 9"/></svg></button><span class="divider"></span>`;
+
+            if(!hideReactionButtons){
+              if(!locked || liked){
+                const likeActive = liked ? 'data-active="true"' : '';
+                const likeLockedAttr = locked ? 'data-locked="true"' : '';
+                 // MODIFICATION: Added stroke-width="2"
+                html += `<button class="act-btn" data-act="like" data-tip="Like" title="Like" ${likeActive} ${likeLockedAttr}>
+                    <svg width="16" height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="2" stroke="${liked ? '#0b80ff' : '#0b2633'}" stroke-linecap="round" stroke-linejoin="round" fill="${liked ? '#0b80ff' : 'none'}">
+                    <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
+                    </svg>
+                </button>`;
+              }
+              if(!hideDislike && (!locked || tempDisliked || disliked)){
+                const discActive = (tempDisliked || disliked) ? 'data-active="true"' : '';
+                // MODIFICATION: Added stroke-width="2"
+                html += `<button class="act-btn" data-act="dislike" data-tip="Dislike" title="Dislike" ${discActive}>
+                    <svg width="16" height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="2" stroke="${disliked ? '#ff4d4f' : '#0b2633'}" stroke-linecap="round" stroke-linejoin="round" fill="${disliked ? '#ff4d4f' : 'none'}">
+                    <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zM17 2h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"></path>
+                    </svg>
+                </button>`;
+              }
+            }
+            // MODIFICATION: Changed share icon SVG
+            html += `<span class="divider"></span>
+              <button class="act-btn" data-act="copy" data-tip="Copy" title="Copy"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0b2633" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+              <button class="act-btn" data-act="share" data-tip="Share" title="Share">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0b2633" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                      <polyline points="15 3 21 3 21 9"></polyline>
+                      <line x1="10" y1="14" x2="21" y2="3"></line>
+                  </svg>
+              </button>`;
+            actions.innerHTML = html;
+            div.appendChild(actions);
+            const fr = document.createElement('div');
+            fr.className = 'feedback-row';
+            fr.innerHTML = `
+              <input class="feedback-input" type="text" placeholder="Tell us why you disliked this reply to help us improve" value="${meta.feedback ? escapeHtml(meta.feedback) : ''}">
+              <div class="feedback-actions">
+                <button class="mini-btn send" data-act="sendFeedback">Send</button>
+                <button class="mini-btn cancel" data-act="cancelFeedback">Cancel</button>
+              </div>
+            `;
+            if((meta.awaitingFeedback) || tempDisliked) fr.style.display = 'flex';
+            div.appendChild(fr);
+        }
+        return div;
+      }
 
       function renderMessages(scrollToBottom=true){
   messagesEl.innerHTML = '';
