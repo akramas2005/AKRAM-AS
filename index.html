@@ -58,8 +58,8 @@
 }
 
   .scroll-to-bottom-btn {
-  position: absolute;
-  bottom: 120px; /* تعديل المسافة حسب الحاجة */
+  position: fixed;       /* بدل absolute */
+  bottom: 120px;         /* المسافة من أسفل الشاشة */
   right: 25px;
   width: 40px;
   height: 40px;
@@ -77,12 +77,17 @@
   pointer-events: none;
   transform: translateY(10px);
   transition: opacity .2s ease, transform .2s ease;
-  z-index: 1000;
+  z-index: 2000;         /* رفعت z-index أكثر */
 }
 .scroll-to-bottom-btn.visible {
   opacity: 1;
   pointer-events: auto;
   transform: translateY(0);
+}
+  .dark-mode .scroll-to-bottom-btn {
+  background-color: rgba(50, 50, 50, 0.9);
+  border: 1px solid #444;
+  color: #fff;
 }
 
 /* --- FINAL & COMPLETE: DYNAMIC THEME STYLES --- */
@@ -168,6 +173,7 @@ body.dark-mode ::-webkit-scrollbar-thumb {
   background-color: #485461;
 }
 /* --- END: Custom Scrollbar Styles --- */
+  
 
   /* --- START: Dark Mode Icon & Font Fixes --- */
 body.dark-mode .msg-actions .act-btn svg,
@@ -3120,13 +3126,20 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null, indicator = nu
                   const botIndex = messages.length - 1;
                   botEl = messagesEl.querySelector(`.msg[data-index="${botIndex}"] .bubble`);
                   isFirstChunk = false;
-                }
-
-                botMsg.content += piece;
-                if (botEl) {
-                  botEl.innerHTML = marked.parse(botMsg.content);
-                  enhanceCodeBlocks(botEl);
-                }
+             if (/[\u0600-\u06FF]/.test(botMsg.content)) {
+  botEl.dir = "rtl";
+  botEl.style.textAlign = "right";
+} else {
+  botEl.dir = "ltr";
+  botEl.style.textAlign = "left";
+}
+                if (/[\u0600-\u06FF]/.test(botMsg.content)) {
+  botEl.dir = "rtl";
+  botEl.style.textAlign = "right";
+} else {
+  botEl.dir = "ltr";
+  botEl.style.textAlign = "left";
+}
                 messagesEl.scrollTop = messagesEl.scrollHeight;
               }
 
@@ -3217,7 +3230,14 @@ if (['zip', 'rar', '7z'].includes(ext)) {
               if (botEl) {
                 botEl.innerHTML = marked.parse(botMsg.content);
                 enhanceCodeBlocks(botEl);
-              }
+                if (/[\u0600-\u06FF]/.test(botMsg.content)) {
+if (/[\u0600-\u06FF]/.test(botMsg.content)) {
+  botEl.dir = "rtl";
+  botEl.style.textAlign = "right";
+} else {
+  botEl.dir = "ltr";
+  botEl.style.textAlign = "left";
+}
               messagesEl.scrollTop = messagesEl.scrollHeight;
             }
 
@@ -3269,7 +3289,13 @@ if (['zip', 'rar', '7z'].includes(ext)) {
         if (botEl) {
           botEl.innerHTML = marked.parse(botMsg.content);
           enhanceCodeBlocks(botEl);
-        }
+          if (/[\u0600-\u06FF]/.test(botMsg.content)) {
+  botEl.dir = "rtl";
+  botEl.style.textAlign = "right";
+} else {
+  botEl.dir = "ltr";
+  botEl.style.textAlign = "left";
+}
         messagesEl.scrollTop = messagesEl.scrollHeight;
       }
     }
@@ -3387,10 +3413,15 @@ if (['zip', 'rar', '7z'].includes(ext)) {
         bubble.className = 'bubble';
 
         if (m.content && typeof m.content === 'string' && String(m.content||'').trim()) {
-  const txt = document.createElement('div');
+  const txt = document.createElement('div'); // ✅ كان ناقص 'div'
   txt.innerHTML = marked.parse(m.content || '');
   bubble.appendChild(txt);
   enhanceCodeBlocks(bubble);
+
+  // 🔧 يحدد اتجاه النص تلقائياً (عربي يمين / إنجليزي يسار / مختلط auto)
+  txt.dir = "auto";
+  txt.style.textAlign = /[\u0600-\u06FF]/.test(m.content) ? "right" : "left";
+}
 
   // 🟢 أضف كود RTL هنا فقط بعد ما يكون txt موجود
   if (/[\u0600-\u06FF]/.test(m.content)) { 
