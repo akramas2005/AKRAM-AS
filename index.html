@@ -3230,22 +3230,25 @@ if (['zip', 'rar', '7z'].includes(ext)) {
 }
 
               botMsg.content += piece;
-              if (botEl) {
-                botEl.innerHTML = marked.parse(botMsg.content);
-                enhanceCodeBlocks(botEl);
-                if (/[\u0600-\u06FF]/.test(botMsg.content)) {
-if (/[\u0600-\u06FF]/.test(botMsg.content)) {
-  botEl.dir = "rtl";
-  botEl.style.textAlign = "right";
-} else {
-  botEl.dir = "ltr";
-  botEl.style.textAlign = "left";
-}
-              messagesEl.scrollTop = messagesEl.scrollHeight;
-            }
+  if (botEl) {
+    botEl.innerHTML = marked.parse(botMsg.content);
+    enhanceCodeBlocks(botEl);
 
-            saveSession();
-            return botMsg ? botMsg.content : null;
+    // 🟢 تحديد الاتجاه بعد تحديث النص
+    if (/[\u0600-\u06FF]/.test(botMsg.content)) {
+      botEl.dir = "rtl";
+      botEl.style.textAlign = "right";
+    } else {
+      botEl.dir = "ltr";
+      botEl.style.textAlign = "left";
+    }
+  }
+
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+saveSession();
+return botMsg ? botMsg.content : null;
           }
         }
 
@@ -3289,26 +3292,25 @@ if (/[\u0600-\u06FF]/.test(botMsg.content)) {
       const piece = part.text || (part.message && part.message.content) || '';
       if (piece) {
         botMsg.content += piece;
-        if (botEl) {
-          botEl.innerHTML = marked.parse(botMsg.content);
-          enhanceCodeBlocks(botEl);
-          if (/[\u0600-\u06FF]/.test(botMsg.content)) {
-  botEl.dir = "rtl";
-  botEl.style.textAlign = "right";
-} else {
-  botEl.dir = "ltr";
-  botEl.style.textAlign = "left";
-}
-        messagesEl.scrollTop = messagesEl.scrollHeight;
-      }
-    }
+  if (botEl) {
+    botEl.innerHTML = marked.parse(botMsg.content);
+    enhanceCodeBlocks(botEl);
 
-    clearIndicator();
-    return botMsg.content;
-  } catch (e) {
-    console.warn("genericFileAnalysis failed", e);
-    clearIndicator();
-    return null;
+    // 🟢 نفس الشيء: تحديد الاتجاه
+    if (/[\u0600-\u06FF]/.test(botMsg.content)) {
+      botEl.dir = "rtl";
+      botEl.style.textAlign = "right";
+    } else {
+      botEl.dir = "ltr";
+      botEl.style.textAlign = "left";
+    }
+  }
+
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+clearIndicator();
+return botMsg.content;
   }
 }
       function appendAssistantText(text) {
