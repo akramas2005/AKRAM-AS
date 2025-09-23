@@ -3373,15 +3373,16 @@ if (['zip', 'rar', '7z'].includes(ext)) {
   txt.innerHTML = marked.parse(m.content || '');
   bubble.appendChild(txt);
   enhanceCodeBlocks(bubble);
-}
-        if (/[\u0600-\u06FF]/.test(m.content)) { // فيه حروف عربية
-  txt.dir = "rtl";
-  txt.style.textAlign = "right";
-} else {
-  txt.dir = "ltr";
-  txt.style.textAlign = "left";
-}
 
+  // 🟢 أضف كود RTL هنا فقط بعد ما يكون txt موجود
+  if (/[\u0600-\u06FF]/.test(m.content)) { 
+    txt.dir = "rtl";
+    txt.style.textAlign = "right";
+  } else {
+    txt.dir = "ltr";
+    txt.style.textAlign = "left";
+  }
+}
         
          if (m.attachment) {
   const att = m.attachment;
