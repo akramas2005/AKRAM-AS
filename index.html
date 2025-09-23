@@ -774,6 +774,25 @@ body.dark-mode .msg.user {
   max-width: none !important;
 }
 
+  .msg.assistant .bubble {
+  white-space: pre-wrap; /* 🟢 يحافظ على أسطر النصوص */
+  line-height: 1.6;      /* تحسين قراءة */
+}
+
+  /* الوضع الافتراضي (إنجليزي/فرنسي إلخ) */
+.msg.assistant .bubble, 
+.msg.user .bubble {
+  direction: ltr;
+  text-align: left;
+}
+
+/* عند وجود نص عربي */
+.msg.assistant .bubble:has(:lang(ar)),
+.msg.user .bubble:has(:lang(ar)) {
+  direction: rtl;
+  text-align: right;
+}
+
 /* لا يظهر معه الأزرار أو الريأكشن */
 .msg.assistant.typing-indicator .msg-actions,
 .msg.assistant.typing-indicator .feedback-row {
@@ -1328,6 +1347,15 @@ body.dark-mode .msg.user {
     .file-thumb-meta{ width:46px; height:46px; }
     .thumb-close{ width:20px; height:20px; top:-6px; right:-6px; }
   }
+
+  #scrollToBottomBtn {
+  position: fixed;
+  bottom: 80px; /* أو حسب المسافة التي تريدها من الأسفل */
+  right: 20px;  /* مكانه يمين */
+  z-index: 9999; /* 🟢 يخليه يطفو فوق كل الرسائل */
+  cursor: pointer;
+  transition: opacity 0.3s ease;
+}
 
   /* ===================== CONVERSATIONS SIDEBAR ===================== */
   .convo-panel{
@@ -3345,6 +3373,13 @@ if (['zip', 'rar', '7z'].includes(ext)) {
   txt.innerHTML = marked.parse(m.content || '');
   bubble.appendChild(txt);
   enhanceCodeBlocks(bubble);
+}
+        if (/[\u0600-\u06FF]/.test(m.content)) { // فيه حروف عربية
+  txt.dir = "rtl";
+  txt.style.textAlign = "right";
+} else {
+  txt.dir = "ltr";
+  txt.style.textAlign = "left";
 }
 
         
