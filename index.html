@@ -3115,26 +3115,36 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null, indicator = nu
               clearTimeout(toAnalyzingTimer);
 
               for await (const part of response) {
-                const piece = part.text || (part.message && part.message.content) || '';
-                if (!piece) continue;
+  const piece = part.text || (part.message && part.message.content) || '';
+  if (!piece) continue;
 
-                if (isFirstChunk) {
-                  clearIndicator();
-                  botMsg = { id: genId(), role: 'assistant', content: '', meta: {} };
-                  messages.push(botMsg);
-                  appendMessage(botMsg, messages.length - 1);
-                  const botIndex = messages.length - 1;
-                  botEl = messagesEl.querySelector(`.msg[data-index="${botIndex}"] .bubble`);
-                  isFirstChunk = false;
-             if (/[\u0600-\u06FF]/.test(botMsg.content)) {
-  botEl.dir = "rtl";
-  botEl.style.textAlign = "right";
-} else {
-  botEl.dir = "ltr";
-  botEl.style.textAlign = "left";
+  if (isFirstChunk) {
+    clearIndicator();
+    botMsg = { id: genId(), role: 'assistant', content: '', meta: {} };
+    messages.push(botMsg);
+    appendMessage(botMsg, messages.length - 1);
+    const botIndex = messages.length - 1;
+    botEl = messagesEl.querySelector(`.msg[data-index="${botIndex}"] .bubble`);
+    isFirstChunk = false;
+  }
+
+  botMsg.content += piece;
+  if (botEl) {
+    botEl.innerHTML = marked.parse(botMsg.content);
+    enhanceCodeBlocks(botEl);
+
+    // 🟢 هنا فقط نحكم الاتجاه بعد تحديث النص
+    if (/[\u0600-\u06FF]/.test(botMsg.content)) {
+      botEl.dir = "rtl";
+      botEl.style.textAlign = "right";
+    } else {
+      botEl.dir = "ltr";
+      botEl.style.textAlign = "left";
+    }
+  }
+
+  messagesEl.scrollTop = messagesEl.scrollHeight;
 }
-                messagesEl.scrollTop = messagesEl.scrollHeight;
-              }
 
               saveSession();
               return botMsg ? botMsg.content : null;
