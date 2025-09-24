@@ -4032,20 +4032,6 @@ async function regenerateAssistantForParent(parentIdx){
         }, 100);
       });
 // ====== END: edit branch replacement ======
- else {
-  if (pendingAttachment) {
-    sendAttachmentNow();
-  } else {
-    composer.value = '';
-    updateSendVisibility();
-    autoGrowTextarea();
-    sendMessage(t);
-  }
-}
-startRotatorIfNeeded();
-
-        }, 260);
-      });
 
       composer.addEventListener('keydown', (e)=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendInsideBtn.click(); } });
 
