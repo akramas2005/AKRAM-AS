@@ -3003,79 +3003,72 @@ async function analyzeImageWithPuter(imageUrl, userPrompt = null, indicator = nu
 
   const delay = Math.floor(Math.random() * (5000 - 3000 + 1)) + 3000;
   const toAnalyzingTimer = setTimeout(() => {
-    try { setToAnalyzing(indicator); } catch (e) {}
+    try { setToAnalyzing(indicator); } catch(e) {}
   }, delay);
 
   try {
-    if (!(typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function')) {
+    if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
+      const basePrompt = (userPrompt && String(userPrompt).trim())
+        ? `${String(userPrompt).trim()}\n\nالآن قم بتحليل الصورة التالية:`
+        : `صف محتوى هذه الصورة باختصار.`;
+
+      const response = await puter.ai.chat(basePrompt, imageUrl, { model: 'gpt-5-nano', stream: true });
+
+      let botMsg = null;
+      let botEl = null;
+      let isFirstChunk = true;
+
       clearTimeout(toAnalyzingTimer);
-      clearIndicator();
-      return null;
-    }
 
-    const basePrompt = (userPrompt && String(userPrompt).trim())
-      ? `${String(userPrompt).trim()}\n\nالآن قم بتحليل الصورة التالية:`
-      : `صف محتوى هذه الصورة باختصار.`;
+      for await (const part of response) {
+  const piece = part.text || (part.message && part.message.content) || '';
+  if (!piece) continue;
 
-    const response = await puter.ai.chat(basePrompt, imageUrl, { model: 'gpt-5-nano', stream: true });
-
-    let botMsg = null;
-    let botIndex = -1;
-    let botEl = null;
-    let isFirstChunk = true;
-
-    for await (const part of response) {
-      const piece = part && (part.text || (part.message && part.message.content)) || '';
-      if (!piece) continue;
-
-      if (isFirstChunk) {
-        clearTimeout(toAnalyzingTimer);
-        clearIndicator(); // نزيل المؤشر الظاهر
-        botMsg = { id: genId(), role: 'assistant', content: '', meta: {} };
-        messages.push(botMsg);
-        appendMessage(botMsg, messages.length - 1);
-        botIndex = messages.length - 1;
-        botEl = messagesEl.querySelector(`.msg[data-index="${botIndex}"] .bubble`);
-        isFirstChunk = false;
-      }
-
-      botMsg.content += piece;
-
-      if (botEl) {
-        const html = marked.parse(botMsg.content);
-        const txt = document.createElement('div');
-        txt.innerHTML = html;
-
-        // تحديد الاتجاه بناءً على وجود أحرف عربية
-        if (/[\u0600-\u06FF]/.test(botMsg.content)) {
-          txt.dir = "rtl";
-          txt.style.textAlign = "right";
-        } else {
-          txt.dir = "ltr";
-          txt.style.textAlign = "left";
-        }
-
-        botEl.innerHTML = "";
-        botEl.appendChild(txt);
-        enhanceCodeBlocks(botEl);
-      }
-
-      // تمرير لأسفل أثناء البث
-      try { messagesEl.scrollTop = messagesEl.scrollHeight; } catch (e) {}
-    }
-
-    // بعد انتهاء البث
-    saveSession();
-    clearIndicator();
-    return botMsg ? botMsg.content : null;
-
-  } catch (err) {
-    console.warn('analyzeImageWithPuter failed', err);
-  } finally {
-    clearTimeout(toAnalyzingTimer);
-    clearIndicator();
+  if (isFirstChunk) {
+    clearIndicator(); // 🟢 إزالة المؤشر
+    botMsg = { id: genId(), role: 'assistant', content: '', meta: {} };
+    messages.push(botMsg);
+    appendMessage(botMsg, messages.length - 1);
+    const botIndex = messages.length - 1;
+    botEl = messagesEl.querySelector(`.msg[data-index="${botIndex}"] .bubble`);
+    isFirstChunk = false;
   }
 
+  botMsg.content += piece;
+
+  if (botEl) {
+    const html = marked.parse(botMsg.content);
+
+    const txt = document.createElement('div');
+    txt.innerHTML = html;
+
+    // RTL للغة العربية، LTR لباقي اللغات
+    if (/[\u0600-\u06FF]/.test(botMsg.content)) {
+      txt.dir = "rtl";
+      txt.style.textAlign = "right";
+    } else {
+      txt.dir = "ltr";
+      txt.style.textAlign = "left";
+    }
+
+    botEl.innerHTML = "";
+    botEl.appendChild(txt);
+
+    enhanceCodeBlocks(botEl);
+  }
+
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+saveSession();
+return botMsg ? botMsg.content : null;
+    }
+  } catch (err) {
+    console.warn('analyzeImageWithPuter failed', err);
+  }
+
+  clearTimeout(toAnalyzingTimer);
+  clearIndicator();
   return null;
 }
       
@@ -3091,120 +3084,75 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null, indicator = nu
 
     const delay = Math.floor(Math.random() * (5000 - 3000 + 1)) + 3000;
     const toAnalyzingTimer = setTimeout(() => {
-      try { setToAnalyzing(indicator); } catch (e) {}
+      try { setToAnalyzing(indicator); } catch(e) {}
     }, delay);
 
-    // --- مساعدة لتحديث DOM أثناء البث (نستخدمها في أماكن متعددة) ---
-    async function streamAndRender(response) {
-      let botMsg = null;
-      let botIndex = -1;
-      let botEl = null;
-      let isFirstChunk = true;
-
-      for await (const part of response) {
-        const piece = part && (part.text || (part.message && part.message.content)) || '';
-        if (!piece) continue;
-
-        if (isFirstChunk) {
-          clearTimeout(toAnalyzingTimer);
-          clearIndicator();
-          botMsg = { id: genId(), role: 'assistant', content: '', meta: {} };
-          messages.push(botMsg);
-          appendMessage(botMsg, messages.length - 1);
-          botIndex = messages.length - 1;
-          botEl = messagesEl.querySelector(`.msg[data-index="${botIndex}"] .bubble`);
-          isFirstChunk = false;
-        }
-
-        botMsg.content += piece;
-
-        if (botEl) {
-          const html = marked.parse(botMsg.content);
-          const txt = document.createElement('div');
-          txt.innerHTML = html;
-
-          if (/[\u0600-\u06FF]/.test(botMsg.content)) {
-            txt.dir = "rtl";
-            txt.style.textAlign = "right";
-          } else {
-            txt.dir = "ltr";
-            txt.style.textAlign = "left";
-          }
-
-          botEl.innerHTML = "";
-          botEl.appendChild(txt);
-          enhanceCodeBlocks(botEl);
-        }
-
-        try { messagesEl.scrollTop = messagesEl.scrollHeight; } catch (e) {}
-      }
-
-      if (botMsg) {
-        saveSession();
-        clearIndicator();
-        return botMsg.content;
-      }
-      return null;
-    }
-
-    // --- إذا كان رابط (string) ---
     if (typeof fileOrUrl === 'string') {
       const lower = fileOrUrl.toLowerCase();
 
-      // رابط صوري -> تعامل كما الصور
       if (lower.match(/\.(png|jpe?g|webp|gif|bmp)(?:[?#].*)?$/)) {
         clearTimeout(toAnalyzingTimer);
         return await analyzeImageWithPuter(fileOrUrl, userPrompt, indicator);
       }
 
-      // نجيب الملف من الرابط
       try {
         const resp = await fetch(fileOrUrl);
-        if (!resp.ok) {
-          clearTimeout(toAnalyzingTimer);
-          clearIndicator();
-          return null;
-        }
-        const mime = resp.headers.get("content-type") || "";
+        if (resp.ok) {
+          const mime = resp.headers.get("content-type") || "";
+          if (mime.startsWith("text/") || mime.includes("json") || mime.includes("xml") || mime.includes("csv")) {
+            const content = await resp.text();
+            if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
+              const basePrompt = (userPrompt && String(userPrompt).trim())
+                ? `${String(userPrompt).trim()}\n\nهذا محتوى الملف:\n\n${content.slice(0, 8000)}`
+                : `حلل هذا الملف (ملخص، نوعه، أي نص داخلي مهم):\n\n${content.slice(0, 8000)}`;
 
-        // نصوص بسيطة -> نقرأ ونبث
-        if (mime.startsWith("text/") || mime.includes("json") || mime.includes("xml") || mime.includes("csv")) {
-          const content = await resp.text();
-          if (!(typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function')) {
-            clearTimeout(toAnalyzingTimer);
-            clearIndicator();
-            return null;
-          }
+              const response = await puter.ai.chat(basePrompt, null, { model: "gpt-5-nano", stream: true });
 
-          const basePrompt = (userPrompt && String(userPrompt).trim())
-            ? `${String(userPrompt).trim()}\n\nهذا محتوى الملف:\n\n${content.slice(0, 8000)}`
-            : `حلل هذا الملف (ملخص، نوعه، نقاط مهمة):\n\n${content.slice(0, 8000)}`;
+              let botMsg = null;
+              let botEl = null;
+              let isFirstChunk = true;
 
-          const response = await puter.ai.chat(basePrompt, null, { model: "gpt-5-nano", stream: true });
-          return await streamAndRender(response);
-        }
+              clearTimeout(toAnalyzingTimer);
 
-        // PDF عبر رابط -> نحاول استخراج النص ثم بثه
-        if (mime.includes('pdf') || lower.endsWith('.pdf')) {
-          try {
-            const arrayBuffer = await resp.arrayBuffer();
-            const pdfText = await extractPdfText(new Blob([arrayBuffer]));
-            if (!pdfText) { clearTimeout(toAnalyzingTimer); clearIndicator(); return null; }
-            if (!(typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function')) {
-              clearTimeout(toAnalyzingTimer); clearIndicator(); return null;
+              for await (const part of response) {
+  const piece = part.text || (part.message && part.message.content) || '';
+  if (!piece) continue;
+
+  if (isFirstChunk) {
+    clearIndicator();
+    botMsg = { id: genId(), role: 'assistant', content: '', meta: {} };
+    messages.push(botMsg);
+    appendMessage(botMsg, messages.length - 1);
+    const botIndex = messages.length - 1;
+    botEl = messagesEl.querySelector(`.msg[data-index="${botIndex}"] .bubble`);
+    isFirstChunk = false;
+  }
+
+  botMsg.content += piece;
+  if (botEl) {
+    botEl.innerHTML = marked.parse(botMsg.content);
+    enhanceCodeBlocks(botEl);
+
+    // 🟢 هنا فقط نحكم الاتجاه بعد تحديث النص
+    if (/[\u0600-\u06FF]/.test(botMsg.content)) {
+      botEl.dir = "rtl";
+      botEl.style.textAlign = "right";
+    } else {
+      botEl.dir = "ltr";
+      botEl.style.textAlign = "left";
+    }
+  }
+
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+              saveSession();
+              return botMsg ? botMsg.content : null;
             }
-            const basePrompt = (userPrompt && String(userPrompt).trim())
-              ? `${String(userPrompt).trim()}\n\nهذا محتوى ملف PDF:\n\n${pdfText.slice(0, 8000)}`
-              : `حلل هذا الملف PDF وقدم ملخصاً:\n\n${pdfText.slice(0, 8000)}`;
-            const response = await puter.ai.chat(basePrompt, null, { model: "gpt-5-nano", stream: true });
-            return await streamAndRender(response);
-          } catch (err) {
-            console.warn('PDF (url) handling failed', err);
           }
         }
-
       } catch (err) {
-        console.warn('fetch file for analysis failed', err);
+        console.warn("fetch file for analysis failed", err);
       }
 
       clearTimeout(toAnalyzingTimer);
@@ -3212,59 +3160,101 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null, indicator = nu
       return null;
     }
 
-    // --- إذا كان File محلي ---
-    if (fileOrUrl instanceof File || fileOrUrl instanceof Blob) {
+    if (fileOrUrl instanceof File) {
       try {
-        // صورة محلية
         if (fileOrUrl.type && fileOrUrl.type.startsWith('image/')) {
+          const dataUrl = await new Promise((res, rej) => {
+            const fr = new FileReader();
+            fr.onload = () => res(fr.result);
+            fr.onerror = rej;
+            fr.readAsDataURL(fileOrUrl);
+          });
           clearTimeout(toAnalyzingTimer);
-          return await analyzeImageWithPuter(fileOrUrl, userPrompt, indicator);
+          return await analyzeImageWithPuter(dataUrl, userPrompt, indicator);
         }
 
         const ext = (fileOrUrl.name || '').split('.').pop().toLowerCase();
         const textLike = ['txt','json','js','html','htm','css','py','md','xml','csv'];
-
-        // PDF محلي
-        if (ext === 'pdf') {
-          const pdfText = await extractPdfText(fileOrUrl);
-          if (!pdfText) { clearTimeout(toAnalyzingTimer); clearIndicator(); return null; }
-          if (!(typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function')) {
-            clearTimeout(toAnalyzingTimer); clearIndicator(); return null;
-          }
-          const basePrompt = (userPrompt && String(userPrompt).trim())
-            ? `${String(userPrompt).trim()}\n\nهذا محتوى ملف PDF:\n\n${pdfText.slice(0, 8000)}`
-            : `حلل هذا الملف PDF وقدم ملخصاً:\n\n${pdfText.slice(0, 8000)}`;
-          const response = await puter.ai.chat(basePrompt, null, { model: 'gpt-5-nano', stream: true });
-          return await streamAndRender(response);
-        }
-
-        // ملفات نصية محلية
         if (textLike.includes(ext)) {
           const txtContent = await fileOrUrl.text();
-          if (!(typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function')) {
-            clearTimeout(toAnalyzingTimer); clearIndicator(); return null;
-          }
-          const basePrompt = (userPrompt && String(userPrompt).trim())
-            ? `${String(userPrompt).trim()}\n\nهذا محتوى الملف (${ext}):\n\n${txtContent.slice(0, 8000)}`
-            : `حلل هذا الملف (${ext}) وقدم ملخصاً:\n\n${txtContent.slice(0, 8000)}`;
-          const response = await puter.ai.chat(basePrompt, null, { model: 'gpt-5-nano', stream: true });
-          return await streamAndRender(response);
-        }
+          if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
+            const basePrompt = (userPrompt && String(userPrompt).trim())
+              ? `${String(userPrompt).trim()}\n\nهذا محتوى الملف (${ext}):\n\n${txtContent.slice(0, 8000)}`
+              : `حلل هذا الملف (${ext}) وقدم ملخصاً:\n\n${txtContent.slice(0, 8000)}`;
 
-        // أنواع أخرى: استخدم genericFileAnalysis كـ fallback
-        const otherExtGroups = {
-          'Word Document': ['doc','docx'],
-          'Spreadsheet / Excel file': ['xls','xlsx','ods','csv'],
-          'PowerPoint Presentation': ['ppt','pptx'],
-          'Compressed Archive': ['zip','rar','7z']
-        };
-        for (const [label, exts] of Object.entries(otherExtGroups)) {
-          if (exts.includes(ext)) {
+            const response = await puter.ai.chat(basePrompt, null, { model: 'gpt-5-nano', stream: true });
+
+            let botMsg = null;
+            let botEl = null;
+            let isFirstChunk = true;
+
             clearTimeout(toAnalyzingTimer);
-            return await genericFileAnalysis(fileOrUrl, userPrompt, label);
+
+            for await (const part of response) {
+              const piece = part.text || (part.message && part.message.content) || '';
+              if (!piece) continue;
+
+              if (isFirstChunk) {
+                clearIndicator();
+                botMsg = { id: genId(), role: 'assistant', content: '', meta: {} };
+                messages.push(botMsg);
+                appendMessage(botMsg, messages.length - 1);
+                const botIndex = messages.length - 1;
+                botEl = messagesEl.querySelector(`.msg[data-index="${botIndex}"] .bubble`);
+                isFirstChunk = false;
+              }
+
+              // 1. ملفات PDF
+if (ext === 'pdf') {
+  return await genericFileAnalysis(fileOrUrl, userPrompt, "PDF");
+}
+
+// 2. ملفات Word
+if (['doc', 'docx'].includes(ext)) {
+  return await genericFileAnalysis(fileOrUrl, userPrompt, "Word Document");
+}
+
+// 3. ملفات Excel
+if (['xls', 'xlsx', 'ods', 'csv'].includes(ext)) {
+  return await genericFileAnalysis(fileOrUrl, userPrompt, "Spreadsheet / Excel file");
+}
+
+// 4. ملفات PowerPoint
+if (['ppt', 'pptx'].includes(ext)) {
+  return await genericFileAnalysis(fileOrUrl, userPrompt, "PowerPoint Presentation");
+}
+
+// 5. ملفات مضغوطة
+if (['zip', 'rar', '7z'].includes(ext)) {
+  return await genericFileAnalysis(fileOrUrl, userPrompt, "Compressed Archive (ZIP/RAR)");
+}
+
+              botMsg.content += piece;
+  if (botEl) {
+    botEl.innerHTML = marked.parse(botMsg.content);
+    enhanceCodeBlocks(botEl);
+
+    // 🟢 تحديد الاتجاه بعد تحديث النص
+    if (/[\u0600-\u06FF]/.test(botMsg.content)) {
+      botEl.dir = "rtl";
+      botEl.style.textAlign = "right";
+    } else {
+      botEl.dir = "ltr";
+      botEl.style.textAlign = "left";
+    }
+  }
+
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+saveSession();
+return botMsg ? botMsg.content : null;
           }
         }
 
+        clearTimeout(toAnalyzingTimer);
+        clearIndicator();
+        return null;
       } catch (e) {
         console.warn('analyzeFileWithPuter read text failed', e);
         clearTimeout(toAnalyzingTimer);
@@ -3290,53 +3280,39 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null, indicator = nu
       ? `${String(userPrompt).trim()}\n\nهذا ملف من نوع ${fileType}. حاول تلخيص أو وصف محتواه بناءً على النوع.`
       : `حلل هذا ${fileType} وقدم ملخصاً أو استنتاجات عامة.`;
 
+    const botMsg = { id: genId(), role: 'assistant', content: '', meta: {} };
+    messages.push(botMsg);
+    appendMessage(botMsg, messages.length - 1);
+    const botIndex = messages.length - 1;
+    const botEl = messagesEl.querySelector(`.msg[data-index="${botIndex}"] .bubble`);
+
     const response = await puter.ai.chat(basePrompt, null, { model: 'gpt-5-nano', stream: true });
 
-    let botMsg = null;
-    let botIndex = -1;
-    let botEl = null;
-    let isFirstChunk = true;
-
     for await (const part of response) {
-      const piece = part && (part.text || (part.message && part.message.content)) || '';
+      const piece = part.text || (part.message && part.message.content) || '';
       if (!piece) continue;
 
-      if (isFirstChunk) {
-        clearIndicator();
-        botMsg = { id: genId(), role: 'assistant', content: '', meta: {} };
-        messages.push(botMsg);
-        appendMessage(botMsg, messages.length - 1);
-        botIndex = messages.length - 1;
-        botEl = messagesEl.querySelector(`.msg[data-index="${botIndex}"] .bubble`);
-        isFirstChunk = false;
-      }
-
       botMsg.content += piece;
-
       if (botEl) {
-        const html = marked.parse(botMsg.content);
-        const txt = document.createElement('div');
-        txt.innerHTML = html;
-
-        if (/[\u0600-\u06FF]/.test(botMsg.content)) {
-          txt.dir = "rtl";
-          txt.style.textAlign = "right";
-        } else {
-          txt.dir = "ltr";
-          txt.style.textAlign = "left";
-        }
-
-        botEl.innerHTML = "";
-        botEl.appendChild(txt);
+        botEl.innerHTML = marked.parse(botMsg.content);
         enhanceCodeBlocks(botEl);
+
+        // 🟢 تحديد الاتجاه
+        if (/[\u0600-\u06FF]/.test(botMsg.content)) {
+          botEl.dir = "rtl";
+          botEl.style.textAlign = "right";
+        } else {
+          botEl.dir = "ltr";
+          botEl.style.textAlign = "left";
+        }
       }
 
-      try { messagesEl.scrollTop = messagesEl.scrollHeight; } catch (e) {}
+      messagesEl.scrollTop = messagesEl.scrollHeight;
     }
 
+    // ✅ بعد انتهاء الحلقة
     clearIndicator();
-    saveSession();
-    return botMsg ? botMsg.content : null;
+    return botMsg.content;
 
   } catch (e) {
     console.warn("genericFileAnalysis failed", e);
