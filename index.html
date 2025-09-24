@@ -720,55 +720,76 @@ body.dark-mode .analyzingText {
 
 /* messages area */
   .messages{flex:1; overflow:auto; padding:18px; display:flex; flex-direction:column; gap:10px; background: linear-gradient(180deg, rgba(255,255,255,0), rgba(245,248,250,0.6)); transition: padding-bottom .12s ease;}
-
-  /* --- START: FINAL MESSAGE ALIGNMENT & STYLE FIX --- */
-
-  /* القاعدة الأساسية لحاوية الرسالة */
   .msg {
-    display: flex; /* استخدام flex لتحديد موضع الفقاعة */
-    width: 100%;   /* اجعل الحاوية تأخذ العرض الكامل */
-    position: relative;
-    opacity:0; transform: translateY(8px);
-    transition: opacity .28s ease, transform .28s;
-    will-change: transform, opacity;
-  }
-  .msg.show{ opacity:1; transform:translateY(0); }
-
-  /* تحديد جهة الرسالة (يمين للمستخدم، يسار للمساعد) */
-  .msg.user { justify-content: flex-end; }
-  .msg.assistant { justify-content: flex-start; }
-
-  /* القاعدة الأساسية للفقاعة الداخلية */
-  .msg .bubble {
-    max-width: min(92%, 850px); /* عرض أكبر كما طلبته سابقًا */
-    line-height:1.45;
-    font-size:14px;
+    max-width: 100%;
+    padding:10px 12px;
+    border-radius:12px; line-height:1.35; font-size:14px; box-shadow: 0 6px 18px rgba(6,30,60,0.04);
+    opacity:0; transform: translateY(8px); transition: opacity .28s ease, transform .28s;
     word-wrap: break-word;
     position: relative;
-    /* هذا هو الجزء الأهم لحل مشكلة المحاذاة */
-    direction: auto;
-    text-align: start;
+    z-index: 1;
+    will-change: transform, opacity;
   }
+  .msg .bubble{
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    hyphens: auto;
+    max-width: 100%;
+  }
+  .msg.show{ opacity:1; transform:translateY(0); }
+  /* تصميم فقاعة المستخدم الجديدة */
+.msg.user {
+  width: fit-content;
+  align-self: flex-end;
+  /* اللون الجديد: رمادي فاتح */
+  background: #eef2f5; 
+  /* لون نص داكن ليناسب الخلفية الفاتحة */
+  color: #1f2328; 
+  border-bottom-right-radius: 6px;
+  z-index: 14030;
+}
 
-  /* تصميم فقاعة المستخدم (رمادية) */
-  .msg.user .bubble {
-    background: #eef2f5;
-    color: #1f2328;
-    padding: 10px 14px;
-    border-radius: 12px;
-    border-bottom-right-radius: 6px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-  }
-  body.dark-mode .msg.user .bubble {
-    background: #2a3038;
-    color: #e6edf3;
-  }
-  
-  /* تصميم رد المساعد (بدون فقاعة) */
-  .msg.assistant .bubble {
-    padding: 4px 0;
-  }
+/* تصميم فقاعة المستخدم في الوضع الداكن */
+body.dark-mode .msg.user {
+  /* لون رمادي داكن للوضع المظلم */
+  background: #2a3038;
+  /* لون نص فاتح كالمعتاد */
+  color: #e6edf3;
+}
+  /* Fix for user bubble width with Markdown */
+.msg.user .bubble p {
+  margin: 0;
+  display: inline-block;
+  text-align: left; /* To ensure text inside aligns correctly */
+}
+  .msg.assistant{ 
+  align-self:flex-start; 
+  background: transparent; /* <--- جعل الخلفية شفافة */
+  box-shadow: none; /* <--- إزالة الظل */
+  color:#0b2633; 
+  border-bottom-left-radius:6px; 
+  z-index: 1; 
+}
 
+  /* لا تجعل المؤشر يأخذ ستايل الفقاعة */
+.msg.assistant.typing-indicator {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  padding: 0 !important;
+  max-width: none !important;
+}
+
+/* لا يظهر معه الأزرار أو الريأكشن */
+.msg.assistant.typing-indicator .msg-actions,
+.msg.assistant.typing-indicator .feedback-row {
+  display: none !important;
+}
+  /* --- START: Final Arabic Text Alignment Fix --- */
+.msg .bubble[dir="rtl"] p {
+    text-align: right;
+}
   /* --- END: FINAL MESSAGE ALIGNMENT & STYLE FIX --- */
 
   .msg-actions{
