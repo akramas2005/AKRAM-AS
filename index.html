@@ -3747,37 +3747,42 @@ async function regenerateAssistantForParent(parentIdx){
             return;
         }
         
-        // --- START: تعديل للتحقق الدقيق من نوع المرفق ---
         const parentMessage = messages[parentIdx];
         const attachment = parentMessage?.attachment;
         let imageUrl = null;
+        let attachmentType = 'default'; // النوع الافتراضي
 
-        // تحقق من وجود مرفق، وأن له رابط، وأن نوعه هو "صورة"
-        if (attachment && attachment.url && attachment.mime_type?.startsWith('image/')) {
-            imageUrl = attachment.url;
+        // 1. تحقق من وجود ونوع المرفق
+        if (attachment && attachment.url) {
+            if (attachment.mime_type?.startsWith('image/')) {
+                imageUrl = attachment.url;
+                attachmentType = 'image';
+            } else {
+                attachmentType = 'file'; // أي نوع آخر هو "ملف"
+            }
         }
-        // --- END: تعديل للتحقق الدقيق من نوع المرفق ---
 
         shouldStopGeneration = false;
         sendInsideBtn.classList.add('is-generating');
         sendInsideBtn.classList.add('visible');
 
-        // أظهر الأنيميشن المناسب (تحليل للصورة، أو عادي للباقي)
+        // 2. أظهر الأنيميشن المناسب بناءً على نوع المرفق
         clearIndicator();
-        showTyping(imageUrl ? 'image' : 'default');
+        showTyping(attachmentType);
 
         let assistantEl = null;
         let bubbleEl = null;
         let assistantMessage = null;
         let isFirstChunk = true;
 
+        // 3. استدعاء الذكاء الاصطناعي (فقط الصور يتم إرسالها للتحليل البصري)
         let response;
         const prompt = buildChatPrompt(messages, parentIdx);
         if (imageUrl) {
             // إذا كانت هناك صورة، أرسل النص والصورة معًا
             response = await puter.ai.chat(prompt, imageUrl, { model: 'gpt-5-nano', stream: true });
         } else {
-            // إذا لم تكن هناك صورة، أرسل النص فقط
+            // للملفات الأخرى والنصوص، أرسل النص فقط (السياق موجود فيه)
             response = await puter.ai.chat(prompt, { model: 'gpt-5-nano', stream: true });
         }
         
