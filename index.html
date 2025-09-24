@@ -792,6 +792,12 @@ body.dark-mode .msg.user {
 }
   /* --- END: FINAL MESSAGE ALIGNMENT & STYLE FIX --- */
 
+  /* --- START: RTL Text Alignment Helper --- */
+.bubble.rtl-text {
+    text-align: right;
+}
+/* --- END: RTL Text Alignment Helper --- */
+
   .msg-actions{
     display:flex; align-items:center; gap:6px; margin-top:6px; opacity:.95;
   }
@@ -1715,6 +1721,10 @@ marked.setOptions({
       t.classList.add('show');
       setTimeout(()=> t.classList.remove('show'), duration);
     }
+    function isRTL(text) {
+    const rtlRegex = /[\u0600-\u06FF\u0750-\u077F]/;
+    return rtlRegex.test(text);
+}
     // helper: try to initialize SVG rect stroke length safely (retries via rAF)
 function ensureRectInitialized(rect, cb) {
   let attempts = 0;
@@ -3452,22 +3462,25 @@ bubble.setAttribute('dir', 'auto'); // <-- هذا هو السطر الجديد �
         return div;
       }
 
-      function renderMessages(scrollToBottom=true){
+     function renderMessages(scrollToBottom=true){
   messagesEl.innerHTML = '';
   messages.forEach((m, idx)=>{
       const messageEl = createMessageElement(m, idx);
       messagesEl.appendChild(messageEl);
 
-      // --- START: تعديل لجعل التلوين دائمًا ---
-      // بعد عرض الرسالة، ابحث عن أي بلوكات أكواد بداخلها وقم بتلوينها
       const codeBlocksToHighlight = messageEl.querySelectorAll('pre code');
       codeBlocksToHighlight.forEach(block => {
-          // تأكد من أن البلوك لم يتم تلوينه من قبل لتجنب الأخطاء
           if (block.classList.contains('hljs-enhanced')) {
               hljs.highlightElement(block);
           }
       });
-      // --- END: تعديل لجعل التلوين دائمًا ---
+
+      // --- START: تعديل المحاذاة للرسائل القديمة ---
+      const bubble = messageEl.querySelector('.bubble');
+      if (bubble && m.content && isRTL(m.content)) {
+          bubble.classList.add('rtl-text');
+      }
+      // --- END: تعديل المحاذاة للرسائل القديمة ---
 
       requestAnimationFrame(()=> setTimeout(()=> messageEl.classList.add('show'), 20));
   });
@@ -3628,11 +3641,8 @@ async function sendMessage(text, parentIndex = null) {
         scheduleSync();
     });
 
-   // 1. إظهار حركة الأعمدة الجديدة
-clearIndicator();
-// 🟢 عند الرسائل النصية نعرض فقط الأعمدة بدون تحليل
-const indicator = showTyping("default");
-
+    clearIndicator();
+    showTyping(); 
 
     const isUserAtBottomInitially = messagesEl.scrollHeight - messagesEl.clientHeight <= messagesEl.scrollTop + 20;
 
@@ -3649,7 +3659,7 @@ const indicator = showTyping("default");
             if (!piece) continue;
 
             if (isFirstChunk) {
-                clearIndicator(); // 2. إزالة المؤشر عند وصول أول جزء من الرد
+                clearIndicator();
                 assistantMessage = { id: genId(), role: 'assistant', content: '', parent: messages.length - 1, meta: {} };
                 messages.push(assistantMessage);
                 assistantEl = createMessageElement(assistantMessage, messages.length - 1);
@@ -3664,8 +3674,7 @@ const indicator = showTyping("default");
                 bubbleEl.innerHTML = marked.parse(assistantMessage.content);
                 enhanceCodeBlocks(bubbleEl);
             }
-            
-            // 3. التمرير للأسفل فقط إذا كان المستخدم قد بدأ من الأسفل
+
             if (isUserAtBottomInitially) {
                 messagesEl.scrollTop = messagesEl.scrollHeight;
             }
@@ -3674,12 +3683,19 @@ const indicator = showTyping("default");
         if (assistantEl) {
             const codeBlocksToHighlight = assistantEl.querySelectorAll('pre code');
             codeBlocksToHighlight.forEach(block => { hljs.highlightElement(block); });
+
+            // --- START: تعديل المحاذاة للرسائل الجديدة ---
+            const finalBubble = assistantEl.querySelector('.bubble');
+            if (finalBubble && isRTL(assistantMessage.content)) {
+                finalBubble.classList.add('rtl-text');
+            }
+            // --- END: تعديل المحاذاة للرسائل الجديدة ---
         }
         saveSession();
 
     } catch (error) {
         console.error("Puter.js Error:", error);
-        clearIndicator(); // 4. إزالة المؤشر عند حدوث خطأ
+        clearIndicator();
         const errorMsg = { id: genId(), role: 'assistant', content: 'عذرًا، حدث خطأ ما.', meta: {} };
         appendMessage(errorMsg, messages.length);
     }
