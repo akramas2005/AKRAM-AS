@@ -3074,224 +3074,97 @@ async function extractPdfText(input) {
 }
       
 // 🟢 تحليل الملفات
-async function analyzeFileWithPuter(fileOrUrl, userPrompt = null, indicator = null) {
+// 🟢 تحليل الملفات (النسخة النهائية والمحسّنة)
+async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
   try {
     if (!fileOrUrl) return null;
 
-    // إذا ما مررنا indicator، ننشئ واحدًا (سيعرض الأعمدة ثم يتحول لاحقًا)
-    if (!indicator) {
-      clearIndicator();
-      indicator = showTyping('file');
+    clearIndicator();
+    const indicator = showTyping("file");
+
+    let textContent = '';
+    let fileType = 'file';
+
+    // -- استخراج النص من المصادر المختلفة --
+    if (typeof fileOrUrl === 'string') { // حالة الرابط
+      const lower = fileOrUrl.toLowerCase();
+      if (lower.match(/\.(png|jpe?g|webp|gif|bmp)(?:[?#].*)?$/)) {
+        return await analyzeImageWithPuter(fileOrUrl, userPrompt);
+      }
+      const resp = await fetch(fileOrUrl);
+      if (resp.ok) {
+        const mime = resp.headers.get("content-type") || "";
+        if (mime.includes('pdf')) {
+          fileType = 'PDF';
+          const arrayBuffer = await resp.arrayBuffer();
+          textContent = await extractPdfText(new Blob([arrayBuffer]));
+        } else if (mime.startsWith('text/')) {
+          fileType = 'text file';
+          textContent = await resp.text();
+        }
+      }
+    } else if (fileOrUrl instanceof File) { // حالة الملف المحلي
+      const ext = (fileOrUrl.name || '').split('.').pop().toLowerCase();
+      if (fileOrUrl.type && fileOrUrl.type.startsWith('image/')) {
+        return await analyzeImageWithPuter(fileOrUrl, userPrompt);
+      }
+      if (ext === 'pdf') {
+        fileType = 'PDF';
+        textContent = await extractPdfText(fileOrUrl);
+      } else {
+        fileType = `${ext} file`;
+        textContent = await fileOrUrl.text();
+      }
     }
 
-    // مدة عشوائية بين 3-5 ثوانٍ قبل التحول إلى analyzing
-    const delay = Math.floor(Math.random() * (5000 - 3000 + 1)) + 3000;
-    const toAnalyzingTimer = setTimeout(() => {
-      try { setToAnalyzing(indicator); } catch (e) {}
-    }, delay);
-
-    // إذا كان رابط (string)
-    if (typeof fileOrUrl === 'string') {
-      const lower = fileOrUrl.toLowerCase();
-
-      // إن كان رابط صورة -> تعامل كما الصور
-      if (lower.match(/\.(png|jpe?g|webp|gif|bmp)(?:[?#].*)?$/)) {
-        clearTimeout(toAnalyzingTimer);
-        return await analyzeImageWithPuter(fileOrUrl, userPrompt, indicator);
-      }
-
-      // حاول جلب الملف ثم قراءته بناءً على نوع المحتوى
-      try {
-        const resp = await fetch(fileOrUrl);
-        if (!resp.ok) {
-          clearTimeout(toAnalyzingTimer);
-          clearIndicator();
-          return null;
-        }
-        const mime = resp.headers.get('content-type') || '';
-
-        // نصوص بسيطة
-        if (mime.startsWith('text/') || mime.includes('json') || mime.includes('xml') || mime.includes('csv')) {
-          const content = await resp.text();
-
-          // نشر رد assistant تدريجيًا (stream) — هنا نرسل الـ prompt النصي
-          if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
-            const basePrompt = (userPrompt && String(userPrompt).trim())
-              ? `${String(userPrompt).trim()}\n\nهذا محتوى الملف:\n\n${content.slice(0, 8000)}`
-              : `حلل هذا الملف (ملخص، نوعه، نقاط مهمة):\n\n${content.slice(0, 8000)}`;
-
-            // بدء البث (stream)
-            const botMsg = { id: genId(), role: 'assistant', content: '', meta: {} };
-            messages.push(botMsg);
-            appendMessage(botMsg, messages.length - 1);
-            const botIndex = messages.length - 1;
-            const botEl = messagesEl.querySelector(`.msg[data-index="${botIndex}"] .bubble`);
-            clearTimeout(toAnalyzingTimer);
-
-            const response = await puter.ai.chat(basePrompt, null, { model: 'gpt-5-nano', stream: true });
-
-            for await (const part of response) {
-              const piece = part.text || (part.message && part.message.content) || '';
-              if (!piece) continue;
-              botMsg.content += piece;
-              if (botEl) {
-                botEl.innerHTML = marked.parse(botMsg.content);
-                enhanceCodeBlocks(botEl);
-              }
-              messagesEl.scrollTop = messagesEl.scrollHeight;
-            }
-
-            clearIndicator();
-            saveSession();
-            return botMsg.content;
-          }
-        }
-
-        // إذا كان ملف PDF عبر رابط
-        if (mime.includes('pdf') || fileOrUrl.endsWith('.pdf')) {
-          // نحاول تحميله كـ ArrayBuffer ثم استخراج النص
-          try {
-            const arrayBuffer = await resp.arrayBuffer();
-            const text = await extractPdfText(new Blob([arrayBuffer]));
-            if (!text) { clearTimeout(toAnalyzingTimer); clearIndicator(); return null; }
-
-            if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
-              const basePrompt = (userPrompt && String(userPrompt).trim())
-                ? `${String(userPrompt).trim()}\n\nهذا محتوى ملف PDF:\n\n${text.slice(0, 8000)}`
-                : `حلل هذا الملف PDF وقدم ملخصاً:\n\n${text.slice(0, 8000)}`;
-
-              const botMsg = { id: genId(), role: 'assistant', content: '', meta: {} };
-              messages.push(botMsg);
-              appendMessage(botMsg, messages.length - 1);
-              const botIndex = messages.length - 1;
-              const botEl = messagesEl.querySelector(`.msg[data-index="${botIndex}"] .bubble`);
-              clearTimeout(toAnalyzingTimer);
-
-              const response = await puter.ai.chat(basePrompt, null, { model: 'gpt-5-nano', stream: true });
-
-              for await (const part of response) {
-                const piece = part.text || (part.message && part.message.content) || '';
-                if (!piece) continue;
-                botMsg.content += piece;
-                if (botEl) {
-                  botEl.innerHTML = marked.parse(botMsg.content);
-                  enhanceCodeBlocks(botEl);
-                }
-                messagesEl.scrollTop = messagesEl.scrollHeight;
-              }
-
-              clearIndicator();
-              saveSession();
-              return botMsg.content;
-            }
-          } catch (err) {
-            console.warn('PDF (url) handling failed', err);
-          }
-        }
-
-      } catch (err) {
-        console.warn('fetch file for analysis failed', err);
-      }
-
-      clearTimeout(toAnalyzingTimer);
+    if (!textContent) {
       clearIndicator();
+      toast('Could not read the file content.');
       return null;
     }
 
-    // إذا كان File محلي
-    if (fileOrUrl instanceof File) {
-      try {
-        // صورة محلية -> مرر للمعالجة بالصور
-        if (fileOrUrl.type && fileOrUrl.type.startsWith('image/')) {
-          clearTimeout(toAnalyzingTimer);
-          return await analyzeImageWithPuter(fileOrUrl, userPrompt, indicator);
-        }
+    // -- الآن، بعد الحصول على النص، نبدأ عملية الرد --
+    const basePrompt = (userPrompt && String(userPrompt).trim())
+      ? `${String(userPrompt).trim()}\n\nThis is the content of a ${fileType}:\n\n${textContent.slice(0, 8000)}`
+      : `Analyze this ${fileType} and provide a summary:\n\n${textContent.slice(0, 8000)}`;
 
-        const ext = (fileOrUrl.name || '').split('.').pop().toLowerCase();
-        const textLike = ['txt','json','js','html','htm','css','py','md','xml','csv'];
+    // نفس منطق الرد التدريجي المستخدم في sendMessage
+    let assistantEl = null;
+    let bubbleEl = null;
+    let assistantMessage = null;
+    let isFirstChunk = true;
 
-        // لو PDF
-        if (ext === 'pdf') {
-          const pdfText = await extractPdfText(fileOrUrl);
-          if (!pdfText) { clearTimeout(toAnalyzingTimer); clearIndicator(); return null; }
+    const response = await puter.ai.chat(basePrompt, null, { model: 'gpt-5-nano', stream: true });
 
-          if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
-            const basePrompt = (userPrompt && String(userPrompt).trim())
-              ? `${String(userPrompt).trim()}\n\nهذا محتوى ملف PDF:\n\n${pdfText.slice(0, 8000)}`
-              : `حلل هذا الملف PDF وقدم ملخصاً:\n\n${pdfText.slice(0, 8000)}`;
+    for await (const part of response) {
+      const piece = part.text || (part.message && part.message.content) || '';
+      if (!piece) continue;
 
-            const botMsg = { id: genId(), role: 'assistant', content: '', meta: {} };
-            messages.push(botMsg);
-            appendMessage(botMsg, messages.length - 1);
-            const botIndex = messages.length - 1;
-            const botEl = messagesEl.querySelector(`.msg[data-index="${botIndex}"] .bubble`);
-            clearTimeout(toAnalyzingTimer);
-
-            const response = await puter.ai.chat(basePrompt, null, { model: 'gpt-5-nano', stream: true });
-
-            for await (const part of response) {
-              const piece = part.text || (part.message && part.message.content) || '';
-              if (!piece) continue;
-              botMsg.content += piece;
-              if (botEl) {
-                botEl.innerHTML = marked.parse(botMsg.content);
-                enhanceCodeBlocks(botEl);
-              }
-              messagesEl.scrollTop = messagesEl.scrollHeight;
-            }
-
-            clearIndicator();
-            saveSession();
-            return botMsg.content;
-          }
-        }
-
-        // لو ملف نصي محلي
-        if (textLike.includes(ext)) {
-          const txtContent = await fileOrUrl.text();
-          if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
-            const basePrompt = (userPrompt && String(userPrompt).trim())
-              ? `${String(userPrompt).trim()}\n\nهذا محتوى الملف (${ext}):\n\n${txtContent.slice(0, 8000)}`
-              : `حلل هذا الملف (${ext}) وقدم ملخصاً:\n\n${txtContent.slice(0, 8000)}`;
-
-            const botMsg = { id: genId(), role: 'assistant', content: '', meta: {} };
-            messages.push(botMsg);
-            appendMessage(botMsg, messages.length - 1);
-            const botIndex = messages.length - 1;
-            const botEl = messagesEl.querySelector(`.msg[data-index="${botIndex}"] .bubble`);
-            clearTimeout(toAnalyzingTimer);
-
-            const response = await puter.ai.chat(basePrompt, null, { model: 'gpt-5-nano', stream: true });
-
-            for await (const part of response) {
-              const piece = part.text || (part.message && part.message.content) || '';
-              if (!piece) continue;
-              botMsg.content += piece;
-              if (botEl) {
-                botEl.innerHTML = marked.parse(botMsg.content);
-                enhanceCodeBlocks(botEl);
-              }
-              messagesEl.scrollTop = messagesEl.scrollHeight;
-            }
-
-            clearIndicator();
-            saveSession();
-            return botMsg.content;
-          }
-        }
-
-      } catch (e) {
-        console.warn('analyzeFileWithPuter read text failed', e);
-        clearTimeout(toAnalyzingTimer);
-        clearIndicator();
-        return null;
+      if (isFirstChunk) {
+        clearIndicator(); // إزالة مؤشر "Analyzing"
+        assistantMessage = { id: genId(), role: 'assistant', content: '', meta: {} };
+        messages.push(assistantMessage);
+        assistantEl = createMessageElement(assistantMessage, messages.length - 1);
+        messagesEl.appendChild(assistantEl);
+        requestAnimationFrame(() => setTimeout(() => assistantEl.classList.add('show'), 20));
+        bubbleEl = assistantEl.querySelector('.bubble');
+        isFirstChunk = false;
       }
+
+      assistantMessage.content += piece;
+      if (bubbleEl) {
+        bubbleEl.innerHTML = marked.parse(assistantMessage.content);
+        enhanceCodeBlocks(bubbleEl);
+      }
+      messagesEl.scrollTop = messagesEl.scrollHeight;
     }
 
-    // نهاية: cleanup
-    clearTimeout(toAnalyzingTimer);
-    clearIndicator();
-    return null;
+    if (assistantEl) {
+        const codeBlocksToHighlight = assistantEl.querySelectorAll('pre code');
+        codeBlocksToHighlight.forEach(block => { hljs.highlightElement(block); });
+    }
+    saveSession();
+    return assistantMessage.content;
 
   } catch (e) {
     console.error('analyzeFileWithPuter error', e);
