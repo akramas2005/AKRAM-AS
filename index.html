@@ -3961,8 +3961,6 @@ async function regenerateAssistantForParent(parentIdx){
         const t = composer.value.trim();
         if(!t && !pendingAttachment) return;
         
-        // سيتم تغيير شكل الزر داخل دوال الإرسال نفسها
-        
         setTimeout(()=>{
             // --- هذا الجزء خاص بمعالجة تعديل الرسائل (يبقى كما هو) ---
             if (editIndex !== null && editIndex >= 0) {
