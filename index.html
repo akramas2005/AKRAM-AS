@@ -720,8 +720,9 @@ body.dark-mode .analyzingText {
 
   /* messages area */
   .messages{flex:1; overflow:auto; padding:18px; display:flex; flex-direction:column; gap:10px; background: linear-gradient(180deg, rgba(255,255,255,0), rgba(245,248,250,0.6)); transition: padding-bottom .12s ease;}
-  .msg {
-    max-width: min(86%, 680px);
+ .msg {
+    /* التعديل: زيادة العرض الأقصى بشكل ملحوظ */
+    max-width: min(92%, 850px);
     padding:10px 12px;
     border-radius:12px; line-height:1.35; font-size:14px; box-shadow: 0 6px 18px rgba(6,30,60,0.04);
     opacity:0; transform: translateY(8px); transition: opacity .28s ease, transform .28s;
