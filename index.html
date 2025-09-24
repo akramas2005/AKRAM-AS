@@ -3746,22 +3746,43 @@ async function regenerateAssistantForParent(parentIdx){
             window._regenLock = false;
             return;
         }
+        
+        // --- START: تعديل للتحقق الدقيق من نوع المرفق ---
+        const parentMessage = messages[parentIdx];
+        const attachment = parentMessage?.attachment;
+        let imageUrl = null;
 
+        // تحقق من وجود مرفق، وأن له رابط، وأن نوعه هو "صورة"
+        if (attachment && attachment.url && attachment.mime_type?.startsWith('image/')) {
+            imageUrl = attachment.url;
+        }
+        // --- END: تعديل للتحقق الدقيق من نوع المرفق ---
+
+        shouldStopGeneration = false;
+        sendInsideBtn.classList.add('is-generating');
+        sendInsideBtn.classList.add('visible');
+
+        // أظهر الأنيميشن المناسب (تحليل للصورة، أو عادي للباقي)
         clearIndicator();
-        showTyping();
+        showTyping(imageUrl ? 'image' : 'default');
 
         let assistantEl = null;
         let bubbleEl = null;
         let assistantMessage = null;
         let isFirstChunk = true;
 
-        const response = await puter.ai.chat(buildChatPrompt(messages, parentIdx), { model: 'gpt-5-nano', stream: true });
+        let response;
+        const prompt = buildChatPrompt(messages, parentIdx);
+        if (imageUrl) {
+            // إذا كانت هناك صورة، أرسل النص والصورة معًا
+            response = await puter.ai.chat(prompt, imageUrl, { model: 'gpt-5-nano', stream: true });
+        } else {
+            // إذا لم تكن هناك صورة، أرسل النص فقط
+            response = await puter.ai.chat(prompt, { model: 'gpt-5-nano', stream: true });
+        }
         
-        // --- START: Smart Update Logic ---
-        let contentBuffer = '';
-        let updateInterval = null;
-
-        const updateUI = () => {
+        // ... (بقية الدالة لمعالجة الرد التدريجي تبقى كما هي تمامًا) ...
+        let updateInterval = setInterval(() => {
             if (bubbleEl) {
                 bubbleEl.innerHTML = DOMPurify.sanitize(marked.parse(assistantMessage.content));
                 enhanceCodeBlocks(bubbleEl);
@@ -3770,10 +3791,10 @@ async function regenerateAssistantForParent(parentIdx){
                     messagesEl.scrollTop = messagesEl.scrollHeight;
                 }
             }
-        };
-        // --- END: Smart Update Logic ---
+        }, 150);
 
         for await (const part of response) {
+            if (shouldStopGeneration) { break; }
             const piece = part.text || (part.message && part.message.content) || '';
             if (!piece) continue;
 
@@ -3786,15 +3807,15 @@ async function regenerateAssistantForParent(parentIdx){
                 requestAnimationFrame(() => setTimeout(() => assistantEl.classList.add('show'), 20));
                 bubbleEl = assistantEl.querySelector('.bubble');
                 isFirstChunk = false;
-                
-                updateInterval = setInterval(updateUI, 150);
             }
-
             assistantMessage.content += piece;
         }
         
         clearInterval(updateInterval);
-        updateUI();
+        if (bubbleEl) {
+            bubbleEl.innerHTML = DOMPurify.sanitize(marked.parse(assistantMessage.content));
+            enhanceCodeBlocks(bubbleEl);
+        }
 
         if (assistantEl) {
             const codeBlocksToHighlight = assistantEl.querySelectorAll('pre code');
@@ -3813,6 +3834,10 @@ async function regenerateAssistantForParent(parentIdx){
         const errorMsg = { id: genId(), role: 'assistant', content: 'حدث خطأ. يرجى المحاولة مرة أخرى.', meta: {} };
         appendMessage(errorMsg, messages.length);
     } finally {
+        sendInsideBtn.classList.remove('is-generating');
+        if (composer.value.trim().length === 0) {
+            sendInsideBtn.classList.remove('visible');
+        }
         window._regenLock = false;
     }
 }
