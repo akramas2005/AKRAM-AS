@@ -3651,16 +3651,29 @@ async function sendMessage(text, parentIndex = null) {
     clearIndicator();
     showTyping(); 
 
-    const isUserAtBottomInitially = messagesEl.scrollHeight - messagesEl.clientHeight <= messagesEl.scrollTop + 20;
-
     let assistantEl = null;
     let bubbleEl = null;
-    let textContainer = null; // <-- حاوية النص الخام الجديدة
     let assistantMessage = null;
     let isFirstChunk = true;
 
     try {
         const response = await puter.ai.chat(buildChatPrompt(messages), { model: 'gpt-5-nano', stream: true });
+
+        // --- START: Smart Update Logic ---
+        let contentBuffer = ''; // مخزن مؤقت للنص
+        let updateInterval = null; // المؤقت الزمني
+
+        const updateUI = () => {
+            if (bubbleEl) {
+                bubbleEl.innerHTML = marked.parse(assistantMessage.content);
+                enhanceCodeBlocks(bubbleEl);
+                const isUserAtBottom = messagesEl.scrollHeight - messagesEl.clientHeight <= messagesEl.scrollTop + 20;
+                if (isUserAtBottom) {
+                    messagesEl.scrollTop = messagesEl.scrollHeight;
+                }
+            }
+        };
+        // --- END: Smart Update Logic ---
 
         for await (const part of response) {
             const piece = part.text || (part.message && part.message.content) || '';
@@ -3674,30 +3687,27 @@ async function sendMessage(text, parentIndex = null) {
                 messagesEl.appendChild(assistantEl);
                 requestAnimationFrame(() => setTimeout(() => assistantEl.classList.add('show'), 20));
                 bubbleEl = assistantEl.querySelector('.bubble');
-                
-                // أنشئ حاوية للنص الخام مرة واحدة فقط
-                textContainer = document.createElement('div');
-                bubbleEl.innerHTML = ''; // أفرغ الفقاعة
-                bubbleEl.appendChild(textContainer);
                 isFirstChunk = false;
+
+                // ابدأ المؤقت الزمني للتحديث كل 150ms
+                updateInterval = setInterval(updateUI, 150);
             }
 
             assistantMessage.content += piece;
-            // فقط أضف النص الجديد. هذه العملية سريعة جدًا!
-            textContainer.textContent = assistantMessage.content;
-            
-            if (isUserAtBottomInitially) {
-                messagesEl.scrollTop = messagesEl.scrollHeight;
-            }
         }
 
         // --- بعد انتهاء الرد بالكامل ---
-        if (assistantEl && bubbleEl) {
-            // الآن فقط، قم بالعمليات المعقدة مرة واحدة
-            bubbleEl.innerHTML = marked.parse(assistantMessage.content);
-            enhanceCodeBlocks(bubbleEl);
+        clearInterval(updateInterval); // أوقف المؤقت
+        updateUI(); // قم بالتحديث الأخير لضمان عرض كل النص
+
+        if (assistantEl) {
             const codeBlocksToHighlight = assistantEl.querySelectorAll('pre code');
             codeBlocksToHighlight.forEach(block => { hljs.highlightElement(block); });
+            const finalBubble = assistantEl.querySelector('.bubble');
+            if (finalBubble && isRTL(assistantMessage.content)) {
+                finalBubble.classList.add('rtl-text');
+                assistantEl.classList.add('msg-rtl');
+            }
         }
         saveSession();
 
@@ -3717,21 +3727,35 @@ async function regenerateAssistantForParent(parentIdx){
         window._regenLock = true;
 
         if (typeof parentIdx !== 'number' || !messages[parentIdx]) {
+            window._regenLock = false;
             return;
         }
 
         clearIndicator();
         showTyping();
 
-        const isUserAtBottomInitially = messagesEl.scrollHeight - messagesEl.clientHeight <= messagesEl.scrollTop + 20;
-
         let assistantEl = null;
         let bubbleEl = null;
-        let textContainer = null;
         let assistantMessage = null;
         let isFirstChunk = true;
 
         const response = await puter.ai.chat(buildChatPrompt(messages, parentIdx), { model: 'gpt-5-nano', stream: true });
+        
+        // --- START: Smart Update Logic ---
+        let contentBuffer = '';
+        let updateInterval = null;
+
+        const updateUI = () => {
+            if (bubbleEl) {
+                bubbleEl.innerHTML = marked.parse(assistantMessage.content);
+                enhanceCodeBlocks(bubbleEl);
+                const isUserAtBottom = messagesEl.scrollHeight - messagesEl.clientHeight <= messagesEl.scrollTop + 20;
+                if (isUserAtBottom) {
+                    messagesEl.scrollTop = messagesEl.scrollHeight;
+                }
+            }
+        };
+        // --- END: Smart Update Logic ---
 
         for await (const part of response) {
             const piece = part.text || (part.message && part.message.content) || '';
@@ -3745,25 +3769,25 @@ async function regenerateAssistantForParent(parentIdx){
                 messagesEl.appendChild(assistantEl);
                 requestAnimationFrame(() => setTimeout(() => assistantEl.classList.add('show'), 20));
                 bubbleEl = assistantEl.querySelector('.bubble');
-                textContainer = document.createElement('div');
-                bubbleEl.innerHTML = '';
-                bubbleEl.appendChild(textContainer);
                 isFirstChunk = false;
+                
+                updateInterval = setInterval(updateUI, 150);
             }
 
             assistantMessage.content += piece;
-            textContainer.textContent = assistantMessage.content;
-            
-            if (isUserAtBottomInitially) {
-                messagesEl.scrollTop = messagesEl.scrollHeight;
-            }
         }
+        
+        clearInterval(updateInterval);
+        updateUI();
 
-        if (assistantEl && bubbleEl) {
-            bubbleEl.innerHTML = marked.parse(assistantMessage.content);
-            enhanceCodeBlocks(bubbleEl);
+        if (assistantEl) {
             const codeBlocksToHighlight = assistantEl.querySelectorAll('pre code');
             codeBlocksToHighlight.forEach(block => { hljs.highlightElement(block); });
+            const finalBubble = assistantEl.querySelector('.bubble');
+            if (finalBubble && isRTL(assistantMessage.content)) {
+                finalBubble.classList.add('rtl-text');
+                assistantEl.classList.add('msg-rtl');
+            }
         }
         saveSession();
 
