@@ -4817,70 +4817,66 @@ else if (act === 'sendFeedback') {
         }
       }
 
-      async function syncHistoryFromServer() {
-          console.log('Syncing conversation list from server...');
-          try {
-              const response = await fetch(`${API_BASE}/api/conversations`);
-              if (!response.ok) {
-                  console.warn(`Server sync failed with status: ${response.status}`);
-                  return;
-              }
-              const serverConvos = await response.json();
-              if (!Array.isArray(serverConvos)) {
-                  console.warn('Server sync failed: the response was not a list.');
-                  return;
-              }
-              savedConvos = serverConvos;
-              saveHistory();
-              renderHistoryPanel(false);
-              console.log('History sync complete.');
-          } catch (error) {
-              console.warn('Could not sync history from server:', error);
-          }
-      }
-
-      function renderHistoryPanel(sync = true){
-        loadHistory(); 
-        convoChips.innerHTML = '';
-        convoList.innerHTML = '';
-        if(savedConvos.length === 0){
-          const emp = document.createElement('div');
-          emp.className = 'convo-item';
-          emp.innerHTML = `<div class="left"><div class="title">No saved conversations</div></div>`;
-          convoList.appendChild(emp);
-          if (sync) {
-              syncHistoryFromServer();
-          }
-          return;
+     /*
+async function syncHistoryFromServer() {
+    console.log('Syncing conversation list from server...');
+    try {
+        const response = await fetch(`${API_BASE}/api/conversations`);
+        if (!response.ok) {
+            console.warn(`Server sync failed with status: ${response.status}`);
+            return;
         }
-        
-        const chips = savedConvos.slice(0,6);
-        chips.forEach((c, i) => {
-          const chip = document.createElement('button');
-          chip.className = 'convo-chip';
-          chip.textContent = c.title || ('Chat ' + (i+1));
-          chip.addEventListener('click', ()=> loadSavedConversation(i));
-          convoChips.appendChild(chip);
-        });
-
-        savedConvos.forEach((c, i) => {
-          const it = document.createElement('div');
-          it.className = 'convo-item';
-          it.dataset.idx = i;
-          it.innerHTML = `<div class="left"><div class="title"><span style="margin-left:6px">${escapeHtml(c.title||'Conversation')}</span></div></div><div class="meta">${new Date(c.createdAt||Date.now()).toLocaleString()}</div>`;
-          it.addEventListener('click', (ev)=>{
-            if(it.dataset._suppressClick === 'true'){ it.dataset._suppressClick = 'false'; return; }
-            loadSavedConversation(i);
-          });
-          attachConvoListItemHandlers(it, i);
-          convoList.appendChild(it);
-        });
-
-        if (sync) {
-          syncHistoryFromServer();
+        const serverConvos = await response.json();
+        if (!Array.isArray(serverConvos)) {
+            console.warn('Server sync failed: the response was not a list.');
+            return;
         }
-      }
+        savedConvos = serverConvos;
+        saveHistory();
+        renderHistoryPanel(false);
+        console.log('History sync complete.');
+    } catch (error) {
+        console.warn('Could not sync history from server:', error);
+    }
+}
+*/
 
+      function renderHistoryPanel(){ // تمت إزالة (sync = true)
+  loadHistory(); 
+  convoChips.innerHTML = '';
+  convoList.innerHTML = '';
+  if(savedConvos.length === 0){
+    const emp = document.createElement('div');
+    emp.className = 'convo-item';
+    emp.innerHTML = `<div class="left"><div class="title">No saved conversations</div></div>`;
+    convoList.appendChild(emp);
+    return;
+  }
+
+  const chips = savedConvos.slice(0,6);
+  chips.forEach((c, i) => {
+    const chip = document.createElement('button');
+    chip.className = 'convo-chip';
+    chip.textContent = c.title || ('Chat ' + (i+1));
+    chip.addEventListener('click', ()=> loadSavedConversation(i));
+    convoChips.appendChild(chip);
+  });
+
+  savedConvos.forEach((c, i) => {
+    const it = document.createElement('div');
+    it.className = 'convo-item';
+    it.dataset.idx = i;
+    it.innerHTML = `<div class="left"><div class="title"><span style="margin-left:6px">${escapeHtml(c.title||'Conversation')}</span></div></div><div class="meta">${new Date(c.createdAt||Date.now()).toLocaleString()}</div>`;
+    it.addEventListener('click', (ev)=>{
+      if(it.dataset._suppressClick === 'true'){ it.dataset._suppressClick = 'false'; return; }
+      loadSavedConversation(i);
+    });
+    attachConvoListItemHandlers(it, i);
+    convoList.appendChild(it);
+  });
+
+  // تم حذف استدعاء المزامنة من هنا
+}
       function attachConvoListItemHandlers(el, idx){
         let longTimer = null;
         const LONG_MS = 600;
