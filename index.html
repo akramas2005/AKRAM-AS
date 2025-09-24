@@ -801,9 +801,6 @@ body.dark-mode .msg.user {
   .msg-actions{
     display:flex; align-items:center; gap:6px; margin-top:6px; opacity:.95;
   }
-.msg.assistant .bubble[dir="rtl"] + .msg-actions {
-    justify-content: flex-end;
-}
   .msg-actions .act-btn{
     width:26px; height:26px; display:inline-flex; align-items:center; justify-content:center;
     border:none; background:transparent; border-radius:6px; cursor:pointer;
@@ -833,6 +830,12 @@ body.dark-mode .msg.user {
   }
   .mini-btn.send{ background: var(--accent); color:#fff; }
   .mini-btn.cancel{ background:#f0f4f8; }
+
+  /* --- START: Final RTL Action Icons Alignment Fix --- */
+.msg.msg-rtl .msg-actions {
+    justify-content: flex-end;
+}
+/* --- END: Final RTL Action Icons Alignment Fix --- */
 
   /* Attachment rendering inside messages */
   .msg .att-image {
@@ -3478,12 +3481,13 @@ bubble.setAttribute('dir', 'auto'); // <-- هذا هو السطر الجديد �
           }
       });
 
-      // --- START: تعديل المحاذاة للرسائل القديمة ---
+     // --- START: تعديل المحاذاة للرسائل القديمة ---
       const bubble = messageEl.querySelector('.bubble');
       if (bubble && m.content && isRTL(m.content)) {
           bubble.classList.add('rtl-text');
+          messageEl.classList.add('msg-rtl'); // <-- هذا هو السطر الجديد
       }
-      // --- END: تعديل المحاذاة للرسائل القديمة ---
+      // --- END: تعديل المحاזהה للرسائل القديمة ---
 
       requestAnimationFrame(()=> setTimeout(()=> messageEl.classList.add('show'), 20));
   });
@@ -3687,12 +3691,13 @@ async function sendMessage(text, parentIndex = null) {
             const codeBlocksToHighlight = assistantEl.querySelectorAll('pre code');
             codeBlocksToHighlight.forEach(block => { hljs.highlightElement(block); });
 
-            // --- START: تعديل المحاذاة للرسائل الجديدة ---
+           // --- START: تعديل المحاזהה للرسائل الجديدة ---
             const finalBubble = assistantEl.querySelector('.bubble');
             if (finalBubble && isRTL(assistantMessage.content)) {
                 finalBubble.classList.add('rtl-text');
+                assistantEl.classList.add('msg-rtl'); // <-- هذا هو السطر الجديد
             }
-            // --- END: تعديل المحاذاة للرسائل الجديدة ---
+            // --- END: تعديل المحاזהה للرسائل الجديدة ---
         }
         saveSession();
 
