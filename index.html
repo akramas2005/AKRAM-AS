@@ -57,16 +57,16 @@
   cursor: pointer;
 }
 
-  .scroll-to-bottom-btn {
+ .scroll-to-bottom-btn {
   position: absolute;
-  bottom: 120px; /* تعديل المسافة حسب الحاجة */
+  bottom: 120px;
   right: 25px;
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background-color: rgba(255, 255, 255, 0.9);
+  background-color: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(4px);
-  border: 1px solid #e0e0e0;
+  border: 1px solid #eaf0f6;
   box-shadow: 0 4px 12px rgba(0,0,0,0.1);
   cursor: pointer;
   display: flex;
@@ -76,14 +76,21 @@
   opacity: 0;
   pointer-events: none;
   transform: translateY(10px);
-  transition: opacity .2s ease, transform .2s ease;
-  z-index: 1000;
+  transition: opacity .2s ease, transform .2s ease, background-color .3s ease, border-color .3s ease;
+  z-index: 14050; /* <-- This brings the button to the front */
 }
 .scroll-to-bottom-btn.visible {
   opacity: 1;
   pointer-events: auto;
   transform: translateY(0);
 }
+/* --- START: Dark Mode Scroll Button Fix --- */
+body.dark-mode .scroll-to-bottom-btn {
+  background-color: rgba(42, 48, 56, 0.85); /* Dark background */
+  border-color: #30363d;
+  color: #e6edf3; /* Light arrow color */
+}
+/* --- END: Dark Mode Scroll Button Fix --- */
 
 /* --- FINAL & COMPLETE: DYNAMIC THEME STYLES --- */
 
