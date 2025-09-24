@@ -3435,8 +3435,9 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null, indicator = nu
         div.className = 'msg ' + (m.role==='user' ? 'user' : 'assistant');
         div.dataset.index = idx;
 
-        const bubble = document.createElement('div');
-        bubble.className = 'bubble';
+       const bubble = document.createElement('div');
+bubble.className = 'bubble';
+bubble.setAttribute('dir', 'auto'); // <-- هذا هو السطر الجديد والمهم
 
         if (m.content && typeof m.content === 'string' && String(m.content||'').trim()) {
   const txt = document.createElement('div');
