@@ -4817,158 +4817,70 @@ else if (act === 'sendFeedback') {
         }
       }
 
-      /* ---------------------------
-         renderHistoryPanel changes:
-         - top chips show max 6 most recent (savedConvos[0..5])
-         - chips: single tap = load conversation (no long-press)
-         - list items: normal tap loads convo; long-press or right-click opens contextual menu (Rename/Delete/Lock soon)
-      --------------------------- */
-     function renderHistoryPanel(sync = true){
-  loadHistory(); 
-  convoChips.innerHTML = '';
-  convoList.innerHTML = '';
-  if(savedConvos.length === 0){
-    const emp = document.createElement('div');
-    emp.className = 'convo-item';
-    emp.innerHTML = `<div class="left"><div class="title">No saved conversations</div></div>`;
-    convoList.appendChild(emp);
-    // حتى لو كانت فارغة، حاول المزامنة من السيرفر
-    if (sync) {
-        syncHistoryFromServer();
-    }
-    return;
-  }
-  
-  const chips = savedConvos.slice(0,6);
-  chips.forEach((c, i) => {
-    const chip = document.createElement('button');
-    chip.className = 'convo-chip';
-    chip.textContent = c.title || ('Chat ' + (i+1));
-    chip.addEventListener('click', ()=> loadSavedConversation(i));
-    convoChips.appendChild(chip);
-  });
+      async function syncHistoryFromServer() {
+          console.log('Syncing conversation list from server...');
+          try {
+              const response = await fetch(`${API_BASE}/api/conversations`);
+              if (!response.ok) {
+                  console.warn(`Server sync failed with status: ${response.status}`);
+                  return;
+              }
+              const serverConvos = await response.json();
+              if (!Array.isArray(serverConvos)) {
+                  console.warn('Server sync failed: the response was not a list.');
+                  return;
+              }
+              savedConvos = serverConvos;
+              saveHistory();
+              renderHistoryPanel(false);
+              console.log('History sync complete.');
+          } catch (error) {
+              console.warn('Could not sync history from server:', error);
+          }
+      }
 
-  savedConvos.forEach((c, i) => {
-    const it = document.createElement('div');
-    it.className = 'convo-item';
-    it.dataset.idx = i;
-    it.innerHTML = `<div class="left"><div class="title"><span style="margin-left:6px">${escapeHtml(c.title||'Conversation')}</span></div></div><div class="meta">${new Date(c.createdAt||Date.now()).toLocaleString()}</div>`;
-    it.addEventListener('click', (ev)=>{
-      if(it.dataset._suppressClick === 'true'){ it.dataset._suppressClick = 'false'; return; }
-      loadSavedConversation(i);
-    });
-    attachConvoListItemHandlers(it, i);
-    convoList.appendChild(it);
-  });
-
-  // 3. في الخلفية، قم بتشغيل المزامنة من السيرفر
-  if (sync) {
-    syncHistoryFromServer(); // <-- هذا السطر أصبح فعالاً الآن
-  }
-}
-
-  // 2. عرض المحادثات المحفوظة محليًا فورًا
-  const chips = savedConvos.slice(0,6);
-  chips.forEach((c, i) => {
-    const chip = document.createElement('button');
-    chip.className = 'convo-chip';
-    chip.textContent = c.title || ('Chat ' + (i+1));
-    chip.addEventListener('click', ()=> loadSavedConversation(i));
-    convoChips.appendChild(chip);
-  });
-
-  savedConvos.forEach((c, i) => {
-    const it = document.createElement('div');
-    it.className = 'convo-item';
-    it.dataset.idx = i;
-    it.innerHTML = `<div class="left"><div class="title"><span style="margin-left:6px">${escapeHtml(c.title||'Conversation')}</span></div></div><div class="meta">${new Date(c.createdAt||Date.now()).toLocaleString()}</div>`;
-    it.addEventListener('click', (ev)=>{
-      if(it.dataset._suppressClick === 'true'){ it.dataset._suppressClick = 'false'; return; }
-      loadSavedConversation(i);
-    });
-    attachConvoListItemHandlers(it, i);
-    convoList.appendChild(it);
-  });
-
-  // 3. (اختياري) في الخلفية، حاول مزامنة البيانات من السيرفر
-  if (sync) {
-    async function syncHistoryFromServer() {
-    console.log('Syncing conversation list from server...');
-    try {
-        // 1. بناء الرابط الصحيح للاتصال بالخادم
-        const response = await fetch(`${API_BASE}/api/conversations`);
-
-        // 2. التحقق من نجاح الطلب
-        if (!response.ok) {
-            console.warn(`Server sync failed with status: ${response.status}`);
-            return;
+      function renderHistoryPanel(sync = true){
+        loadHistory(); 
+        convoChips.innerHTML = '';
+        convoList.innerHTML = '';
+        if(savedConvos.length === 0){
+          const emp = document.createElement('div');
+          emp.className = 'convo-item';
+          emp.innerHTML = `<div class="left"><div class="title">No saved conversations</div></div>`;
+          convoList.appendChild(emp);
+          if (sync) {
+              syncHistoryFromServer();
+          }
+          return;
         }
+        
+        const chips = savedConvos.slice(0,6);
+        chips.forEach((c, i) => {
+          const chip = document.createElement('button');
+          chip.className = 'convo-chip';
+          chip.textContent = c.title || ('Chat ' + (i+1));
+          chip.addEventListener('click', ()=> loadSavedConversation(i));
+          convoChips.appendChild(chip);
+        });
 
-        // 3. قراءة البيانات المستلمة من الخادم
-        const serverConvos = await response.json();
+        savedConvos.forEach((c, i) => {
+          const it = document.createElement('div');
+          it.className = 'convo-item';
+          it.dataset.idx = i;
+          it.innerHTML = `<div class="left"><div class="title"><span style="margin-left:6px">${escapeHtml(c.title||'Conversation')}</span></div></div><div class="meta">${new Date(c.createdAt||Date.now()).toLocaleString()}</div>`;
+          it.addEventListener('click', (ev)=>{
+            if(it.dataset._suppressClick === 'true'){ it.dataset._suppressClick = 'false'; return; }
+            loadSavedConversation(i);
+          });
+          attachConvoListItemHandlers(it, i);
+          convoList.appendChild(it);
+        });
 
-        if (!Array.isArray(serverConvos)) {
-            console.warn('Server sync failed: the response was not a list.');
-            return;
+        if (sync) {
+          syncHistoryFromServer();
         }
+      }
 
-        // 4. تحديث القائمة المحلية بالبيانات الجديدة من الخادم وحفظها
-        savedConvos = serverConvos;
-        saveHistory();
-
-        // 5. أعد عرض القائمة بالبيانات المحدثة (مع منع المزامنة مرة أخرى)
-        renderHistoryPanel(false);
-        console.log('History sync complete.');
-
-    } catch (error) {
-        console.warn('Could not sync history from server:', error);
-    }
-}
-
-function renderHistoryPanel(sync = true){
-  loadHistory(); 
-  convoChips.innerHTML = '';
-  convoList.innerHTML = '';
-
-  if(savedConvos.length === 0){
-    const emp = document.createElement('div');
-    emp.className = 'convo-item';
-    emp.innerHTML = `<div class="left"><div class="title">No saved conversations</div></div>`;
-    convoList.appendChild(emp);
-    if (sync) {
-        syncHistoryFromServer();
-    }
-    return;
-  }
-  
-  const chips = savedConvos.slice(0,6);
-  chips.forEach((c, i) => {
-    const chip = document.createElement('button');
-    chip.className = 'convo-chip';
-    chip.textContent = c.title || ('Chat ' + (i+1));
-    chip.addEventListener('click', ()=> loadSavedConversation(i));
-    convoChips.appendChild(chip);
-  });
-
-  savedConvos.forEach((c, i) => {
-    const it = document.createElement('div');
-    it.className = 'convo-item';
-    it.dataset.idx = i;
-    it.innerHTML = `<div class="left"><div class="title"><span style="margin-left:6px">${escapeHtml(c.title||'Conversation')}</span></div></div><div class="meta">${new Date(c.createdAt||Date.now()).toLocaleString()}</div>`;
-    it.addEventListener('click', (ev)=>{
-      if(it.dataset._suppressClick === 'true'){ it.dataset._suppressClick = 'false'; return; }
-      loadSavedConversation(i);
-    });
-    attachConvoListItemHandlers(it, i);
-    convoList.appendChild(it);
-  });
-
-  if (sync) {
-    syncHistoryFromServer();
-  }
-}
-
-      // long-press / right-click for list items -> open contextual menu (Rename/Delete/Lock soon)
       function attachConvoListItemHandlers(el, idx){
         let longTimer = null;
         const LONG_MS = 600;
@@ -4988,25 +4900,21 @@ function renderHistoryPanel(sync = true){
         });
         el.addEventListener('pointercancel', clearTimer);
         el.addEventListener('pointerleave', clearTimer);
-        // right-click also
         el.addEventListener('contextmenu', (ev)=>{
           ev.preventDefault();
           showConvoItemMenuAtEvent(ev, idx);
         });
       }
 
-      // position and show menu
       function showConvoItemMenuAtEvent(ev, idx){
         const menu = convoItemMenu;
         convoMenuTargetIndex = idx;
         const x = ev.clientX || (ev.touches && ev.touches[0] && ev.touches[0].clientX) || 100;
         const y = ev.clientY || (ev.touches && ev.touches[0] && ev.touches[0].clientY) || 100;
-        // compute menu placement to not overflow
         menu.style.left = (x + 6) + 'px';
         menu.style.top = (y + 6) + 'px';
         menu.classList.add('show');
         menu.setAttribute('aria-hidden','false');
-        // close when clicking elsewhere
         setTimeout(()=> {
           const onDoc = (e) => {
             if(!menu.contains(e.target)) {
