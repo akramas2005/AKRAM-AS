@@ -801,6 +801,9 @@ body.dark-mode .msg.user {
   .msg-actions{
     display:flex; align-items:center; gap:6px; margin-top:6px; opacity:.95;
   }
+.msg.assistant .bubble[dir="rtl"] + .msg-actions {
+    justify-content: flex-end;
+}
   .msg-actions .act-btn{
     width:26px; height:26px; display:inline-flex; align-items:center; justify-content:center;
     border:none; background:transparent; border-radius:6px; cursor:pointer;
