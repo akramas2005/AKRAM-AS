@@ -737,6 +737,9 @@ body.dark-mode .analyzingText {
     word-break: break-word;
     hyphens: auto;
     max-width: 100%;
+    padding: 4px 0; /* تعديل الهوامش العمودية */
+    direction: auto;
+    text-align: start; /* <-- هذا هو السطر الجديد والمهم */
   }
   .msg.show{ opacity:1; transform:translateY(0); }
   /* تصميم فقاعة المستخدم الجديدة */
@@ -757,12 +760,6 @@ body.dark-mode .msg.user {
   background: #2a3038;
   /* لون نص فاتح كالمعتاد */
   color: #e6edf3;
-}
-  /* Fix for user bubble width with Markdown */
-.msg.user .bubble p {
-  margin: 0;
-  display: inline-block;
-  text-align: left; /* To ensure text inside aligns correctly */
 }
   .msg.assistant{ 
   align-self:flex-start; 
