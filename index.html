@@ -3655,6 +3655,7 @@ async function sendMessage(text, parentIndex = null) {
 
     let assistantEl = null;
     let bubbleEl = null;
+    let textContainer = null; // <-- حاوية النص الخام الجديدة
     let assistantMessage = null;
     let isFirstChunk = true;
 
@@ -3673,31 +3674,30 @@ async function sendMessage(text, parentIndex = null) {
                 messagesEl.appendChild(assistantEl);
                 requestAnimationFrame(() => setTimeout(() => assistantEl.classList.add('show'), 20));
                 bubbleEl = assistantEl.querySelector('.bubble');
+                
+                // أنشئ حاوية للنص الخام مرة واحدة فقط
+                textContainer = document.createElement('div');
+                bubbleEl.innerHTML = ''; // أفرغ الفقاعة
+                bubbleEl.appendChild(textContainer);
                 isFirstChunk = false;
             }
 
             assistantMessage.content += piece;
-            if (bubbleEl) {
-                bubbleEl.innerHTML = marked.parse(assistantMessage.content);
-                enhanceCodeBlocks(bubbleEl);
-            }
-
+            // فقط أضف النص الجديد. هذه العملية سريعة جدًا!
+            textContainer.textContent = assistantMessage.content;
+            
             if (isUserAtBottomInitially) {
                 messagesEl.scrollTop = messagesEl.scrollHeight;
             }
         }
 
-        if (assistantEl) {
+        // --- بعد انتهاء الرد بالكامل ---
+        if (assistantEl && bubbleEl) {
+            // الآن فقط، قم بالعمليات المعقدة مرة واحدة
+            bubbleEl.innerHTML = marked.parse(assistantMessage.content);
+            enhanceCodeBlocks(bubbleEl);
             const codeBlocksToHighlight = assistantEl.querySelectorAll('pre code');
             codeBlocksToHighlight.forEach(block => { hljs.highlightElement(block); });
-
-           // --- START: تعديل المحاזהה للرسائل الجديدة ---
-            const finalBubble = assistantEl.querySelector('.bubble');
-            if (finalBubble && isRTL(assistantMessage.content)) {
-                finalBubble.classList.add('rtl-text');
-                assistantEl.classList.add('msg-rtl'); // <-- هذا هو السطر الجديد
-            }
-            // --- END: تعديل المحاזהה للرسائل الجديدة ---
         }
         saveSession();
 
@@ -3712,102 +3712,69 @@ async function sendMessage(text, parentIndex = null) {
 
 // Regenerate assistant reply for a given parent message index
 async function regenerateAssistantForParent(parentIdx){
-  try {
-    // 🔹 حماية ضد الضغط المتكرر
-    if (window._regenLock) {
-      console.warn("Regenerate in progress, ignoring extra click");
-      return;
-    }
-    window._regenLock = true;
-
-    if (typeof parentIdx !== 'number' || parentIdx < 0 || !messages[parentIdx]) {
-      window._regenLock = false;
-      return;
-    }
-    const userText = String(messages[parentIdx].content || '').trim();
-    if (!userText) {
-      window._regenLock = false;
-      return;
-    }
-
-    const assistantMessage = { id: genId(), role: 'assistant', content: '', parent: parentIdx, meta: {} };
-    messages.push(assistantMessage);
-    const assistantIdx = messages.length - 1;
-    saveSession();
-
-    // 🔹 إزالة أي typing قديم قبل إنشاء الجديد
-    const oldTyping = messagesEl.querySelector('.typing');
-    if (oldTyping && oldTyping.parentNode) {
-      oldTyping.parentNode.removeChild(oldTyping);
-    }
-
-    const typingEl = showTyping();
-    if (typeof messagesEl !== 'undefined' && messagesEl) {
-      messagesEl.scrollTop = messagesEl.scrollHeight;
-    }
-
-    if (typeof puter === 'undefined' || !puter.ai || typeof puter.ai.chat !== 'function') {
-      // fallback: simulated reply
-      setTimeout(()=>{
-        try { if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl); } catch(e){}
-        const reply = (typeof simulatedAssistantReply === 'function') ? simulatedAssistantReply(userText) : ('Reply: ' + userText.slice(0,200));
-        assistantMessage.content = reply;
-        if (typeof appendMessage === 'function') appendMessage(assistantMessage, assistantIdx);
-        saveSession();
-        window._regenLock = false;
-      }, 700 + Math.min(1500, userText.length * 18));
-      return;
-    }
-
-    let botMessageEl = null;
-    let bubbleEl = null;
-    let domAppended = false;
     try {
-      const response = await puter.ai.chat(buildChatPrompt(messages, parentIdx), { model: 'gpt-5-nano', stream: true });
-      let buffer = '';
+        if (window._regenLock) return;
+        window._regenLock = true;
 
-      for await (const part of response) {
-        if (!part) continue;
-        const piece = part.text || (part.message && part.message.content) || '';
-        if (!piece) continue;
-
-        if (!domAppended) {
-          try { if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl); } catch(e){}
-          if (typeof appendMessage === 'function') appendMessage(assistantMessage, assistantIdx);
-          botMessageEl = (typeof messagesEl !== 'undefined' && messagesEl) ? 
-            (messagesEl.querySelector('.msg[data-id="'+assistantMessage.id+'"]') 
-            || messagesEl.querySelector('.msg[data-index="'+assistantIdx+'"]') 
-            || messagesEl.querySelector('.msg:last-child')) : null;
-          bubbleEl = botMessageEl ? botMessageEl.querySelector('.bubble') : null;
-          domAppended = true;
+        if (typeof parentIdx !== 'number' || !messages[parentIdx]) {
+            return;
         }
 
-        buffer += String(piece);
-        assistantMessage.content = buffer;
-        if (bubbleEl) bubbleEl.innerHTML = escapeHtml(assistantMessage.content).replace(/\n/g,'<br>');
-        if (typeof messagesEl !== 'undefined' && messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
-      }
+        clearIndicator();
+        showTyping();
 
-      if (!domAppended) {
-        try { if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl); } catch(e){}
-        if (typeof appendMessage === 'function') appendMessage(assistantMessage, assistantIdx);
-      }
+        const isUserAtBottomInitially = messagesEl.scrollHeight - messagesEl.clientHeight <= messagesEl.scrollTop + 20;
 
-      saveSession();
-      window._regenLock = false;
+        let assistantEl = null;
+        let bubbleEl = null;
+        let textContainer = null;
+        let assistantMessage = null;
+        let isFirstChunk = true;
+
+        const response = await puter.ai.chat(buildChatPrompt(messages, parentIdx), { model: 'gpt-5-nano', stream: true });
+
+        for await (const part of response) {
+            const piece = part.text || (part.message && part.message.content) || '';
+            if (!piece) continue;
+
+            if (isFirstChunk) {
+                clearIndicator();
+                assistantMessage = { id: genId(), role: 'assistant', content: '', parent: parentIdx, meta: {} };
+                messages.push(assistantMessage);
+                assistantEl = createMessageElement(assistantMessage, messages.length - 1);
+                messagesEl.appendChild(assistantEl);
+                requestAnimationFrame(() => setTimeout(() => assistantEl.classList.add('show'), 20));
+                bubbleEl = assistantEl.querySelector('.bubble');
+                textContainer = document.createElement('div');
+                bubbleEl.innerHTML = '';
+                bubbleEl.appendChild(textContainer);
+                isFirstChunk = false;
+            }
+
+            assistantMessage.content += piece;
+            textContainer.textContent = assistantMessage.content;
+            
+            if (isUserAtBottomInitially) {
+                messagesEl.scrollTop = messagesEl.scrollHeight;
+            }
+        }
+
+        if (assistantEl && bubbleEl) {
+            bubbleEl.innerHTML = marked.parse(assistantMessage.content);
+            enhanceCodeBlocks(bubbleEl);
+            const codeBlocksToHighlight = assistantEl.querySelectorAll('pre code');
+            codeBlocksToHighlight.forEach(block => { hljs.highlightElement(block); });
+        }
+        saveSession();
 
     } catch (error) {
-      console.error("regenerateAssistantForParent Error:", error);
-      try { if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl); } catch(e){}
-      if (typeof appendMessage === 'function') appendMessage(assistantMessage, assistantIdx);
-      assistantMessage.content = 'حدث خطأ. يرجى المحاولة مرة أخرى.';
-      saveSession();
-      window._regenLock = false;
+        console.error("regenerateAssistantForParent Error:", error);
+        clearIndicator();
+        const errorMsg = { id: genId(), role: 'assistant', content: 'حدث خطأ. يرجى المحاولة مرة أخرى.', meta: {} };
+        appendMessage(errorMsg, messages.length);
+    } finally {
+        window._regenLock = false;
     }
-  } catch(e) {
-    console.error('regenerateAssistantForParent wrapper error', e);
-    window._regenLock = false;
-  }
 }
 // OPEN/CLOSE CHAT (use history for back-button order)
       function openChatSimple(){
