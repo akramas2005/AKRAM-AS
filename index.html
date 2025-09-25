@@ -401,43 +401,6 @@ body.dark-mode .analyzingText {
   cursor: pointer;
 }
 
-  /* --- START: Send/Stop Button Animation --- */
-
-/* أضف حركة انتقالية ناعمة للعناصر قبل التغيير */
-.send-inside .send-icon::before,
-.send-inside .send-icon::after {
-  transition: all 0.3s cubic-bezier(.2,.9,.25,1);
-}
-
-/* عندما يكون الزر في وضع "التوليد" */
-.send-inside.is-generating {
-  /* يمكنك تغيير لون الخلفية إذا أردت */
-  background: linear-gradient(135deg, #5A5A5A, #3A3A3A); 
-  box-shadow: 0 8px 20px rgba(80, 80, 80, 0.25);
-}
-
-/* 1. إخفاء رأس السهم (المثلث) */
-.send-inside.is-generating .send-icon::after {
-  opacity: 0;
-  transform: translateX(-50%) scale(0.5);
-}
-
-/* 2. تحويل جسم السهم إلى مربع */
-.send-inside.is-generating .send-icon::before {
-  /* ألغِ الميلان وأعد الأبعاد لتكون مربعة */
-  transform: translateX(-50%) rotate(0deg);
-  width: 10px; /* عرض المربع */
-  height: 10px; /* طول المربع */
-  /* أعد تموضع المربع في المنتصف */
-  left: 50%;
-  top: 50%;
-  margin-top: -5px; /* نصف الارتفاع */
-  margin-left: -5px; /* نصف العرض */
-  border-radius: 2px; /* اجعل حوافه مربعة قليلاً */
-}
-
-/* --- END: Send/Stop Button Animation --- */
-
 /* file icon extension label */
 .file-icon {
   display:flex;
@@ -1961,7 +1924,6 @@ if (savedTheme) {
       let pendingMessageDeleteIndex = null;
       let userActionsTimeout = null; // MODIFICATION: Timeout for user actions
       let pendingDeleteId = null;
-      let shouldStopGeneration = false;
 
       // 🟢 conversation id (current)
 let currentConversationId = localStorage.getItem('currentConversationId') || null;
@@ -3705,11 +3667,6 @@ async function sendMessage(text, parentIndex = null) {
     clearIndicator();
     showTyping(); 
 
-    // --- التعديل يبدأ هنا ---
-    shouldStopGeneration = false; // إعادة تعيين الحالة قبل كل طلب جديد
-    sendInsideBtn.classList.add('is-generating'); // تفعيل حالة الإيقاف
-    sendInsideBtn.classList.add('visible'); // التأكد من أن الزر ظاهر
-
     let assistantEl = null;
     let bubbleEl = null;
     let assistantMessage = null;
@@ -3718,7 +3675,11 @@ async function sendMessage(text, parentIndex = null) {
     try {
         const response = await puter.ai.chat(buildChatPrompt(messages), { model: 'gpt-5-nano', stream: true });
 
-        let updateInterval = setInterval(() => {
+        // --- START: Smart Update Logic ---
+        let contentBuffer = ''; // مخزن مؤقت للنص
+        let updateInterval = null; // المؤقت الزمني
+
+        const updateUI = () => {
             if (bubbleEl) {
                 bubbleEl.innerHTML = DOMPurify.sanitize(marked.parse(assistantMessage.content));
                 enhanceCodeBlocks(bubbleEl);
@@ -3727,13 +3688,10 @@ async function sendMessage(text, parentIndex = null) {
                     messagesEl.scrollTop = messagesEl.scrollHeight;
                 }
             }
-        }, 150);
+        };
+        // --- END: Smart Update Logic ---
 
         for await (const part of response) {
-            if (shouldStopGeneration) { // التحقق من طلب الإيقاف
-                break; 
-            }
-
             const piece = part.text || (part.message && part.message.content) || '';
             if (!piece) continue;
 
@@ -3746,16 +3704,17 @@ async function sendMessage(text, parentIndex = null) {
                 requestAnimationFrame(() => setTimeout(() => assistantEl.classList.add('show'), 20));
                 bubbleEl = assistantEl.querySelector('.bubble');
                 isFirstChunk = false;
+
+                // ابدأ المؤقت الزمني للتحديث كل 150ms
+                updateInterval = setInterval(updateUI, 150);
             }
 
             assistantMessage.content += piece;
         }
 
-        clearInterval(updateInterval);
-        if (bubbleEl) {
-            bubbleEl.innerHTML = DOMPurify.sanitize(marked.parse(assistantMessage.content));
-            enhanceCodeBlocks(bubbleEl);
-        }
+        // --- بعد انتهاء الرد بالكامل ---
+        clearInterval(updateInterval); // أوقف المؤقت
+        updateUI(); // قم بالتحديث الأخير لضمان عرض كل النص
 
         if (assistantEl) {
             const codeBlocksToHighlight = assistantEl.querySelectorAll('pre code');
@@ -3767,17 +3726,12 @@ async function sendMessage(text, parentIndex = null) {
             }
         }
         saveSession();
+
     } catch (error) {
         console.error("Puter.js Error:", error);
         clearIndicator();
         const errorMsg = { id: genId(), role: 'assistant', content: 'عذرًا، حدث خطأ ما.', meta: {} };
         appendMessage(errorMsg, messages.length);
-    } finally {
-        // --- إخفاء الزر عند انتهاء الرد أو إيقافه ---
-        sendInsideBtn.classList.remove('is-generating');
-        if (composer.value.trim().length === 0) {
-             sendInsideBtn.classList.remove('visible');
-        }
     }
 }
       
@@ -3792,26 +3746,27 @@ async function regenerateAssistantForParent(parentIdx){
             window._regenLock = false;
             return;
         }
-
+        
         const parentMessage = messages[parentIdx];
         const attachment = parentMessage?.attachment;
         let imageUrl = null;
-        let attachmentType = 'default';
+        let attachmentType = 'default'; // النوع الافتراضي
 
+        // 1. تحقق من وجود ونوع المرفق
         if (attachment && attachment.url) {
             if (attachment.mime_type?.startsWith('image/')) {
                 imageUrl = attachment.url;
                 attachmentType = 'image';
             } else {
-                attachmentType = 'file';
+                attachmentType = 'file'; // أي نوع آخر هو "ملف"
             }
         }
 
-        // --- التعديل يبدأ هنا ---
-        shouldStopGeneration = false; // إعادة تعيين الحالة
+        shouldStopGeneration = false;
         sendInsideBtn.classList.add('is-generating');
         sendInsideBtn.classList.add('visible');
 
+        // 2. أظهر الأنيميشن المناسب بناءً على نوع المرفق
         clearIndicator();
         showTyping(attachmentType);
 
@@ -3820,14 +3775,18 @@ async function regenerateAssistantForParent(parentIdx){
         let assistantMessage = null;
         let isFirstChunk = true;
 
+        // 3. استدعاء الذكاء الاصطناعي (فقط الصور يتم إرسالها للتحليل البصري)
         let response;
         const prompt = buildChatPrompt(messages, parentIdx);
         if (imageUrl) {
+            // إذا كانت هناك صورة، أرسل النص والصورة معًا
             response = await puter.ai.chat(prompt, imageUrl, { model: 'gpt-5-nano', stream: true });
         } else {
+            // للملفات الأخرى والنصوص، أرسل النص فقط (السياق موجود فيه)
             response = await puter.ai.chat(prompt, { model: 'gpt-5-nano', stream: true });
         }
-
+        
+        // ... (بقية الدالة لمعالجة الرد التدريجي تبقى كما هي تمامًا) ...
         let updateInterval = setInterval(() => {
             if (bubbleEl) {
                 bubbleEl.innerHTML = DOMPurify.sanitize(marked.parse(assistantMessage.content));
@@ -3840,10 +3799,7 @@ async function regenerateAssistantForParent(parentIdx){
         }, 150);
 
         for await (const part of response) {
-            if (shouldStopGeneration) { // التحقق من طلب الإيقاف
-                break; 
-            }
-
+            if (shouldStopGeneration) { break; }
             const piece = part.text || (part.message && part.message.content) || '';
             if (!piece) continue;
 
@@ -3859,7 +3815,7 @@ async function regenerateAssistantForParent(parentIdx){
             }
             assistantMessage.content += piece;
         }
-
+        
         clearInterval(updateInterval);
         if (bubbleEl) {
             bubbleEl.innerHTML = DOMPurify.sanitize(marked.parse(assistantMessage.content));
@@ -3876,16 +3832,16 @@ async function regenerateAssistantForParent(parentIdx){
             }
         }
         saveSession();
+
     } catch (error) {
         console.error("regenerateAssistantForParent Error:", error);
         clearIndicator();
         const errorMsg = { id: genId(), role: 'assistant', content: 'حدث خطأ. يرجى المحاولة مرة أخرى.', meta: {} };
         appendMessage(errorMsg, messages.length);
     } finally {
-        // --- إخفاء الزر عند انتهاء الرد أو إيقافه ---
         sendInsideBtn.classList.remove('is-generating');
         if (composer.value.trim().length === 0) {
-             sendInsideBtn.classList.remove('visible');
+            sendInsideBtn.classList.remove('visible');
         }
         window._regenLock = false;
     }
@@ -3979,134 +3935,119 @@ async function regenerateAssistantForParent(parentIdx){
         startRotatorIfNeeded();
       });
 
-      sendInsideBtn.addEventListener('click', (e) => {
-    e.preventDefault();
+      sendInsideBtn.addEventListener('click', (e)=>{
+        e.preventDefault();
+        const t = composer.value.trim();
+        if(!t && !pendingAttachment) return;
+        sendInsideBtn.classList.add('sending');
+        setTimeout(()=>{
+          sendInsideBtn.classList.remove('sending');
+        // ====== START: replace existing "edit" branch with this block ======
+if (editIndex !== null && editIndex >= 0) {
+  const t = composer.value.trim();
 
-    // --- التعديل الجديد: التحقق من حالة الزر (إرسال أم إيقاف) ---
-    if (sendInsideBtn.classList.contains('is-generating')) {
-        shouldStopGeneration = true; // ارفع علم الإيقاف
-        return; // توقف هنا ولا تكمل باقي الكود
+  // 1) تحديث بيانات الرسالة (نحتفظ بأي مرفقات موجودة)
+  messages[editIndex].content = t;
+
+  // 2) تحديث فقاعـة الرسالة في الـ DOM من دون مسح الـ children (صور أو مرفقات)
+  const editedMsgEl = messagesEl.querySelector(`.msg[data-index="${editIndex}"] .bubble`);
+  if (editedMsgEl) {
+    // حاول إيجاد عنصر يحمل النص (أفضل إذا كان class="bubble-text")
+    let textHolder = editedMsgEl.querySelector('.bubble-text');
+
+    // إذا لم يوجد عنصر مخصص، نبحث عن عقدة نص أو عنصر غير وسائط (IMG/VIDEO/PICTURE)
+    if (!textHolder) {
+      for (let node of editedMsgEl.childNodes) {
+        if (node.nodeType === Node.TEXT_NODE && node.nodeValue.trim() !== '') {
+          textHolder = node;
+          break;
+        }
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          const tag = node.tagName.toUpperCase();
+          // تجاهل عناصر الوسائط و أزرار التحكم داخل الفقاعة
+          if (tag !== 'IMG' && tag !== 'PICTURE' && tag !== 'VIDEO'
+              && !node.classList.contains('msg-actions') && !node.classList.contains('feedback-row')) {
+            textHolder = node;
+            break;
+          }
+        }
+      }
     }
-    // --- نهاية التعديل ---
 
-    // المنطق الأصلي للإرسال والتعديل يبدأ من هنا
-    const t = composer.value.trim();
-    if (!t && !pendingAttachment) return;
+    // إذا وجدنا مكاناً للنص، نحدّثه (نستبدل، لا نضيف)
+    if (textHolder) {
+      if (textHolder.nodeType === Node.TEXT_NODE) {
+        textHolder.nodeValue = t;
+      } else {
+        textHolder.textContent = t;
+      }
+    } else {
+      // لا يوجد نص سابق: نُنشئ span مخصص وندرجه قبل أول ميديا إن وُجدت أو كبداية الفقاعة
+      const span = document.createElement('span');
+      span.className = 'bubble-text';
+      span.textContent = t;
+      const media = editedMsgEl.querySelector('img, picture, video');
+      if (media) editedMsgEl.insertBefore(span, media);
+      else editedMsgEl.insertBefore(span, editedMsgEl.firstChild);
+    }
+  }
 
-    sendInsideBtn.classList.add('sending');
+  // 3) حذف الردود التالية من المصفوفة
+  messages.splice(editIndex + 1);
 
-    setTimeout(() => {
-        sendInsideBtn.classList.remove('sending');
+  // 4) حذف عناصر DOM المقابلة للرسائل التي بعد الرسالة المعدلة بسلاسة (بدون ومضة)
+  const nodes = [...messagesEl.querySelectorAll('.msg')];
+  const toRemove = [];
+  for (const el of nodes) {
+    const i = Number(el.dataset.index || -1);
+    if (i > editIndex) toRemove.push(el);
+  }
+  toRemove.forEach((el, idx) => {
+    el.style.transition = 'opacity .12s ease, transform .12s ease';
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(-6px)';
+    setTimeout(() => { el.remove(); }, 120 + idx * 10);
+  });
 
-        // ====== START: existing "edit" branch ======
-        if (editIndex !== null && editIndex >= 0) {
-            const t = composer.value.trim();
+  // 4b) إعادة ترقيم DOM إن وجدت دالة لهذا الغرض
+  if (typeof reindexDom === 'function') {
+    setTimeout(() => { reindexDom(); }, 160);
+  }
 
-            // 1) تحديث بيانات الرسالة (نحتفظ بأي مرفقات موجودة)
-            messages[editIndex].content = t;
+  // 5) حفظ الحالة
+  saveSession();
 
-            // 2) تحديث فقاعـة الرسالة في الـ DOM من دون مسح الـ children (صور أو مرفقات)
-            const editedMsgEl = messagesEl.querySelector(`.msg[data-index="${editIndex}"] .bubble`);
-            if (editedMsgEl) {
-                // حاول إيجاد عنصر يحمل النص (أفضل إذا كان class="bubble-text")
-                let textHolder = editedMsgEl.querySelector('.bubble-text');
+  // 6) تنظيف حالة التعديل في الواجهة
+  const oldIndex = editIndex;
+  editIndex = null;
+  editCancelBtn.style.display = 'none';
+  composer.value = '';
+  localStorage.removeItem(DRAFT_KEY);
+  updateSendVisibility();
+  autoGrowTextarea();
 
-                // إذا لم يوجد عنصر مخصص، نبحث عن عقدة نص أو عنصر غير وسائط (IMG/VIDEO/PICTURE)
-                if (!textHolder) {
-                    for (let node of editedMsgEl.childNodes) {
-                        if (node.nodeType === Node.TEXT_NODE && node.nodeValue.trim() !== '') {
-                            textHolder = node;
-                            break;
-                        }
-                        if (node.nodeType === Node.ELEMENT_NODE) {
-                            const tag = node.tagName.toUpperCase();
-                            // تجاهل عناصر الوسائط و أزرار التحكم داخل الفقاعة
-                            if (tag !== 'IMG' && tag !== 'PICTURE' && tag !== 'VIDEO' &&
-                                !node.classList.contains('msg-actions') && !node.classList.contains('feedback-row')) {
-                                textHolder = node;
-                                break;
-                            }
-                        }
-                    }
-                }
+  // 7) إظهار نقاط الكتابة ثم إضافة رد المساعد الجديد بسلاسة (appendMessage إن وُجد)
+    // regenerate reply for edited message
+  regenerateAssistantForParent(oldIndex);
+  if (typeof reindexDom === 'function') reindexDom();
+  return;
+}
+// ====== END: edit branch replacement ======
+ else {
+  if (pendingAttachment) {
+    sendAttachmentNow();
+  } else {
+    composer.value = '';
+    updateSendVisibility();
+    autoGrowTextarea();
+    sendMessage(t);
+  }
+}
+startRotatorIfNeeded();
 
-                // إذا وجدنا مكاناً للنص، نحدّثه (نستبدل، لا نضيف)
-                if (textHolder) {
-                    if (textHolder.nodeType === Node.TEXT_NODE) {
-                        textHolder.nodeValue = t;
-                    } else {
-                        textHolder.textContent = t;
-                    }
-                } else {
-                    // لا يوجد نص سابق: نُنشئ span مخصص وندرجه قبل أول ميديا إن وُجدت أو كبداية الفقاعة
-                    const span = document.createElement('span');
-                    span.className = 'bubble-text';
-                    span.textContent = t;
-                    const media = editedMsgEl.querySelector('img, picture, video');
-                    if (media) editedMsgEl.insertBefore(span, media);
-                    else editedMsgEl.insertBefore(span, editedMsgEl.firstChild);
-                }
-            }
+        }, 260);
+      });
 
-            // 3) حذف الردود التالية من المصفوفة
-            messages.splice(editIndex + 1);
-
-            // 4) حذف عناصر DOM المقابلة للرسائل التي بعد الرسالة المعدلة بسلاسة (بدون ومضة)
-            const nodes = [...messagesEl.querySelectorAll('.msg')];
-            const toRemove = [];
-            for (const el of nodes) {
-                const i = Number(el.dataset.index || -1);
-                if (i > editIndex) toRemove.push(el);
-            }
-            toRemove.forEach((el, idx) => {
-                el.style.transition = 'opacity .12s ease, transform .12s ease';
-                el.style.opacity = '0';
-                el.style.transform = 'translateY(-6px)';
-                setTimeout(() => {
-                    el.remove();
-                }, 120 + idx * 10);
-            });
-
-            // 4b) إعادة ترقيم DOM إن وجدت دالة لهذا الغرض
-            if (typeof reindexDom === 'function') {
-                setTimeout(() => {
-                    reindexDom();
-                }, 160);
-            }
-
-            // 5) حفظ الحالة
-            saveSession();
-
-            // 6) تنظيف حالة التعديل في الواجهة
-            const oldIndex = editIndex;
-            editIndex = null;
-            editCancelBtn.style.display = 'none';
-            composer.value = '';
-            localStorage.removeItem(DRAFT_KEY);
-            updateSendVisibility();
-            autoGrowTextarea();
-
-            // 7) إظهار نقاط الكتابة ثم إضافة رد المساعد الجديد بسلاسة (appendMessage إن وُجد)
-            // regenerate reply for edited message
-            regenerateAssistantForParent(oldIndex);
-            if (typeof reindexDom === 'function') reindexDom();
-            return;
-        }
-        // ====== END: edit branch ======
-        else {
-            if (pendingAttachment) {
-                sendAttachmentNow();
-            } else {
-                composer.value = '';
-                updateSendVisibility();
-                autoGrowTextarea();
-                sendMessage(t);
-            }
-        }
-        startRotatorIfNeeded();
-
-    }, 260);
-});
       composer.addEventListener('keydown', (e)=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendInsideBtn.click(); } });
 
       editCancelBtn.addEventListener('click', (e)=>{
