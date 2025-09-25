@@ -915,37 +915,77 @@ body.dark-mode .msg.user {
   }
   .input-field:focus{ box-shadow: 0 10px 30px rgba(0,120,255,0.08), inset 0 2px 10px rgba(0,0,0,0.03); border-color: rgba(0,120,255,0.22); transform: translateY(-1px); }
 
-  .send-inside{
-    position:absolute; right:8px; top:50%; transform: translateY(-50%) translateX(6px);
-    display:inline-flex; align-items:center; justify-content:center;
-    /* التعديل: تم تصغير الحجم من 40px إلى 36px */
-    width:36px; height:36px; 
-    padding:8px; border-radius:999px; background: linear-gradient(135deg,#0078ff,#00aaff); color:white; font-weight:800; border:none; cursor:pointer;
-    opacity:0; pointer-events:none; transition: opacity .22s ease, transform .22s ease;
-    box-shadow: 0 8px 20px rgba(0,120,255,0.18);
-  }
-  .send-inside.visible{ opacity:1; pointer-events:auto; transform: translateY(-50%) translateX(0); }
-  .send-inside.sending{ opacity:0; transform: translateY(-50%) scale(.98); transition: opacity .36s ease, transform .36s ease; }
+  /* زر الإرسال: حاوية */
+.send-inside{
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%) translateX(6px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 8px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #1f7bff, #005ee6);
+  color: white;
+  border: none;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .22s ease, transform .22s ease;
+  box-shadow: 0 8px 20px rgba(0,120,255,0.18);
+  /* مهم: نحتاجها لتضع children بالمركز عبر absolute */
+  /* (هي بالفعل absolute في ملفك لكن نؤكد) */
+}
 
-  .send-inside .send-icon{
-    /* التعديل: تم تصغير حجم حاوية الأيقونة من 18px إلى 16px */
-    width:16px; height:16px; 
-    position:relative; display:block;
-  }
-  .send-inside .send-icon::before{
-    content:''; position:absolute; left:50%; bottom:10%; transform:translateX(-50%); 
-    /* التعديل: تم تصغير أبعاد جسم السهم */
-    width:3px; height:9px; 
-    border-radius:2px;
-    background: linear-gradient(180deg,#ffffff,#dbeeff);
-  }
-  .send-inside .send-icon::after{
-    content:''; position:absolute; left:50%; top:0; transform:translateX(-50%) rotate(0deg);
-    /* التعديل: تم تصغير أبعاد رأس السهم */
-    width:11px; height:7px;
-    background: linear-gradient(180deg,#ffffff,#dbeeff);
-    clip-path: polygon(50% 0, 100% 100%, 0 100%);
-  }
+/* قابلية الظهور */
+.send-inside.visible{ opacity:1; pointer-events:auto; transform: translateY(-50%) translateX(0); }
+.send-inside.sending{ opacity:0; transform: translateY(-50%) scale(.98); transition: opacity .36s ease, transform .36s ease; }
+
+/* نجعل الأيقونتين (السهم + مربع الإيقاف) متراكبتين ومتمركزتين */
+.send-inside .send-icon,
+.send-inside .stop-icon {
+  position: absolute;            /* overlap */
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 16px;
+  height: 16px;
+  display: block;
+  transition: opacity .18s cubic-bezier(.2,.8,.2,1), transform .18s cubic-bezier(.2,.8,.2,1);
+  pointer-events: none;
+}
+
+/* السهم: نحتفظ بشكله عبر pseudo-elements كما عندك */
+.send-inside .send-icon::before{
+  content:''; position:absolute; left:50%; bottom:10%; transform:translateX(-50%); 
+  width:3px; height:9px; border-radius:2px;
+  background: linear-gradient(180deg,#ffffff,#dbeeff);
+}
+.send-inside .send-icon::after{
+  content:''; position:absolute; left:50%; top:0; transform:translateX(-50%) rotate(0deg);
+  width:11px; height:7px;
+  background: linear-gradient(180deg,#ffffff,#dbeeff);
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+
+/* مربع الإيقاف — بسيط ومرئي */
+.send-inside .stop-icon{
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(.86);
+  border-radius: 3px;
+  background: linear-gradient(180deg,#ffffff,#e6f2ff);
+  box-shadow: 0 1px 0 rgba(0,0,0,0.06) inset;
+}
+
+/* حالة التوليد: السهم يختفي والمربع يظهر */
+.send-inside.is-generating .send-icon{ opacity:0; transform: translate(-50%, -50%) scale(.72); }
+.send-inside.is-generating .stop-icon{ opacity:1; transform: translate(-50%, -50%) scale(1); }
+
+/* لمسة عند الضغط على Stop (صغير للـ feedback) */
+.send-inside.stopping{ transform: translateY(-50%) scale(.98); transition: transform .14s ease; }
 
   /* STOP icon styling (appears when generating) */
 .send-inside .stop-icon{
@@ -1635,9 +1675,7 @@ body.dark-mode .msg.user {
               </div>
               <button class="send-inside" id="sendInsideBtn" title="Send">
     <span class="send-icon" aria-hidden="true"></span>
-    <!-- STOP ICON (new) -->
-    <span class="stop-icon" aria-hidden="true"></span>
-    <span class="sr-only">Send</span>
+   <span class="stop-icon" aria-hidden="true"></span>
 </button>
           </div>
 
@@ -2737,6 +2775,7 @@ if (!analysisText) {
       let messages = [];
       let editIndex = null;
       let shouldStopGeneration = false;
+      let currentStreamingIterator = null;
       function genId(){ return 'm-'+Math.random().toString(36).slice(2,9); }
       function escapeHtml(str){ return String(str).replace(/[&<>"]/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s])); }
 
@@ -3681,37 +3720,36 @@ async function sendMessage(text, parentIndex = null) {
     clearIndicator();
     showTyping();
 
-    // *** enable generating state so UI shows stop button (arrow -> square) ***
+    // علامـة التوليد: لتظهر أيقونة الـ Stop
     shouldStopGeneration = false;
-    try { sendInsideBtn.classList.add('is-generating'); sendInsideBtn.classList.add('visible'); } catch (e) {}
+    try { sendInsideBtn.classList.add('is-generating'); sendInsideBtn.classList.add('visible'); } catch(e){}
 
     let assistantEl = null;
     let bubbleEl = null;
     let assistantMessage = null;
     let isFirstChunk = true;
 
+    let updateInterval = null;
+    const updateUI = () => {
+        if (bubbleEl) {
+            bubbleEl.innerHTML = marked.parse(assistantMessage.content || '');
+            enhanceCodeBlocks(bubbleEl);
+            const isUserAtBottom = messagesEl.scrollHeight - messagesEl.clientHeight <= messagesEl.scrollTop + 20;
+            if (isUserAtBottom) messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+    };
+
     try {
         const response = await puter.ai.chat(buildChatPrompt(messages), { model: 'gpt-5-nano', stream: true });
 
-        // --- START: Smart Update Logic ---
-        let contentBuffer = ''; // مخزن مؤقت للنص
-        let updateInterval = null; // المؤقت الزمني
-
-        const updateUI = () => {
-            if (bubbleEl) {
-                bubbleEl.innerHTML = marked.parse(assistantMessage.content);
-                enhanceCodeBlocks(bubbleEl);
-                const isUserAtBottom = messagesEl.scrollHeight - messagesEl.clientHeight <= messagesEl.scrollTop + 20;
-                if (isUserAtBottom) {
-                    messagesEl.scrollTop = messagesEl.scrollHeight;
-                }
-            }
-        };
-        // --- END: Smart Update Logic ---
+        // حفظ المرجع ليمكننا محاولة إيقافه من الـ click handler
+        currentStreamingIterator = response;
 
         for await (const part of response) {
-            // إذا ضغط المستخدم زر الإيقاف — اكسر الحلقة بأمان
+            // فحص طلب الإيقاف من المستخدم
             if (shouldStopGeneration) {
+                // محاولة إنهاء الـ iterator إن أمكن
+                try { if (response && typeof response.return === 'function') response.return(); } catch(e){}
                 break;
             }
 
@@ -3735,15 +3773,15 @@ async function sendMessage(text, parentIndex = null) {
             assistantMessage.content += piece;
         }
 
-        // --- بعد انتهاء/إيقاف الرد ---
+        // تنظيف المؤقت وتحديث نهائي
         try { clearInterval(updateInterval); } catch(e){}
-        updateUI(); // تحديث نهائي
+        updateUI();
 
         if (assistantEl) {
             const codeBlocksToHighlight = assistantEl.querySelectorAll('pre code');
             codeBlocksToHighlight.forEach(block => { hljs.highlightElement(block); });
             const finalBubble = assistantEl.querySelector('.bubble');
-            if (finalBubble && isRTL(assistantMessage.content)) {
+            if (finalBubble && isRTL(assistantMessage.content || '')) {
                 finalBubble.classList.add('rtl-text');
                 assistantEl.classList.add('msg-rtl');
             }
@@ -3756,7 +3794,9 @@ async function sendMessage(text, parentIndex = null) {
         const errorMsg = { id: genId(), role: 'assistant', content: 'عذرًا، حدث خطأ ما.', meta: {} };
         appendMessage(errorMsg, messages.length);
     } finally {
-        // نظف حالة الزر البصرية عندما ينتهي/يُوقَف الرد
+        // تنظيف المَرَكِز المرجعي ومظهر الزر
+        currentStreamingIterator = null;
+        shouldStopGeneration = false;
         try {
             sendInsideBtn.classList.remove('is-generating');
             if ((composer.value || '').trim().length === 0) {
@@ -3939,21 +3979,26 @@ async function regenerateAssistantForParent(parentIdx){
       sendInsideBtn.addEventListener('click', (e)=>{
   e.preventDefault();
 
-  // 1) إذا كان الزر في وضع "توليد" -> اضغطته لوقف التدفق
+  // إذا كنا في وضع توليد: اضغط = "أوقف التوليد"
   if (sendInsideBtn.classList.contains('is-generating')) {
-    // ضع العلم ليتم فحصه داخل حلقات الـ stream
     shouldStopGeneration = true;
-    // علّق الشكل بصرياً (نزيل حالة is-generating حتى يعود السهم لاختفاء/ظهور طبيعي)
-    sendInsideBtn.classList.remove('is-generating');
-    // إخفاؤه إذا لم يكن هناك نص في composer
+    // إذا دعم الـ iterator ال-return() نحاول إغلاقه فوراً
+    try {
+      if (currentStreamingIterator && typeof currentStreamingIterator.return === 'function') {
+        currentStreamingIterator.return();
+      }
+    } catch (err) { /* ignore */ }
+
+    // نُعطي feedback بصري ونخفي الزر إن كان الحقل فارغًا
+    sendInsideBtn.classList.add('stopping');
+    setTimeout(()=> sendInsideBtn.classList.remove('stopping'), 300);
     if ((composer.value || '').trim().length === 0) {
       sendInsideBtn.classList.remove('visible');
     }
-    // لا نتابع إرسال رسالة جديدة
-    return;
+    return; // لا نرسل رسالة جديدة
   }
 
-  // 2) السلوك السابق: إرسال/تعديل/مرفقات
+  // خلاف ذلك: سلوك الإرسال/التحرير العادي
   const t = composer.value.trim();
   if(!t && !pendingAttachment) return;
 
@@ -3961,19 +4006,19 @@ async function regenerateAssistantForParent(parentIdx){
   setTimeout(()=>{
     sendInsideBtn.classList.remove('sending');
 
-    // ====== START: edit branch (كما في ملفك) ======
+    // ====== edit branch (نفس منطق ملفك) ======
     if (editIndex !== null && editIndex >= 0) {
       const t = composer.value.trim();
-
-      // 1) تحديث بيانات الرسالة (نحتفظ بأي مرفقات موجودة)
       messages[editIndex].content = t;
-      // ... (ابقَ على بقية منطق التحرير كما هو في ملفك)
-      // في ملفك الأصلي هنا يتم حفظ وإعادة توليد الرد المعدل
-      // (لا نغير هذا الجزء، نتركه كما كان)
+      const editedMsgEl = messagesEl.querySelector(`.msg[data-index="${editIndex}"] .bubble`);
+      if (editedMsgEl) {
+        editedMsgEl.innerHTML = marked.parse(t);
+        // (ابقَ على منطق التحديث الإضافي هنا كما في ملفك)
+      }
       regenerateAssistantForParent(oldIndex);
       return;
     }
-    // ====== END: edit branch ======
+    // ====== end edit branch ======
     else {
       if (pendingAttachment) {
         sendAttachmentNow();
@@ -3981,7 +4026,11 @@ async function regenerateAssistantForParent(parentIdx){
         composer.value = '';
         updateSendVisibility();
         autoGrowTextarea();
-        // عند إرسال رسالة جديدة: sendMessage سيقوم بإضافة is-generating تلقائياً
+
+        // قبل بدء التوليد: نؤكد أن علم الإيقاف على false
+        shouldStopGeneration = false;
+
+        // start generation — sendMessage سيقوم بإضافة is-generating على الزر
         sendMessage(t);
       }
     }
