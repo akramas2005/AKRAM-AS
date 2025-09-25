@@ -3974,92 +3974,37 @@ async function regenerateAssistantForParent(parentIdx){
         startRotatorIfNeeded();
       });
 
-      sendInsideBtn.addEventListener('click', (e)=>{
-        e.preventDefault();
+      sendInsideBtn.addEventListener('click', (e) => {
+    e.preventDefault();
 
-        // إذا كان الزر في وضع "إيقاف"، قم بتغيير حالة المتغير فقط
-        if (sendInsideBtn.classList.contains('is-generating')) {
-            console.log('Stop generation requested...');
-            shouldStopGeneration = true;
-            return; // لا تقم بأي شيء آخر
+    // الحالة 1: إذا كان الزر في وضع "إيقاف"
+    if (sendInsideBtn.classList.contains('is-generating')) {
+        shouldStopGeneration = true;
+        return;
+    }
+
+    // الحالة 2: إذا كان في وضع "إرسال"
+    const t = composer.value.trim();
+    if (!t && !pendingAttachment) return;
+
+    if (editIndex !== null && editIndex >= 0) {
+        // منطق تعديل الرسالة
+        regenerateAssistantForParent(editIndex, true); // (isEdit = true)
+    } else {
+        // منطق الإرسال العادي
+        if (pendingAttachment) {
+            sendAttachmentNow();
+        } else {
+            sendMessage(t);
         }
-        
-        // إذا كان الزر في وضع "إرسال"، قم بتنفيذ المنطق الحالي
-        const t = composer.value.trim();
-        if(!t && !pendingAttachment) return;
-        
-        // لا نضيف is-generating هنا، بل داخل sendMessage/sendAttachmentNow
-        
-        setTimeout(()=>{
-            // --- هذا الجزء خاص بمعالجة تعديل الرسائل (يبقى كما هو) ---
-            if (editIndex !== null && editIndex >= 0) {
-              const t = composer.value.trim();
-              messages[editIndex].content = t;
-              const editedMsgEl = messagesEl.querySelector(`.msg[data-index="${editIndex}"] .bubble`);
-              if (editedMsgEl) {
-                let textHolder = editedMsgEl.querySelector('.bubble-text');
-                if (!textHolder) {
-                  for (let node of editedMsgEl.childNodes) {
-                    if (node.nodeType === Node.TEXT_NODE && node.nodeValue.trim() !== '') { textHolder = node; break; }
-                    if (node.nodeType === Node.ELEMENT_NODE) {
-                      const tag = node.tagName.toUpperCase();
-                      if (tag !== 'IMG' && tag !== 'PICTURE' && tag !== 'VIDEO' && !node.classList.contains('msg-actions') && !node.classList.contains('feedback-row')) {
-                        textHolder = node; break;
-                      }
-                    }
-                  }
-                }
-                if (textHolder) {
-                  if (textHolder.nodeType === Node.TEXT_NODE) { textHolder.nodeValue = t; } else { textHolder.textContent = t; }
-                } else {
-                  const span = document.createElement('span');
-                  span.className = 'bubble-text';
-                  span.textContent = t;
-                  const media = editedMsgEl.querySelector('img, picture, video');
-                  if (media) editedMsgEl.insertBefore(span, media);
-                  else editedMsgEl.insertBefore(span, editedMsgEl.firstChild);
-                }
-              }
-              messages.splice(editIndex + 1);
-              const nodes = [...messagesEl.querySelectorAll('.msg')];
-              const toRemove = [];
-              for (const el of nodes) {
-                const i = Number(el.dataset.index || -1);
-                if (i > editIndex) toRemove.push(el);
-              }
-              toRemove.forEach((el, idx) => {
-                el.style.transition = 'opacity .12s ease, transform .12s ease';
-                el.style.opacity = '0';
-                el.style.transform = 'translateY(-6px)';
-                setTimeout(() => { el.remove(); }, 120 + idx * 10);
-              });
-              if (typeof reindexDom === 'function') { setTimeout(() => { reindexDom(); }, 160); }
-              saveSession();
-              const oldIndex = editIndex;
-              editIndex = null;
-              editCancelBtn.style.display = 'none';
-              composer.value = '';
-              localStorage.removeItem(DRAFT_KEY);
-              updateSendVisibility();
-              autoGrowTextarea();
-              regenerateAssistantForParent(oldIndex);
-              if (typeof reindexDom === 'function') reindexDom();
-              return;
-            }
-            // --- نهاية جزء التعديل ---
-            else { // إذا لم يكن في وضع التعديل، قم بالإرسال العادي
-              if (pendingAttachment) {
-                sendAttachmentNow();
-              } else {
-                sendMessage(t);
-              }
-            }
-            composer.value = ''; // مسح النص بعد الإرسال
-            updateSendVisibility();
-            autoGrowTextarea();
-            startRotatorIfNeeded();
-        }, 100);
-      });
+    }
+
+    // مسح حقل الكتابة بعد الإرسال مباشرة
+    composer.value = '';
+    updateSendVisibility(); // سيقوم بإخفاء الزر مؤقتًا قبل أن تعيده دالة الإرسال
+    autoGrowTextarea();
+    startRotatorIfNeeded();
+});
 
       composer.addEventListener('keydown', (e)=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendInsideBtn.click(); } });
 
