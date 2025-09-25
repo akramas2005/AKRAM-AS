@@ -916,19 +916,18 @@ body.dark-mode .msg.user {
   .input-field:focus{ box-shadow: 0 10px 30px rgba(0,120,255,0.08), inset 0 2px 10px rgba(0,0,0,0.03); border-color: rgba(0,120,255,0.22); transform: translateY(-1px); }
 
   /* زر الإرسال: حاوية */
-.send-inside{
-  position: absolute;
+.send-inside {
+  position: absolute;   /* حافظ كما كان لتثبيت الزر داخل الـ input */
   right: 8px;
   top: 50%;
-  transform: translateY(-50%) translateX(6px);
+  transform: translateY(-50%) translateX(0);
+  width: 36px;
+  height: 36px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  padding: 8px;
   border-radius: 999px;
-  background: linear-gradient(180deg, #1f7bff, #005ee6);
+  background: linear-gradient(180deg,#1f7bff,#005ee6);
   color: white;
   border: none;
   cursor: pointer;
@@ -936,86 +935,58 @@ body.dark-mode .msg.user {
   pointer-events: none;
   transition: opacity .22s ease, transform .22s ease;
   box-shadow: 0 8px 20px rgba(0,120,255,0.18);
-  /* مهم: نحتاجها لتضع children بالمركز عبر absolute */
-  /* (هي بالفعل absolute في ملفك لكن نؤكد) */
+  /* important: ensure children absolute positioning is relative to this button */
+  overflow: visible;
 }
 
-/* قابلية الظهور */
-.send-inside.visible{ opacity:1; pointer-events:auto; transform: translateY(-50%) translateX(0); }
-.send-inside.sending{ opacity:0; transform: translateY(-50%) scale(.98); transition: opacity .36s ease, transform .36s ease; }
+/* visible state */
+.send-inside.visible{ opacity:1; pointer-events:auto; }
 
-/* نجعل الأيقونتين (السهم + مربع الإيقاف) متراكبتين ومتمركزتين */
+/* icon overlap: force absolute center and override any conflicting styles */
 .send-inside .send-icon,
 .send-inside .stop-icon {
-  position: absolute;            /* overlap */
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  transform: translate(-50%, -50%) !important;
   width: 16px;
   height: 16px;
-  display: block;
-  transition: opacity .18s cubic-bezier(.2,.8,.2,1), transform .18s cubic-bezier(.2,.8,.2,1);
-  pointer-events: none;
+  display: block !important;
+  pointer-events: none !important;
+  transition: opacity .16s cubic-bezier(.2,.8,.2,1), transform .16s cubic-bezier(.2,.8,.2,1);
 }
 
-/* السهم: نحتفظ بشكله عبر pseudo-elements كما عندك */
+/* ensure the arrow (send-icon) visuals are centered via pseudo-elements */
 .send-inside .send-icon::before{
-  content:''; position:absolute; left:50%; bottom:10%; transform:translateX(-50%); 
+  content:''; position:absolute; left:50%; top:50%; transform: translate(-50%, 3px);
   width:3px; height:9px; border-radius:2px;
   background: linear-gradient(180deg,#ffffff,#dbeeff);
 }
 .send-inside .send-icon::after{
-  content:''; position:absolute; left:50%; top:0; transform:translateX(-50%) rotate(0deg);
+  content:''; position:absolute; left:50%; top:50%; transform: translate(-50%, -5px);
   width:11px; height:7px;
   background: linear-gradient(180deg,#ffffff,#dbeeff);
   clip-path: polygon(50% 0, 100% 100%, 0 100%);
 }
 
-/* مربع الإيقاف — بسيط ومرئي */
+/* stop-icon appearance (hidden by default) */
 .send-inside .stop-icon{
   opacity: 0;
-  transform: translate(-50%, -50%) scale(.86);
+  transform: translate(-50%, -50%) scale(.86) !important;
   border-radius: 3px;
   background: linear-gradient(180deg,#ffffff,#e6f2ff);
   box-shadow: 0 1px 0 rgba(0,0,0,0.06) inset;
+  z-index: 5;
 }
 
-/* حالة التوليد: السهم يختفي والمربع يظهر */
-.send-inside.is-generating .send-icon{ opacity:0; transform: translate(-50%, -50%) scale(.72); }
-.send-inside.is-generating .stop-icon{ opacity:1; transform: translate(-50%, -50%) scale(1); }
+/* ensure arrow sits below stop visually */
+.send-inside .send-icon{ z-index: 2; }
+.send-inside.is-generating .send-icon{ opacity: 0; transform: translate(-50%, -50%) scale(.72); z-index: 2; }
+.send-inside.is-generating .stop-icon{ opacity: 1; transform: translate(-50%, -50%) scale(1) !important; z-index: 6; }
 
-/* لمسة عند الضغط على Stop (صغير للـ feedback) */
+/* small feedback when pressing stop */
 .send-inside.stopping{ transform: translateY(-50%) scale(.98); transition: transform .14s ease; }
-
-  /* STOP icon styling (appears when generating) */
-.send-inside .stop-icon{
-  display:block;
-  width:12px;
-  height:12px;
-  border-radius:2px;
-  opacity:0;
-  transform: scale(0.85);
-  transition: opacity .18s ease, transform .18s ease;
-  /* white square with subtle gradient to match send-icon look */
-  background: linear-gradient(180deg,#ffffff,#e6f2ff);
-}
-
-/* When generating: hide arrow, show square */
-.send-inside.is-generating .send-icon{
-  opacity:0;
-  transform: scale(0.6) translateY(-1px);
-  transition: opacity .18s ease, transform .18s ease;
-}
-.send-inside.is-generating .stop-icon{
-  opacity:1;
-  transform: scale(1);
-}
-
-/* small extra polish: when button not visible, ensure icons hidden */
-.send-inside { /* existing rules already exist */ }
-
-  .sr-only{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
-
+ 
   .edit-cancel{
     display:none;
     padding:8px 10px; border-radius:10px; border:none; font-weight:700; background:#f0f4f8; cursor:pointer;
@@ -3698,112 +3669,116 @@ msg.appendChild(content);
         }
       }
 async function sendMessage(text, parentIndex = null) {
-    let textToUse = (text || '').trim();
-    if (!textToUse && !pendingAttachment) return;
+  let textToUse = (text || '').trim();
+  if (!textToUse && !pendingAttachment) return;
 
-    if (pendingAttachment) {
-        sendAttachmentNow();
-        return;
+  if (pendingAttachment) {
+    sendAttachmentNow();
+    return;
+  }
+
+  const userMessage = { id: genId(), role: 'user', content: textToUse, parent: parentIndex, meta: {} };
+  messages.push(userMessage);
+  appendMessage(userMessage, messages.length - 1);
+  saveSession();
+  localStorage.removeItem(DRAFT_KEY);
+  updateWelcomeVisibility();
+  postMessageToServer(userMessage).catch((err) => {
+    console.warn('postMessageToServer failed (will retry):', err);
+    scheduleSync();
+  });
+
+  clearIndicator();
+  showTyping();
+
+  // علامـة التوليد: لتظهر أيقونة الـ Stop
+  shouldStopGeneration = false;
+  try { sendInsideBtn.classList.add('is-generating'); sendInsideBtn.classList.add('visible'); } catch(e){}
+
+  let assistantEl = null;
+  let bubbleEl = null;
+  let assistantMessage = null;
+  let isFirstChunk = true;
+
+  let updateInterval = null;
+  const updateUI = () => {
+    if (bubbleEl) {
+      bubbleEl.innerHTML = marked.parse(assistantMessage.content || '');
+      enhanceCodeBlocks(bubbleEl);
+      const isUserAtBottom = messagesEl.scrollHeight - messagesEl.clientHeight <= messagesEl.scrollTop + 20;
+      if (isUserAtBottom) messagesEl.scrollTop = messagesEl.scrollHeight;
     }
+  };
 
-    const userMessage = { id: genId(), role: 'user', content: textToUse, parent: parentIndex, meta: {} };
-    messages.push(userMessage);
-    appendMessage(userMessage, messages.length - 1);
-    saveSession();
-    localStorage.removeItem(DRAFT_KEY);
-    updateWelcomeVisibility();
-    postMessageToServer(userMessage).catch((err) => {
-        console.warn('postMessageToServer failed (will retry):', err);
-        scheduleSync();
-    });
+  try {
+    const response = await puter.ai.chat(buildChatPrompt(messages), { model: 'gpt-5-nano', stream: true });
 
-    clearIndicator();
-    showTyping();
+    // **احصل على الـ async iterator الحقيقي** و خزّنه لتمكين الإلغاء
+    const iterator = (typeof response[Symbol.asyncIterator] === 'function') ? response[Symbol.asyncIterator]() : response;
+    currentStreamingIterator = iterator;
 
-    // علامـة التوليد: لتظهر أيقونة الـ Stop
-    shouldStopGeneration = false;
-    try { sendInsideBtn.classList.add('is-generating'); sendInsideBtn.classList.add('visible'); } catch(e){}
-
-    let assistantEl = null;
-    let bubbleEl = null;
-    let assistantMessage = null;
-    let isFirstChunk = true;
-
-    let updateInterval = null;
-    const updateUI = () => {
-        if (bubbleEl) {
-            bubbleEl.innerHTML = marked.parse(assistantMessage.content || '');
-            enhanceCodeBlocks(bubbleEl);
-            const isUserAtBottom = messagesEl.scrollHeight - messagesEl.clientHeight <= messagesEl.scrollTop + 20;
-            if (isUserAtBottom) messagesEl.scrollTop = messagesEl.scrollHeight;
-        }
-    };
-
-    try {
-        const response = await puter.ai.chat(buildChatPrompt(messages), { model: 'gpt-5-nano', stream: true });
-
-        // حفظ المرجع ليمكننا محاولة إيقافه من الـ click handler
-        currentStreamingIterator = response;
-
-        for await (const part of response) {
-            // فحص طلب الإيقاف من المستخدم
-            if (shouldStopGeneration) {
-                // محاولة إنهاء الـ iterator إن أمكن
-                try { if (response && typeof response.return === 'function') response.return(); } catch(e){}
-                break;
-            }
-
-            const piece = part.text || (part.message && part.message.content) || '';
-            if (!piece) continue;
-
-            if (isFirstChunk) {
-                clearIndicator();
-                assistantMessage = { id: genId(), role: 'assistant', content: '', parent: messages.length - 1, meta: {} };
-                messages.push(assistantMessage);
-                assistantEl = createMessageElement(assistantMessage, messages.length - 1);
-                messagesEl.appendChild(assistantEl);
-                requestAnimationFrame(() => setTimeout(() => assistantEl.classList.add('show'), 20));
-                bubbleEl = assistantEl.querySelector('.bubble');
-                isFirstChunk = false;
-
-                // ابدأ المؤقت الزمني للتحديث كل 150ms
-                updateInterval = setInterval(updateUI, 150);
-            }
-
-            assistantMessage.content += piece;
-        }
-
-        // تنظيف المؤقت وتحديث نهائي
-        try { clearInterval(updateInterval); } catch(e){}
-        updateUI();
-
-        if (assistantEl) {
-            const codeBlocksToHighlight = assistantEl.querySelectorAll('pre code');
-            codeBlocksToHighlight.forEach(block => { hljs.highlightElement(block); });
-            const finalBubble = assistantEl.querySelector('.bubble');
-            if (finalBubble && isRTL(assistantMessage.content || '')) {
-                finalBubble.classList.add('rtl-text');
-                assistantEl.classList.add('msg-rtl');
-            }
-        }
-        saveSession();
-
-    } catch (error) {
-        console.error("Puter.js Error:", error);
-        clearIndicator();
-        const errorMsg = { id: genId(), role: 'assistant', content: 'عذرًا، حدث خطأ ما.', meta: {} };
-        appendMessage(errorMsg, messages.length);
-    } finally {
-        // تنظيف المَرَكِز المرجعي ومظهر الزر
-        currentStreamingIterator = null;
-        shouldStopGeneration = false;
-        try {
-            sendInsideBtn.classList.remove('is-generating');
-            if ((composer.value || '').trim().length === 0) {
-                sendInsideBtn.classList.remove('visible');
-            }
+    for await (const part of iterator) {
+      // فحص طلب الإيقاف من المستخدم فوراً
+      if (shouldStopGeneration) {
+        // محاولة إنهاء الـ iterator إن أمكن
+        try { if (currentStreamingIterator && typeof currentStreamingIterator.return === 'function') {
+            await currentStreamingIterator.return();
+          }
         } catch(e){}
+        break;
+      }
+
+      const piece = part.text || (part.message && part.message.content) || '';
+      if (!piece) continue;
+
+      if (isFirstChunk) {
+        clearIndicator();
+        assistantMessage = { id: genId(), role: 'assistant', content: '', parent: messages.length - 1, meta: {} };
+        messages.push(assistantMessage);
+        assistantEl = createMessageElement(assistantMessage, messages.length - 1);
+        messagesEl.appendChild(assistantEl);
+        requestAnimationFrame(() => setTimeout(() => assistantEl.classList.add('show'), 20));
+        bubbleEl = assistantEl.querySelector('.bubble');
+        isFirstChunk = false;
+
+        // ابدأ المؤقت الزمني للتحديث كل 150ms
+        updateInterval = setInterval(updateUI, 150);
+      }
+
+      assistantMessage.content += piece;
     }
+
+    // تنظيف المؤقت وتحديث نهائي
+    try { clearInterval(updateInterval); } catch(e){}
+    updateUI();
+
+    if (assistantEl) {
+      const codeBlocksToHighlight = assistantEl.querySelectorAll('pre code');
+      codeBlocksToHighlight.forEach(block => { hljs.highlightElement(block); });
+      const finalBubble = assistantEl.querySelector('.bubble');
+      if (finalBubble && isRTL(assistantMessage.content || '')) {
+        finalBubble.classList.add('rtl-text');
+        assistantEl.classList.add('msg-rtl');
+      }
+    }
+    saveSession();
+
+  } catch (error) {
+    console.error("Puter.js Error:", error);
+    clearIndicator();
+    const errorMsg = { id: genId(), role: 'assistant', content: 'عذرًا، حدث خطأ ما.', meta: {} };
+    appendMessage(errorMsg, messages.length);
+  } finally {
+    // تنظيف المَرَكِز المرجعي ومظهر الزر
+    currentStreamingIterator = null;
+    shouldStopGeneration = false;
+    try {
+      sendInsideBtn.classList.remove('is-generating');
+      if ((composer.value || '').trim().length === 0) {
+        sendInsideBtn.classList.remove('visible');
+      }
+    } catch(e){}
+  }
 }
       
 
@@ -3976,26 +3951,28 @@ async function regenerateAssistantForParent(parentIdx){
         startRotatorIfNeeded();
       });
 
-      sendInsideBtn.addEventListener('click', (e)=>{
+     sendInsideBtn.addEventListener('click', async (e) => {
   e.preventDefault();
 
-  // إذا كنا في وضع توليد: اضغط = "أوقف التوليد"
   if (sendInsideBtn.classList.contains('is-generating')) {
+    console.log('[Debug] Stop pressed — setting shouldStopGeneration = true', { currentStreamingIterator });
     shouldStopGeneration = true;
-    // إذا دعم الـ iterator ال-return() نحاول إغلاقه فوراً
+    // حاول إنهاء الـ iterator إن أمكن (بعض الـ iterators تدعم return)
     try {
       if (currentStreamingIterator && typeof currentStreamingIterator.return === 'function') {
-        currentStreamingIterator.return();
+        // نستخدم await لتسريع الإغلاق إن كان ممكن
+        await currentStreamingIterator.return();
       }
-    } catch (err) { /* ignore */ }
-
-    // نُعطي feedback بصري ونخفي الزر إن كان الحقل فارغًا
+    } catch (err) {
+      console.warn('[Debug] iterator.return() failed', err);
+    }
+    // feedback بصري
     sendInsideBtn.classList.add('stopping');
     setTimeout(()=> sendInsideBtn.classList.remove('stopping'), 300);
     if ((composer.value || '').trim().length === 0) {
       sendInsideBtn.classList.remove('visible');
     }
-    return; // لا نرسل رسالة جديدة
+    return;
   }
 
   // خلاف ذلك: سلوك الإرسال/التحرير العادي
