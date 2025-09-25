@@ -958,15 +958,26 @@ body.dark-mode .msg.user {
 
 /* ensure the arrow (send-icon) visuals are centered via pseudo-elements */
 .send-inside .send-icon::before{
-  content:''; position:absolute; left:50%; top:50%; transform: translate(-50%, 3px);
-  width:3px; height:9px; border-radius:2px;
-  background: linear-gradient(180deg,#ffffff,#dbeeff);
+    content:''; 
+    position:absolute; 
+    left:50%; 
+    bottom:10%; 
+    transform:translateX(-50%); 
+    width:3px; 
+    height:9px; 
+    border-radius:2px;
+    background: linear-gradient(180deg,#ffffff,#dbeeff);
 }
 .send-inside .send-icon::after{
-  content:''; position:absolute; left:50%; top:50%; transform: translate(-50%, -5px);
-  width:11px; height:7px;
-  background: linear-gradient(180deg,#ffffff,#dbeeff);
-  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+    content:''; 
+    position:absolute; 
+    left:50%; 
+    top:0; 
+    transform:translateX(-50%) rotate(0deg);
+    width:11px; 
+    height:7px;
+    background: linear-gradient(180deg,#ffffff,#dbeeff);
+    clip-path: polygon(50% 0, 100% 100%, 0 100%);
 }
 
 /* stop-icon appearance (hidden by default) */
@@ -3955,25 +3966,23 @@ async function regenerateAssistantForParent(parentIdx){
   e.preventDefault();
 
   if (sendInsideBtn.classList.contains('is-generating')) {
-    console.log('[Debug] Stop pressed — setting shouldStopGeneration = true', { currentStreamingIterator });
     shouldStopGeneration = true;
-    // حاول إنهاء الـ iterator إن أمكن (بعض الـ iterators تدعم return)
     try {
       if (currentStreamingIterator && typeof currentStreamingIterator.return === 'function') {
-        // نستخدم await لتسريع الإغلاق إن كان ممكن
         await currentStreamingIterator.return();
       }
-    } catch (err) {
-      console.warn('[Debug] iterator.return() failed', err);
-    }
-    // feedback بصري
+    } catch (err) { /* ignore */ }
+
+    // 🔴 أوقف المؤشر (3 نقاط) عند الإيقاف
+    clearIndicator();
+
     sendInsideBtn.classList.add('stopping');
     setTimeout(()=> sendInsideBtn.classList.remove('stopping'), 300);
     if ((composer.value || '').trim().length === 0) {
       sendInsideBtn.classList.remove('visible');
     }
     return;
-  }
+}
 
   // خلاف ذلك: سلوك الإرسال/التحرير العادي
   const t = composer.value.trim();
