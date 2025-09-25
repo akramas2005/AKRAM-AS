@@ -2758,6 +2758,7 @@ if (!analysisText) {
       let editIndex = null;
       let shouldStopGeneration = false;
       let currentStreamingIterator = null;
+      let abortController = null;
       function genId(){ return 'm-'+Math.random().toString(36).slice(2,9); }
       function escapeHtml(str){ return String(str).replace(/[&<>"]/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s])); }
 
@@ -3061,7 +3062,14 @@ async function analyzeImageWithPuter(imageUrl, userPrompt = null, indicator = nu
         ? `${String(userPrompt).trim()}\n\nالآن قم بتحليل الصورة التالية:`
         : `صف محتوى هذه الصورة باختصار.`;
 
-      const response = await puter.ai.chat(basePrompt, imageUrl, { model: 'gpt-5-nano', stream: true });
+      // أنشئ controller جديد عند كل إرسال
+abortController = new AbortController();
+
+const response = await puter.ai.chat(buildChatPrompt(messages), {
+  model: 'gpt-5-nano',
+  stream: true,
+  signal: abortController.signal   // <== مهم
+});
 
       let botMsg = null;
       let botEl = null;
@@ -3783,6 +3791,7 @@ async function sendMessage(text, parentIndex = null) {
     // تنظيف المَرَكِز المرجعي ومظهر الزر
     currentStreamingIterator = null;
     shouldStopGeneration = false;
+    abortController = null;
     try {
       sendInsideBtn.classList.remove('is-generating');
       if ((composer.value || '').trim().length === 0) {
@@ -3972,6 +3981,9 @@ async function regenerateAssistantForParent(parentIdx){
         await currentStreamingIterator.return();
       }
     } catch (err) { /* ignore */ }
+    if (abortController) {
+      try { abortController.abort(); } catch(e){}
+    }
 
     // 🔴 أوقف المؤشر (3 نقاط) عند الإيقاف
     clearIndicator();
