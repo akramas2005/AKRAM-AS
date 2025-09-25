@@ -270,27 +270,11 @@ body.dark-mode .code-block-actions button svg {
     background: linear-gradient(to top, var(--bg, #fff) 20%, transparent);
     pointer-events: none;
 }
-/* --- START: Collapsible Shadow FIX --- */
-.code-block-container::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 30px;
-    background: linear-gradient(to top, var(--bg, #fff) 20%, transparent);
-    pointer-events: none;
-    opacity: 0; /* ابدأ مخفيًا */
-    transition: opacity 0.3s ease;
-}
-body.dark-mode .code-block-container::after {
+body.dark-mode .code-block-container.collapsed pre::after {
     background: linear-gradient(to top, #161b22 20%, transparent);
 }
-.code-block-container.collapsed::after {
-    opacity: 1; /* أظهره فقط عندما يكون البلوك مطويًا */
-}
-/* --- END: Collapsible Shadow FIX --- */
-  
+/* --- END: Collapsible Code Block Styles --- */
+
   /* --- START: New Typing & Analyzing Animations --- */
 .msg.typing-indicator .bubble {
   background: transparent !important;
@@ -934,53 +918,35 @@ body.dark-mode .msg.user {
   .send-inside{
     position:absolute; right:8px; top:50%; transform: translateY(-50%) translateX(6px);
     display:inline-flex; align-items:center; justify-content:center;
+    /* التعديل: تم تصغير الحجم من 40px إلى 36px */
     width:36px; height:36px; 
     padding:8px; border-radius:999px; background: linear-gradient(135deg,#0078ff,#00aaff); color:white; font-weight:800; border:none; cursor:pointer;
     opacity:0; pointer-events:none; transition: opacity .22s ease, transform .22s ease;
     box-shadow: 0 8px 20px rgba(0,120,255,0.18);
   }
   .send-inside.visible{ opacity:1; pointer-events:auto; transform: translateY(-50%) translateX(0); }
+  .send-inside.sending{ opacity:0; transform: translateY(-50%) scale(.98); transition: opacity .36s ease, transform .36s ease; }
 
   .send-inside .send-icon{
+    /* التعديل: تم تصغير حجم حاوية الأيقونة من 18px إلى 16px */
     width:16px; height:16px; 
     position:relative; display:block;
   }
-  /* الأجزاء التي تشكل السهم */
-  .send-inside .send-icon::before,
-  .send-inside .send-icon::after {
-    content:'';
-    position:absolute;
-    background: white;
-    transition: all 0.3s cubic-bezier(.2,.9,.25,1); /* حركة سلسة لكل الخصائص */
-  }
-  /* جسم السهم */
   .send-inside .send-icon::before{
-    left:50%; bottom:10%; transform:translateX(-50%); 
+    content:''; position:absolute; left:50%; bottom:10%; transform:translateX(-50%); 
+    /* التعديل: تم تصغير أبعاد جسم السهم */
     width:3px; height:9px; 
     border-radius:2px;
+    background: linear-gradient(180deg,#ffffff,#dbeeff);
   }
-  /* رأس السهم */
   .send-inside .send-icon::after{
-    left:50%; top:0; transform:translateX(-50%) rotate(0deg);
+    content:''; position:absolute; left:50%; top:0; transform:translateX(-50%) rotate(0deg);
+    /* التعديل: تم تصغير أبعاد رأس السهم */
     width:11px; height:7px;
+    background: linear-gradient(180deg,#ffffff,#dbeeff);
     clip-path: polygon(50% 0, 100% 100%, 0 100%);
   }
 
-  /* --- START: حالة إيقاف الرد الجديدة --- */
-  /* عندما يكون الزر في وضع "إيقاف" */
-  .send-inside.is-generating .send-icon::before {
-    width: 10px; /* تحويل جسم السهم إلى مربع */
-    height: 10px;
-    transform: translate(-50%, -50%); /* توسيط المربع */
-    top: 50%;
-    bottom: auto; /* إلغاء الموضع السفلي */
-    border-radius: 2px;
-  }
-  .send-inside.is-generating .send-icon::after {
-    opacity: 0; /* إخفاء رأس السهم */
-    transform: translateX(-50%) scale(0.5);
-  }
-  /* --- END: حالة إيقاف الرد الجديدة --- */
   .sr-only{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
 
   .edit-cancel{
@@ -1531,7 +1497,6 @@ body.dark-mode .msg.user {
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <link rel="stylesheet" id="highlight-theme" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/stackoverflow-light.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
 </head>
 <body>
   <div class="wrap">
@@ -2742,7 +2707,6 @@ if (!analysisText) {
       const API_BASE = "https://backend-as-space-1.onrender.com";
       let messages = [];
       let editIndex = null;
-      let shouldStopGeneration = false;
       function genId(){ return 'm-'+Math.random().toString(36).slice(2,9); }
       function escapeHtml(str){ return String(str).replace(/[&<>"]/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s])); }
 
@@ -3130,6 +3094,7 @@ async function extractPdfText(input) {
   }
 }
       
+// 🟢 تحليل الملفات
 // 🟢 تحليل الملفات (النسخة النهائية والمحسّنة)
 async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
   try {
@@ -3209,7 +3174,7 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
 
       assistantMessage.content += piece;
       if (bubbleEl) {
-        bubbleEl.innerHTML = DOMPurify.sanitize(marked.parse(botMsg.content));
+        bubbleEl.innerHTML = marked.parse(assistantMessage.content);
         enhanceCodeBlocks(bubbleEl);
       }
       messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -3370,7 +3335,7 @@ bubble.setAttribute('dir', 'auto'); // <-- هذا هو السطر الجديد �
 
         if (m.content && typeof m.content === 'string' && String(m.content||'').trim()) {
   const txt = document.createElement('div');
- txt.innerHTML = DOMPurify.sanitize(marked.parse(m.content || ''));
+  txt.innerHTML = marked.parse(m.content || '');
   bubble.appendChild(txt);
   enhanceCodeBlocks(bubble);
 }
@@ -3683,38 +3648,34 @@ async function sendMessage(text, parentIndex = null) {
         scheduleSync();
     });
 
-    shouldStopGeneration = false; // <-- إعادة تعيين الحالة قبل كل رد جديد
-    sendInsideBtn.classList.add('is-generating'); // <-- تحويل الزر إلى مربع
-
     clearIndicator();
-    showTyping();
-
-    const isUserAtBottomInitially = messagesEl.scrollHeight - messagesEl.clientHeight <= messagesEl.scrollTop + 20;
+    showTyping(); 
 
     let assistantEl = null;
     let bubbleEl = null;
-    let textContainer = null;
     let assistantMessage = null;
     let isFirstChunk = true;
 
     try {
         const response = await puter.ai.chat(buildChatPrompt(messages), { model: 'gpt-5-nano', stream: true });
 
-        let updateInterval = setInterval(() => {
+        // --- START: Smart Update Logic ---
+        let contentBuffer = ''; // مخزن مؤقت للنص
+        let updateInterval = null; // المؤقت الزمني
+
+        const updateUI = () => {
             if (bubbleEl) {
-                bubbleEl.innerHTML = DOMPurify.sanitize(marked.parse(assistantMessage.content));
+                bubbleEl.innerHTML = marked.parse(assistantMessage.content);
                 enhanceCodeBlocks(bubbleEl);
-                if (isUserAtBottomInitially) {
+                const isUserAtBottom = messagesEl.scrollHeight - messagesEl.clientHeight <= messagesEl.scrollTop + 20;
+                if (isUserAtBottom) {
                     messagesEl.scrollTop = messagesEl.scrollHeight;
                 }
             }
-        }, 150);
+        };
+        // --- END: Smart Update Logic ---
 
         for await (const part of response) {
-            if (shouldStopGeneration) {
-                console.log('Stream stopped by user.');
-                break; // <-- الخروج من حلقة الرد
-            }
             const piece = part.text || (part.message && part.message.content) || '';
             if (!piece) continue;
 
@@ -3727,20 +3688,18 @@ async function sendMessage(text, parentIndex = null) {
                 requestAnimationFrame(() => setTimeout(() => assistantEl.classList.add('show'), 20));
                 bubbleEl = assistantEl.querySelector('.bubble');
                 isFirstChunk = false;
+
+                // ابدأ المؤقت الزمني للتحديث كل 150ms
+                updateInterval = setInterval(updateUI, 150);
             }
+
             assistantMessage.content += piece;
         }
 
+        // --- بعد انتهاء الرد بالكامل ---
         clearInterval(updateInterval); // أوقف المؤقت
-        // قم بالتحديث الأخير لضمان عرض كل النص
-        if (bubbleEl) {
-            bubbleEl.innerHTML = DOMPurify.sanitize(marked.parse(assistantMessage.content));
-            enhanceCodeBlocks(bubbleEl);
-            if (isUserAtBottomInitially) {
-                messagesEl.scrollTop = messagesEl.scrollHeight;
-            }
-        }
-        
+        updateUI(); // قم بالتحديث الأخير لضمان عرض كل النص
+
         if (assistantEl) {
             const codeBlocksToHighlight = assistantEl.querySelectorAll('pre code');
             codeBlocksToHighlight.forEach(block => { hljs.highlightElement(block); });
@@ -3757,12 +3716,6 @@ async function sendMessage(text, parentIndex = null) {
         clearIndicator();
         const errorMsg = { id: genId(), role: 'assistant', content: 'عذرًا، حدث خطأ ما.', meta: {} };
         appendMessage(errorMsg, messages.length);
-    } finally {
-        // إعادة الزر إلى حالته الطبيعية في كل الحالات
-        sendInsideBtn.classList.remove('is-generating');
-        if (composer.value.trim().length === 0) {
-            sendInsideBtn.classList.remove('visible');
-        }
     }
 }
       
@@ -3778,14 +3731,8 @@ async function regenerateAssistantForParent(parentIdx){
             return;
         }
 
-        shouldStopGeneration = false; // <-- إعادة تعيين الحالة
-        sendInsideBtn.classList.add('is-generating'); // <-- تحويل الزر
-        sendInsideBtn.classList.add('visible'); // <-- إظهار الزر
-
         clearIndicator();
         showTyping();
-
-        const isUserAtBottomInitially = messagesEl.scrollHeight - messagesEl.clientHeight <= messagesEl.scrollTop + 20;
 
         let assistantEl = null;
         let bubbleEl = null;
@@ -3794,21 +3741,23 @@ async function regenerateAssistantForParent(parentIdx){
 
         const response = await puter.ai.chat(buildChatPrompt(messages, parentIdx), { model: 'gpt-5-nano', stream: true });
         
-        let updateInterval = setInterval(() => {
+        // --- START: Smart Update Logic ---
+        let contentBuffer = '';
+        let updateInterval = null;
+
+        const updateUI = () => {
             if (bubbleEl) {
-                bubbleEl.innerHTML = DOMPurify.sanitize(marked.parse(assistantMessage.content));
+                bubbleEl.innerHTML = marked.parse(assistantMessage.content);
                 enhanceCodeBlocks(bubbleEl);
-                if (isUserAtBottomInitially) {
+                const isUserAtBottom = messagesEl.scrollHeight - messagesEl.clientHeight <= messagesEl.scrollTop + 20;
+                if (isUserAtBottom) {
                     messagesEl.scrollTop = messagesEl.scrollHeight;
                 }
             }
-        }, 150);
+        };
+        // --- END: Smart Update Logic ---
 
         for await (const part of response) {
-            if (shouldStopGeneration) {
-                console.log('Regeneration stream stopped by user.');
-                break; // <-- الخروج من حلقة الرد
-            }
             const piece = part.text || (part.message && part.message.content) || '';
             if (!piece) continue;
 
@@ -3821,18 +3770,15 @@ async function regenerateAssistantForParent(parentIdx){
                 requestAnimationFrame(() => setTimeout(() => assistantEl.classList.add('show'), 20));
                 bubbleEl = assistantEl.querySelector('.bubble');
                 isFirstChunk = false;
+                
+                updateInterval = setInterval(updateUI, 150);
             }
+
             assistantMessage.content += piece;
         }
         
         clearInterval(updateInterval);
-        if (bubbleEl) {
-            bubbleEl.innerHTML = DOMPurify.sanitize(marked.parse(assistantMessage.content));
-            enhanceCodeBlocks(bubbleEl);
-            if (isUserAtBottomInitially) {
-                messagesEl.scrollTop = messagesEl.scrollHeight;
-            }
-        }
+        updateUI();
 
         if (assistantEl) {
             const codeBlocksToHighlight = assistantEl.querySelectorAll('pre code');
@@ -3851,10 +3797,6 @@ async function regenerateAssistantForParent(parentIdx){
         const errorMsg = { id: genId(), role: 'assistant', content: 'حدث خطأ. يرجى المحاولة مرة أخرى.', meta: {} };
         appendMessage(errorMsg, messages.length);
     } finally {
-        sendInsideBtn.classList.remove('is-generating');
-        if (composer.value.trim().length === 0) {
-            sendInsideBtn.classList.remove('visible');
-        }
         window._regenLock = false;
     }
 }
@@ -3949,90 +3891,101 @@ async function regenerateAssistantForParent(parentIdx){
 
       sendInsideBtn.addEventListener('click', (e)=>{
         e.preventDefault();
-
-        // إذا كان الزر في وضع "إيقاف"، قم بتغيير حالة المتغير فقط
-        if (sendInsideBtn.classList.contains('is-generating')) {
-            console.log('Stop generation requested...');
-            shouldStopGeneration = true;
-            return; // لا تقم بأي شيء آخر
-        }
-        
-        // إذا كان الزر في وضع "إرسال"، قم بتنفيذ المنطق الحالي
         const t = composer.value.trim();
         if(!t && !pendingAttachment) return;
-        
-        // سيتم تغيير شكل الزر داخل دوال الإرسال نفسها
-        
+        sendInsideBtn.classList.add('sending');
         setTimeout(()=>{
-            // --- هذا الجزء خاص بمعالجة تعديل الرسائل (يبقى كما هو) ---
-            if (editIndex !== null && editIndex >= 0) {
-              const t = composer.value.trim();
-              messages[editIndex].content = t;
-              const editedMsgEl = messagesEl.querySelector(`.msg[data-index="${editIndex}"] .bubble`);
-              if (editedMsgEl) {
-                let textHolder = editedMsgEl.querySelector('.bubble-text');
-                if (!textHolder) {
-                  for (let node of editedMsgEl.childNodes) {
-                    if (node.nodeType === Node.TEXT_NODE && node.nodeValue.trim() !== '') { textHolder = node; break; }
-                    if (node.nodeType === Node.ELEMENT_NODE) {
-                      const tag = node.tagName.toUpperCase();
-                      if (tag !== 'IMG' && tag !== 'PICTURE' && tag !== 'VIDEO' && !node.classList.contains('msg-actions') && !node.classList.contains('feedback-row')) {
-                        textHolder = node; break;
-                      }
-                    }
-                  }
-                }
-                if (textHolder) {
-                  if (textHolder.nodeType === Node.TEXT_NODE) { textHolder.nodeValue = t; } else { textHolder.textContent = t; }
-                } else {
-                  const span = document.createElement('span');
-                  span.className = 'bubble-text';
-                  span.textContent = t;
-                  const media = editedMsgEl.querySelector('img, picture, video');
-                  if (media) editedMsgEl.insertBefore(span, media);
-                  else editedMsgEl.insertBefore(span, editedMsgEl.firstChild);
-                }
-              }
-              messages.splice(editIndex + 1);
-              const nodes = [...messagesEl.querySelectorAll('.msg')];
-              const toRemove = [];
-              for (const el of nodes) {
-                const i = Number(el.dataset.index || -1);
-                if (i > editIndex) toRemove.push(el);
-              }
-              toRemove.forEach((el, idx) => {
-                el.style.transition = 'opacity .12s ease, transform .12s ease';
-                el.style.opacity = '0';
-                el.style.transform = 'translateY(-6px)';
-                setTimeout(() => { el.remove(); }, 120 + idx * 10);
-              });
-              if (typeof reindexDom === 'function') { setTimeout(() => { reindexDom(); }, 160); }
-              saveSession();
-              const oldIndex = editIndex;
-              editIndex = null;
-              editCancelBtn.style.display = 'none';
-              composer.value = '';
-              localStorage.removeItem(DRAFT_KEY);
-              updateSendVisibility();
-              autoGrowTextarea();
-              regenerateAssistantForParent(oldIndex);
-              if (typeof reindexDom === 'function') reindexDom();
-              return;
-            }
-            // --- نهاية جزء التعديل ---
-            else { // إذا لم يكن في وضع التعديل، قم بالإرسال العادي
-              if (pendingAttachment) {
-                sendAttachmentNow();
-              } else {
-                sendMessage(t);
-              }
-            }
-            composer.value = ''; // مسح النص بعد الإرسال
-            updateSendVisibility();
-            autoGrowTextarea();
-            startRotatorIfNeeded();
-        }, 100);
-      });
+          sendInsideBtn.classList.remove('sending');
+        // ====== START: replace existing "edit" branch with this block ======
+if (editIndex !== null && editIndex >= 0) {
+  const t = composer.value.trim();
+
+  // 1) تحديث بيانات الرسالة (نحتفظ بأي مرفقات موجودة)
+  messages[editIndex].content = t;
+
+  // 2) تحديث فقاعـة الرسالة في الـ DOM من دون مسح الـ children (صور أو مرفقات)
+  const editedMsgEl = messagesEl.querySelector(`.msg[data-index="${editIndex}"] .bubble`);
+  if (editedMsgEl) {
+    // حاول إيجاد عنصر يحمل النص (أفضل إذا كان class="bubble-text")
+    let textHolder = editedMsgEl.querySelector('.bubble-text');
+
+    // إذا لم يوجد عنصر مخصص، نبحث عن عقدة نص أو عنصر غير وسائط (IMG/VIDEO/PICTURE)
+    if (!textHolder) {
+      for (let node of editedMsgEl.childNodes) {
+        if (node.nodeType === Node.TEXT_NODE && node.nodeValue.trim() !== '') {
+          textHolder = node;
+          break;
+        }
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          const tag = node.tagName.toUpperCase();
+          // تجاهل عناصر الوسائط و أزرار التحكم داخل الفقاعة
+          if (tag !== 'IMG' && tag !== 'PICTURE' && tag !== 'VIDEO'
+              && !node.classList.contains('msg-actions') && !node.classList.contains('feedback-row')) {
+            textHolder = node;
+            break;
+          }
+        }
+      }
+    }
+
+    // إذا وجدنا مكاناً للنص، نحدّثه (نستبدل، لا نضيف)
+    if (textHolder) {
+      if (textHolder.nodeType === Node.TEXT_NODE) {
+        textHolder.nodeValue = t;
+      } else {
+        textHolder.textContent = t;
+      }
+    } else {
+      // لا يوجد نص سابق: نُنشئ span مخصص وندرجه قبل أول ميديا إن وُجدت أو كبداية الفقاعة
+      const span = document.createElement('span');
+      span.className = 'bubble-text';
+      span.textContent = t;
+      const media = editedMsgEl.querySelector('img, picture, video');
+      if (media) editedMsgEl.insertBefore(span, media);
+      else editedMsgEl.insertBefore(span, editedMsgEl.firstChild);
+    }
+  }
+
+  // 3) حذف الردود التالية من المصفوفة
+  messages.splice(editIndex + 1);
+
+  // 4) حذف عناصر DOM المقابلة للرسائل التي بعد الرسالة المعدلة بسلاسة (بدون ومضة)
+  const nodes = [...messagesEl.querySelectorAll('.msg')];
+  const toRemove = [];
+  for (const el of nodes) {
+    const i = Number(el.dataset.index || -1);
+    if (i > editIndex) toRemove.push(el);
+  }
+  toRemove.forEach((el, idx) => {
+    el.style.transition = 'opacity .12s ease, transform .12s ease';
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(-6px)';
+    setTimeout(() => { el.remove(); }, 120 + idx * 10);
+  });
+
+  // 4b) إعادة ترقيم DOM إن وجدت دالة لهذا الغرض
+  if (typeof reindexDom === 'function') {
+    setTimeout(() => { reindexDom(); }, 160);
+  }
+
+  // 5) حفظ الحالة
+  saveSession();
+
+  // 6) تنظيف حالة التعديل في الواجهة
+  const oldIndex = editIndex;
+  editIndex = null;
+  editCancelBtn.style.display = 'none';
+  composer.value = '';
+  localStorage.removeItem(DRAFT_KEY);
+  updateSendVisibility();
+  autoGrowTextarea();
+
+  // 7) إظهار نقاط الكتابة ثم إضافة رد المساعد الجديد بسلاسة (appendMessage إن وُجد)
+    // regenerate reply for edited message
+  regenerateAssistantForParent(oldIndex);
+  if (typeof reindexDom === 'function') reindexDom();
+  return;
+}
 // ====== END: edit branch replacement ======
  else {
   if (pendingAttachment) {
