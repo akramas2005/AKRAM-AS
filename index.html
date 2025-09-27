@@ -917,7 +917,7 @@ body.dark-mode .msg.user {
 
   /* زر الإرسال: حاوية */
 .send-inside {
-  position: absolute;   /* حافظ كما كان لتثبيت الزر داخل الـ input */
+  position: absolute;
   right: 8px;
   top: 50%;
   transform: translateY(-50%) translateX(0);
@@ -927,109 +927,98 @@ body.dark-mode .msg.user {
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  background: linear-gradient(180deg,#1f7bff,#005ee6);
+  background: linear-gradient(135deg, #0078ff, #00aaff); /* اللون الأزرق الافتراضي */
   color: white;
   border: none;
   cursor: pointer;
   opacity: 0;
   pointer-events: none;
-  transition: opacity .22s ease, transform .22s ease;
-  box-shadow: 0 8px 20px rgba(0,120,255,0.18);
-  /* important: ensure children absolute positioning is relative to this button */
-  overflow: visible;
+  box-shadow: 0 8px 20px rgba(0, 120, 255, 0.18);
+  transition: opacity .22s ease, transform .22s ease, background .3s ease;
 }
 
-/* visible state */
-.send-inside.visible{ opacity:1; pointer-events:auto; }
+/* حالة الظهور العادية (أيقونة الإرسال) */
+.send-inside.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
 
-/* icon overlap: force absolute center and override any conflicting styles */
+/* الأيقونات (السهم والمربع) */
 .send-inside .send-icon,
 .send-inside .stop-icon {
-  position: absolute !important;
-  left: 50% !important;
-  top: 50% !important;
-  transform: translate(-50%, -50%) !important;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
   width: 16px;
   height: 16px;
-  display: block !important;
-  pointer-events: none !important;
-  transition: opacity .16s cubic-bezier(.2,.8,.2,1), transform .16s cubic-bezier(.2,.8,.2,1);
+  pointer-events: none;
+  transition: opacity .25s ease, transform .25s ease;
 }
 
-/* ensure the arrow (send-icon) visuals are centered via pseudo-elements */
-.send-inside .send-icon::before{
-    content:''; 
-    position:absolute; 
-    left:50%; 
-    bottom:10%; 
-    transform:translateX(-50%); 
-    width:3px; 
-    height:9px; 
-    border-radius:2px;
-    background: linear-gradient(180deg,#ffffff,#dbeeff);
+/* أيقونة الإرسال (السهم) - مكونة من جزئين */
+.send-inside .send-icon::before,
+.send-inside .send-icon::after {
+  content: '';
+  position: absolute;
+  background: #fff; /* لون أبيض بسيط */
 }
-.send-inside .send-icon::after{
-    content:''; 
-    position:absolute; 
-    left:50%; 
-    top:0; 
-    transform:translateX(-50%) rotate(0deg);
-    width:11px; 
-    height:7px;
-    background: linear-gradient(180deg,#ffffff,#dbeeff);
-    clip-path: polygon(50% 0, 100% 100%, 0 100%);
+.send-inside .send-icon::before {
+  left: 50%;
+  bottom: 10%;
+  transform: translateX(-50%);
+  width: 3px;
+  height: 9px;
+  border-radius: 2px;
 }
-
-/* stop-icon default: موجود لكنه مخفي جزئياً */
-.send-inside .stop-icon{
-  opacity: 0.2; /* بدل 0 */
-  transform: translate(-50%, -50%) scale(.7);
-  border-radius: 3px;
-  background: transparent;
-  box-shadow: none;
-  z-index: 5;
-  transition: background .22s ease, transform .18s ease, opacity .18s ease;
+.send-inside .send-icon::after {
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+  width: 11px;
+  height: 7px;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
 }
 
-/* ensure arrow sits below stop visually */
-.send-inside .send-icon{ z-index: 2; }
-.send-inside.is-generating .send-icon{ opacity: 0; transform: translate(-50%, -50%) scale(.72); z-index: 2; }
-.send-inside.is-generating .stop-icon{ opacity: 1; transform: translate(-50%, -50%) scale(1) !important; z-index: 6; }
+/* أيقونة الإيقاف (المربع) - الحالة الافتراضية */
+.send-inside .stop-icon {
+  width: 10px;      /* حجم المربع */
+  height: 10px;     /* حجم المربع */
+  background: #fff; /* <<< هذا هو الحل لمشكلة الاختفاء */
+  border-radius: 2px;
+  opacity: 0; /* يكون مختفياً في البداية */
+  transform: translate(-50%, -50%) scale(0.7);
+}
 
-/* small feedback when pressing stop */
-.send-inside.stopping{ transform: translateY(-50%) scale(.98); transition: transform .14s ease; }
+/* --- التحكم في الحالات --- */
 
-  /* --- pending (ظاهر لكن غير قابل للضغط) --- */
+/* 1. حالة الانتظار (Pending) - رمادي وغير قابل للضغط */
 .send-inside.is-pending {
+  background: linear-gradient(135deg, #B0BEC5, #90A4AE); /* اللون الرمادي */
+  box-shadow: 0 6px 16px rgba(100, 110, 120, 0.2);
   cursor: not-allowed;
-  /* لو تريد تخفيف اللمعان قليلاً أثناء الانتظار */
-  opacity: 0.98;
-}
-
-/* مربع الإيقاف أثناء pending — لون رمادي */
-.send-inside.is-pending .stop-icon {
-  background: linear-gradient(180deg,#bdbdbd,#e0e0e0);
+  pointer-events: auto; /* مهم ليبقى الزر ظاهراً */
   opacity: 1;
-  transform: translate(-50%, -50%) scale(.92);
 }
 
-/* أخفّ إظهار للسهم أثناء pending (نخفي السهم عادة) */
-.send-inside.is-pending .send-icon {
+/* 2. حالة توليد الرد (Generating) - أزرق وقابل للضغط */
+.send-inside.is-generating {
+  background: linear-gradient(135deg, #0078ff, #00aaff); /* العودة للأزرق */
+  box-shadow: 0 8px 20px rgba(0, 120, 255, 0.18);
+  cursor: pointer;
+}
+
+/* إظهار / إخفاء الأيقونات حسب الحالة */
+.send-inside.is-pending .send-icon,
+.send-inside.is-generating .send-icon {
   opacity: 0;
-  transform: translate(-50%, -50%) scale(.7);
+  transform: translate(-50%, -50%) scale(0.5); /* إخفاء السهم */
 }
 
-/* الانتقال إلى الحالة المفعلة (is-generating) — ستظهر بأزرق حسب قواعدك الحالية */
+.send-inside.is-pending .stop-icon,
 .send-inside.is-generating .stop-icon {
-  background: linear-gradient(180deg,#1f7bff,#005ee6);
   opacity: 1;
-  transform: translate(-50%, -50%) scale(1);
-}
-
-/* تأكد من وجود انتقال سلس لكل التغييرات */
-.send-inside .stop-icon,
-.send-inside .send-icon {
-  transition: opacity .18s ease, transform .18s ease, background .22s ease;
+  transform: translate(-50%, -50%) scale(1); /* إظهار المربع */
 }
  
   .edit-cancel{
