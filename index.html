@@ -3144,8 +3144,14 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
   try {
     if (!fileOrUrl) return null;
 
-    clearIndicator();
-    const indicator = showTyping("file");
+   clearIndicator();
+const indicator = showTyping("file");
+
+// 🟢 نفس منطق الصور: بعد ثواني يتحول لـ Analyzing file
+const delay = Math.floor(Math.random() * (5000 - 3000 + 1)) + 3000;
+const toAnalyzingTimer = setTimeout(() => {
+  try { setToAnalyzing(indicator); } catch(e) {}
+}, delay);
 
     let textContent = '';
     let fileType = 'file';
