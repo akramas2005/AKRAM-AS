@@ -3207,6 +3207,8 @@ const toAnalyzingTimer = setTimeout(() => {
 
     const response = await puter.ai.chat(basePrompt, null, { model: 'gpt-5-nano', stream: true });
 
+  
+    clearTimeout(toAnalyzingTimer);
     for await (const part of response) {
       const piece = part.text || (part.message && part.message.content) || '';
       if (!piece) continue;
