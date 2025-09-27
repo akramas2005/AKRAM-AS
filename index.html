@@ -980,14 +980,15 @@ body.dark-mode .msg.user {
     clip-path: polygon(50% 0, 100% 100%, 0 100%);
 }
 
-/* stop-icon appearance (hidden by default) */
+/* stop-icon default: موجود لكنه مخفي جزئياً */
 .send-inside .stop-icon{
   opacity: 0;
-  transform: translate(-50%, -50%) scale(.86) !important;
+  transform: translate(-50%, -50%) scale(.86);
   border-radius: 3px;
-  background: linear-gradient(180deg,#ffffff,#e6f2ff);
-  box-shadow: 0 1px 0 rgba(0,0,0,0.06) inset;
+  background: transparent; /* شفاف افتراضياً بدل لون */
+  box-shadow: none;
   z-index: 5;
+  transition: background .22s ease, transform .18s ease, opacity .18s ease;
 }
 
 /* ensure arrow sits below stop visually */
@@ -1010,7 +1011,6 @@ body.dark-mode .msg.user {
   background: linear-gradient(180deg,#bdbdbd,#e0e0e0);
   opacity: 1;
   transform: translate(-50%, -50%) scale(.92);
-  transition: background .22s ease, transform .18s ease, opacity .18s ease;
 }
 
 /* أخفّ إظهار للسهم أثناء pending (نخفي السهم عادة) */
@@ -1021,11 +1021,9 @@ body.dark-mode .msg.user {
 
 /* الانتقال إلى الحالة المفعلة (is-generating) — ستظهر بأزرق حسب قواعدك الحالية */
 .send-inside.is-generating .stop-icon {
-  /* اللون الأزرق الذي تريده عند التفعيل */
   background: linear-gradient(180deg,#1f7bff,#005ee6);
   opacity: 1;
   transform: translate(-50%, -50%) scale(1);
-  transition: background .22s ease, transform .18s ease, opacity .18s ease;
 }
 
 /* تأكد من وجود انتقال سلس لكل التغييرات */
