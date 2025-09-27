@@ -3189,10 +3189,10 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
       }
 
       assistantMessage.content += piece;
-      if (bubbleEl) {
-        bubbleEl.innerHTML = DOMPurify.sanitize(marked.parse(botMsg.content));
-        enhanceCodeBlocks(bubbleEl);
-      }
+if (bubbleEl) {
+  bubbleEl.innerHTML = DOMPurify.sanitize(marked.parse(assistantMessage.content));
+  enhanceCodeBlocks(bubbleEl);
+}
       messagesEl.scrollTop = messagesEl.scrollHeight;
     }
 
