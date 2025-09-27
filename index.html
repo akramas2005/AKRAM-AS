@@ -2519,21 +2519,31 @@ function showFilePreview(file){
     });
 
     // close button: delete remote file + cleanup
-    closeBtn.addEventListener('click', async (ev)=>{
-      ev.preventDefault();
-      try {
-        const remoteId = pendingAttachment && (pendingAttachment.id || (pendingAttachment._uploadResult && pendingAttachment._uploadResult.id));
-        if (remoteId) {
-          await fetch(API_BASE + '/api/files/' + remoteId, { method: 'DELETE' }).catch(()=>{});
-        }
-      } catch(e){
-        console.warn('delete failed', e);
-      }
-      try { if (pendingAttachment && pendingAttachment._objectUrl) URL.revokeObjectURL(pendingAttachment._objectUrl); } catch(e){}
-      clearPreview();
-      pendingAttachment = null;
-      updateSendVisibility();
-    });
+closeBtn.addEventListener('click', (ev)=>{
+  ev.preventDefault();
+
+  // 🟢 امسح المعاينة مباشرة من الواجهة
+  clearPreview();
+  pendingAttachment = null;
+  updateSendVisibility();
+
+  // 🟡 الحذف من السيرفر يتم في الخلفية
+  try {
+    const remoteId = pendingAttachment && (pendingAttachment.id || (pendingAttachment._uploadResult && pendingAttachment._uploadResult.id));
+    if (remoteId) {
+      fetch(API_BASE + '/api/files/' + remoteId, { method: 'DELETE' })
+        .catch(()=>{ console.warn('delete request failed'); });
+    }
+  } catch(e){
+    console.warn('delete failed', e);
+  }
+
+  try { 
+    if (pendingAttachment && pendingAttachment._objectUrl) {
+      URL.revokeObjectURL(pendingAttachment._objectUrl);
+    }
+  } catch(e){}
+});
 
     // retry overlay — re-run the real upload
     retry.addEventListener('click', (ev)=>{
