@@ -2594,6 +2594,15 @@ function parsePuterResult(res) {
       if (getString(res[k])) return res[k];
     }
 
+    function decodeFilename(name) {
+  try {
+    // يحاول تحويل الاسم من Latin-1/URL-encoded إلى UTF-8
+    return decodeURIComponent(escape(name));
+  } catch(e) {
+    return name; // fallback لو فشل
+  }
+}
+
     // shape: { message: { content: ... } }
     if (res.message) {
       const c = res.message.content || res.message.text || res.message;
@@ -2655,12 +2664,12 @@ async function sendAttachmentNow() {
       id: genId(),
       role: 'user',
       content: text || '',
-      attachment: {
-        id: pendingAttachment.id,
-        url: pendingAttachment.url || pendingAttachment.src,
-        filename: pendingAttachment.filename || pendingAttachment.name,
-        mime_type: pendingAttachment.mime_type || pendingAttachment.type || ''
-      },
+     attachment: {
+  id: pendingAttachment.id,
+  url: pendingAttachment.url || pendingAttachment.src,
+  filename: decodeFilename(pendingAttachment.filename || pendingAttachment.name),
+  mime_type: pendingAttachment.mime_type || pendingAttachment.type || ''
+},
       conversation_id: currentConversationId || null,
       meta: {}
     };
@@ -3370,7 +3379,7 @@ bubble.setAttribute('dir', 'auto'); // <-- هذا هو السطر الجديد �
          if (m.attachment) {
   const att = m.attachment;
   const mime = att.mime_type || att.attachment_type || att.type || '';
-  const name = att.filename || att.name || 'file';
+  const name = decodeFilename(att.filename || att.name || 'file');
   let url = att.url || att.src || null;
 
   const isImage = mime && mime.startsWith('image/');
