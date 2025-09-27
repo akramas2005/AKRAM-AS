@@ -931,37 +931,136 @@ body.dark-mode .msg.user {
   }
   .input-field:focus{ box-shadow: 0 10px 30px rgba(0,120,255,0.08), inset 0 2px 10px rgba(0,0,0,0.03); border-color: rgba(0,120,255,0.22); transform: translateY(-1px); }
 
-  .send-inside{
-    position:absolute; right:8px; top:50%; transform: translateY(-50%) translateX(6px);
-    display:inline-flex; align-items:center; justify-content:center;
-    /* التعديل: تم تصغير الحجم من 40px إلى 36px */
-    width:36px; height:36px; 
-    padding:8px; border-radius:999px; background: linear-gradient(135deg,#0078ff,#00aaff); color:white; font-weight:800; border:none; cursor:pointer;
-    opacity:0; pointer-events:none; transition: opacity .22s ease, transform .22s ease;
-    box-shadow: 0 8px 20px rgba(0,120,255,0.18);
-  }
-  .send-inside.visible{ opacity:1; pointer-events:auto; transform: translateY(-50%) translateX(0); }
-  .send-inside.sending{ opacity:0; transform: translateY(-50%) scale(.98); transition: opacity .36s ease, transform .36s ease; }
+  /* زر الإرسال: حاوية */
+.send-inside {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%) translateX(0);
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: linear-gradient(180deg,#1f7bff,#005ee6);
+  color: white;
+  border: none;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .22s ease, transform .22s ease, background .22s ease;
+  box-shadow: 0 8px 20px rgba(0,120,255,0.18);
+  overflow: visible;
+}
 
-  .send-inside .send-icon{
-    /* التعديل: تم تصغير حجم حاوية الأيقونة من 18px إلى 16px */
-    width:16px; height:16px; 
-    position:relative; display:block;
-  }
-  .send-inside .send-icon::before{
-    content:''; position:absolute; left:50%; bottom:10%; transform:translateX(-50%); 
-    /* التعديل: تم تصغير أبعاد جسم السهم */
-    width:3px; height:9px; 
-    border-radius:2px;
-    background: linear-gradient(180deg,#ffffff,#dbeeff);
-  }
-  .send-inside .send-icon::after{
-    content:''; position:absolute; left:50%; top:0; transform:translateX(-50%) rotate(0deg);
-    /* التعديل: تم تصغير أبعاد رأس السهم */
-    width:11px; height:7px;
-    background: linear-gradient(180deg,#ffffff,#dbeeff);
-    clip-path: polygon(50% 0, 100% 100%, 0 100%);
-  }
+/* visible state */
+.send-inside.visible { opacity: 1; pointer-events: auto; }
+
+/* icon overlap: force absolute center */
+.send-inside .send-icon,
+.send-inside .stop-icon {
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  width: 16px;
+  height: 16px;
+  display: block !important;
+  pointer-events: none !important;
+  transition: opacity .16s cubic-bezier(.2,.8,.2,1),
+              transform .16s cubic-bezier(.2,.8,.2,1),
+              background .22s ease;
+}
+
+/* arrow visuals (send-icon) via pseudo elements */
+.send-inside .send-icon::before{
+  content:''; position:absolute; left:50%; bottom:10%;
+  transform:translateX(-50%);
+  width:3px; height:9px; border-radius:2px;
+  background: linear-gradient(180deg,#ffffff,#dbeeff);
+}
+.send-inside .send-icon::after{
+  content:''; position:absolute; left:50%; top:0;
+  transform:translateX(-50%) rotate(0deg);
+  width:11px; height:7px;
+  background: linear-gradient(180deg,#ffffff,#dbeeff);
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+
+/* stop-icon default (square) — hidden initially */
+.send-inside .stop-icon {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(.86);
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: transparent;
+  box-shadow: none;
+  z-index: 5;
+}
+
+/* ensure arrow sits below stop visually */
+.send-inside .send-icon { z-index: 2; }
+
+/* small feedback when pressing stop */
+.send-inside.stopping { transform: translateY(-50%) scale(.98); transition: transform .14s ease; }
+
+/* --- pending (ظاهر لكن غير قابل للضغط) --- */
+.send-inside.is-pending {
+  cursor: not-allowed;
+  opacity: 0.98;
+  pointer-events: none; /* لا يسمح بالضغط أثناء pending */
+  background: linear-gradient(180deg,#d6d6d6,#bfbfbf);
+}
+
+/* مربع الإيقاف أثناء pending — لون رمادي ظاهر */
+.send-inside.is-pending .stop-icon {
+  background: linear-gradient(180deg,#bdbdbd,#e0e0e0);
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(.92);
+}
+
+/* أخفّ إظهار للسهم أثناء pending (نخفي السهم عادة) */
+.send-inside.is-pending .send-icon {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(.7);
+}
+
+/* الانتقال إلى الحالة المفعّلة (is-generating) — تصبح زرقاء وقابلة للضغط */
+.send-inside.is-generating {
+  pointer-events: auto;
+  cursor: pointer;
+  background: linear-gradient(180deg,#1f7bff,#005ee6);
+}
+
+/* stop-icon أثناء is-generating — يظهر كـ مربع أزرق وينبض */
+.send-inside.is-generating .stop-icon {
+  background: linear-gradient(180deg,#1f7bff,#005ee6);
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+  box-shadow: 0 2px 8px rgba(0,120,255,0.16);
+  animation: stop-pulse 1.6s ease-in-out infinite;
+}
+
+/* خلال is-generating نخفي السهم تدريجيًا */
+.send-inside.is-generating .send-icon {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(.7);
+}
+
+/* pulse keyframes */
+@keyframes stop-pulse {
+  0% { transform: translate(-50%, -50%) scale(0.98); }
+  50% { transform: translate(-50%, -50%) scale(1.04); }
+  100% { transform: translate(-50%, -50%) scale(0.98); }
+}
+
+/* transitions for both icons (smoother) */
+.send-inside .stop-icon,
+.send-inside .send-icon {
+  transition: opacity .18s ease, transform .18s ease, background .22s ease;
+}
 
   .sr-only{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
 
@@ -1623,10 +1722,11 @@ body.dark-mode .msg.user {
               <div id="rotator" class="rotator" aria-hidden="true">
                   <span class="rotator-text" id="rotatorText"></span>
               </div>
-              <button class="send-inside" id="sendInsideBtn" title="Send">
-                  <span class="send-icon" aria-hidden="true"></span>
-                  <span class="sr-only">Send</span>
-              </button>
+              <button class="send-inside" id="sendInsideBtn" title="Send" aria-label="Send message" type="button">
+  <span class="send-icon" aria-hidden="true"></span>
+  <span class="stop-icon" aria-hidden="true"></span>
+  <span class="sr-only">Send</span>
+</button>
           </div>
 
           <button id="editCancelBtn" class="edit-cancel" title="Cancel edit">Cancel</button>
@@ -3084,6 +3184,19 @@ async function analyzeImageWithPuter(imageUrl, userPrompt = null, indicator = nu
         }
         messagesEl.scrollTop = messagesEl.scrollHeight;
       }
+            // --- تنظيف حالة الزر بعد انتهاء stream الصورة ---
+      try {
+        const btn = document.getElementById('sendInsideBtn');
+        if (btn) {
+          btn.classList.remove('is-generating', 'is-pending');
+          btn.disabled = false;
+          if (btn._stopHandler) {
+            btn.removeEventListener('click', btn._stopHandler);
+            btn._stopHandler = null;
+          }
+          btn._abortCurrentResponse = null;
+        }
+      } catch(e){}
 
       saveSession();
       return botMsg ? botMsg.content : null;
@@ -3236,6 +3349,20 @@ if (bubbleEl) {
         const codeBlocksToHighlight = assistantEl.querySelectorAll('pre code');
         codeBlocksToHighlight.forEach(block => { hljs.highlightElement(block); });
     }
+
+        // --- تنظيف حالة الزر بعد انتهاء stream الملف ---
+    try {
+      const btn = document.getElementById('sendInsideBtn');
+      if (btn) {
+        btn.classList.remove('is-generating', 'is-pending');
+        btn.disabled = false;
+        if (btn._stopHandler) {
+          btn.removeEventListener('click', btn._stopHandler);
+          btn._stopHandler = null;
+        }
+        btn._abortCurrentResponse = null;
+      }
+    } catch(e){}
     saveSession();
     return assistantMessage.content;
 
@@ -3731,19 +3858,50 @@ async function sendMessage(text, parentIndex = null) {
             const piece = part.text || (part.message && part.message.content) || '';
             if (!piece) continue;
 
-            if (isFirstChunk) {
-                clearIndicator();
-                assistantMessage = { id: genId(), role: 'assistant', content: '', parent: messages.length - 1, meta: {} };
-                messages.push(assistantMessage);
-                assistantEl = createMessageElement(assistantMessage, messages.length - 1);
-                messagesEl.appendChild(assistantEl);
-                requestAnimationFrame(() => setTimeout(() => assistantEl.classList.add('show'), 20));
-                bubbleEl = assistantEl.querySelector('.bubble');
-                isFirstChunk = false;
+           if (isFirstChunk) {
+    clearIndicator();
+    assistantMessage = { id: genId(), role: 'assistant', content: '', parent: messages.length - 1, meta: {} };
+    messages.push(assistantMessage);
+    assistantEl = createMessageElement(assistantMessage, messages.length - 1);
+    messagesEl.appendChild(assistantEl);
+    requestAnimationFrame(() => setTimeout(() => assistantEl.classList.add('show'), 20));
+    bubbleEl = assistantEl.querySelector('.bubble');
+    isFirstChunk = false;
 
-                // ابدأ المؤقت الزمني للتحديث كل 150ms
-                updateInterval = setInterval(updateUI, 150);
-            }
+    // ابدأ المؤقت الزمني للتحديث كل 150ms
+    updateInterval = setInterval(updateUI, 150);
+
+    // --- new: حوّل زر الإرسال إلى حالة generating (أزرق) + أرفق stop handler ---
+    try {
+      const btn = document.getElementById('sendInsideBtn');
+      if (btn) {
+        // إزالة pending (الرمادي) وإظهار حالة التوليد
+        btn.classList.remove('is-pending');
+        btn.classList.add('is-generating', 'visible');
+        btn.disabled = false;
+
+        // خزّن مرجع response حتى نتمكن من محاولة إيقافه
+        btn._abortCurrentResponse = response;
+
+        if (!btn._stopHandler) {
+          btn._stopHandler = function(ev) {
+            ev.stopPropagation();
+            // علامة محلية لإخبار الحلقة بالتوقف فوراً
+            window._userRequestedStop = true;
+            try {
+              if (btn._abortCurrentResponse && typeof btn._abortCurrentResponse.return === 'function') {
+                btn._abortCurrentResponse.return(); // حاول إغلاق الـ iterator إن أمكن
+              }
+            } catch (e) { /* ignore */ }
+            // بصمة بصرية سريعة
+            btn.classList.add('stopping');
+            setTimeout(()=> btn.classList.remove('stopping'), 160);
+          };
+          btn.addEventListener('click', btn._stopHandler);
+        }
+      }
+    } catch(e) { console.warn('send-button state error', e); }
+}
 
             assistantMessage.content += piece;
         }
@@ -3751,6 +3909,19 @@ async function sendMessage(text, parentIndex = null) {
         // --- بعد انتهاء الرد بالكامل ---
         clearInterval(updateInterval); // أوقف المؤقت
         updateUI(); // قم بالتحديث الأخير لضمان عرض كل النص
+          // --- تنظيف حالة الزر بعد انتهاء الـ stream ---
+    try {
+      const btn = document.getElementById('sendInsideBtn');
+      if (btn) {
+        btn.classList.remove('is-generating', 'is-pending');
+        btn.disabled = false;
+        if (btn._stopHandler) {
+          btn.removeEventListener('click', btn._stopHandler);
+          btn._stopHandler = null;
+        }
+        btn._abortCurrentResponse = null;
+      }
+    } catch(e){}
 
         if (assistantEl) {
             const codeBlocksToHighlight = assistantEl.querySelectorAll('pre code');
@@ -3972,10 +4143,15 @@ async function regenerateAssistantForParent(parentIdx){
       });
 
       sendInsideBtn.addEventListener('click', (e)=>{
-        e.preventDefault();
-        const t = composer.value.trim();
-        if(!t && !pendingAttachment) return;
-        sendInsideBtn.classList.add('sending');
+  e.preventDefault();
+  const t = composer.value.trim();
+  if(!t && !pendingAttachment) return;
+
+  // --- new: immediately show pending (رمادي، غير قابل للضغط) ---
+  sendInsideBtn.classList.add('is-pending', 'visible');
+  sendInsideBtn.disabled = true;
+
+  sendInsideBtn.classList.add('sending');
         setTimeout(()=>{
           sendInsideBtn.classList.remove('sending');
         // ====== START: replace existing "edit" branch with this block ======
