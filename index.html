@@ -932,8 +932,17 @@ body.dark-mode .msg.user {
   .input-field:focus{ box-shadow: 0 10px 30px rgba(0,120,255,0.08), inset 0 2px 10px rgba(0,0,0,0.03); border-color: rgba(0,120,255,0.22); transform: translateY(-1px); }
 
   /* زر الإرسال: حاوية */
-/* زر الإرسال: افتراضي أزرق سماوي */
+/* ============================
+   send-inside — sky-blue + ring
+   ============================ */
+
+/* متغيّرات للألوان (سهلة التعديل لاحقاً) */
 .send-inside {
+  --sky-1: #7fdcf7;   /* أعلى التدرج */
+  --sky-2: #38c8f3;   /* أسفل التدرج */
+  --ring-accent: rgba(255,255,255,0.95);
+  --ring-accent-soft: rgba(255,255,255,0.28);
+
   position: absolute;
   right: 8px;
   top: 50%;
@@ -944,22 +953,22 @@ body.dark-mode .msg.user {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: linear-gradient(180deg,#4fc3f7,#29b6f6); /* أزرق سماوي */
+  background: linear-gradient(180deg, var(--sky-1), var(--sky-2)); /* أزرق سماوي */
   color: white;
   border: none;
   cursor: pointer;
   opacity: 0;
   pointer-events: none;
   transition: opacity .22s ease, transform .22s ease, background .22s ease;
-  box-shadow: 0 8px 20px rgba(79,195,247,0.2);
+  box-shadow: 0 8px 20px rgba(56,200,243,0.16);
   overflow: visible;
   will-change: transform, opacity, background;
 }
 
-/* visible */
+/* visible state */
 .send-inside.visible { opacity: 1; pointer-events: auto; }
 
-/* core icons */
+/* أيقونات داخل الزر — نفس البنية القديمة */
 .send-inside .send-icon,
 .send-inside .stop-icon {
   position: absolute !important;
@@ -970,25 +979,28 @@ body.dark-mode .msg.user {
   height: 16px;
   display: block !important;
   pointer-events: none !important;
-  transition: opacity .16s ease, transform .16s ease, background .22s ease;
+  transition: opacity .16s cubic-bezier(.2,.8,.2,1), transform .16s cubic-bezier(.2,.8,.2,1), background .22s ease;
+  will-change: opacity, transform, background;
 }
 
-/* arrow visuals */
+/* سهم الإرسال (كما في مشروعك) */
 .send-inside .send-icon::before{
   content:''; position:absolute; left:50%; bottom:10%;
   transform:translateX(-50%);
   width:3px; height:9px; border-radius:2px;
-  background: #ffffff;
+  background: linear-gradient(180deg,#ffffff,#dbeeff);
+  transition: opacity .15s ease, transform .15s ease;
 }
 .send-inside .send-icon::after{
   content:''; position:absolute; left:50%; top:0;
-  transform:translateX(-50%);
+  transform:translateX(-50%) rotate(0deg);
   width:11px; height:7px;
-  background: #ffffff;
+  background: linear-gradient(180deg,#ffffff,#dbeeff);
   clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  transition: opacity .15s ease, transform .15s ease;
 }
 
-/* stop icon */
+/* مربع الإيقاف الافتراضي (مخفي) */
 .send-inside .stop-icon {
   opacity: 0;
   transform: translate(-50%, -50%) scale(.7);
@@ -996,71 +1008,127 @@ body.dark-mode .msg.user {
   height: 12px;
   border-radius: 3px;
   background: transparent;
+  box-shadow: none;
   z-index: 20;
+  border: 0;
 }
 
-/* pending: باهت + مربع */
+/* سهم تحت المربع */
+.send-inside .send-icon { z-index: 10; }
+
+/* تأثير ضغط خفيف */
+.send-inside.stopping{ transform: translateY(-50%) scale(.98); transition: transform .14s ease; }
+
+/* -------------------------
+   PENDING (بعد الضغط) — أزرق سماوي فاتح
+   ------------------------- */
 .send-inside.is-pending {
-  background: linear-gradient(180deg,#b3e5fc,#81d4fa); /* أزرق سماوي فاتح */
   cursor: not-allowed;
   pointer-events: none;
+  background: linear-gradient(180deg,#dff6fb,#bfeaf9); /* أزرق سماوي فاتح */
+  opacity: 0.98;
 }
+
+/* مربع أبيض داخل pending */
 .send-inside.is-pending .stop-icon {
   background: #ffffff;
   opacity: 1 !important;
-  transform: translate(-50%, -50%) scale(.9);
-  border: 2px solid #81d4fa;
+  transform: translate(-50%, -50%) scale(.9) !important;
+  border-radius: 3px;
+  border: 2px solid rgba(56,200,243,0.35);
+  box-shadow: 0 0 2px rgba(0,0,0,0.08) inset;
 }
+
+/* إخفاء السهم تماماً أثناء pending */
 .send-inside.is-pending .send-icon,
 .send-inside.is-pending .send-icon::before,
 .send-inside.is-pending .send-icon::after {
   opacity: 0 !important;
+  transform: translate(-50%, -50%) scale(.6) !important;
 }
 
-/* generating: أزرق سماوي غني + حلقة تدفق */
+/* -------------------------
+   GENERATING (أثناء وجود الرد) — أزرق سماوي قوي + حلقة
+   ------------------------- */
 .send-inside.is-generating {
-  background: linear-gradient(180deg,#4fc3f7,#29b6f6);
-  position: relative;
+  pointer-events: auto;
+  cursor: pointer;
+  background: linear-gradient(180deg,var(--sky-1),var(--sky-2)); /* استعاد اللون الرئيسي */
 }
+
+/* مربع أبيض مع إطار أثناء التوليد */
 .send-inside.is-generating .stop-icon {
   background: #ffffff;
   opacity: 1 !important;
-  transform: translate(-50%, -50%) scale(.9);
-  border: 2px solid #29b6f6;
-  box-shadow: 0 0 5px rgba(41,182,246,0.3);
+  transform: translate(-50%, -50%) scale(.9) !important;
+  border-radius: 3px;
+  border: 2px solid var(--sky-2);
+  box-shadow: 0 0 6px rgba(56,200,243,0.22);
+  animation: stop-pulse 1.35s ease-in-out infinite;
 }
+
+/* إخفاء السهم نهائياً أثناء التوليد (ضمان) */
 .send-inside.is-generating .send-icon,
 .send-inside.is-generating .send-icon::before,
 .send-inside.is-generating .send-icon::after {
   opacity: 0 !important;
+  transform: translate(-50%, -50%) scale(.6) !important;
 }
 
-/* الحلقة الخارجية (circle ring) */
+/* =========================
+   الحَلْقَة (ring) المحيطة — تستخدم pseudo-element
+   - نحيفة، متدرجة لونية، وتتحرك: من 0 → 360deg → 0
+   ========================= */
+
+/* إعداد الحلقة: نحفة حول الزر، مخفية افتراضياً */
 .send-inside::after {
   content: "";
   position: absolute;
-  inset: -4px;
+  inset: -6px;                /* يحيط بالزر بمسافة بسيطة */
   border-radius: 50%;
-  border: 2px solid transparent;
-  border-top-color: rgba(41,182,246,0.9);
-  border-right-color: rgba(41,182,246,0.5);
-  border-bottom-color: rgba(41,182,246,0.2);
-  border-left-color: transparent;
+  pointer-events: none;
+  /* نستخدم conic-gradient مع متغير زاوية (--ang) لتحديد طول القوس */
+  background: conic-gradient(from 0deg,
+    rgba(255,255,255,0.98) 0deg,
+    rgba(255,255,255,0.35) var(--ang, 0deg),
+    rgba(255,255,255,0.0) var(--ang, 0deg));
+  /* نحّده ليصبح "حلقة" رفيعة عبر قناع دائري */
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 6px), black calc(100% - 4px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 6px), black calc(100% - 4px));
   opacity: 0;
-  transform: rotate(0deg);
+  transform: rotate(0deg) scale(1);
+  transition: opacity .22s ease, transform .22s ease;
+  mix-blend-mode: screen;
 }
 
-/* الحلقة تعمل فقط أثناء التوليد */
+/* إظهار الحلقة وتشغيل الأنيميشن أثناء is-generating */
 .send-inside.is-generating::after {
   opacity: 1;
-  animation: ring-pulse 2s ease-in-out infinite;
+  animation: ring-progress 2.2s linear infinite;
 }
 
-/* أنيميشن الحلقة: من 0 إلى 360 ثم عكس */
-@keyframes ring-pulse {
-  0%   { transform: rotate(0deg) scale(1); opacity: .9; }
-  50%  { transform: rotate(360deg) scale(1.05); opacity: .5; }
-  100% { transform: rotate(0deg) scale(1); opacity: .9; }
+/* أنيميشن الحلقة: --ang يتدرّج 0deg → 360deg → 0deg ليعطي فكرة النمو ثم التراجع،
+   مع دوران طفيف للعنصر لتحريك التدرّج */
+@keyframes ring-progress {
+  0%   { --ang: 0deg;   transform: rotate(0deg)   scale(1);  opacity: .95; }
+  45%  { --ang: 270deg; transform: rotate(180deg) scale(1.02); opacity: .6; }
+  50%  { --ang: 360deg; transform: rotate(240deg) scale(1.03); opacity: .5; }
+  95%  { --ang: 30deg;  transform: rotate(420deg) scale(1.01); opacity: .7; }
+  100% { --ang: 0deg;   transform: rotate(540deg) scale(1);  opacity: .95; }
+}
+
+/* نبض المربع الصغير أثناء التوليد (كما كانت لديك) */
+@keyframes stop-pulse {
+  0% { transform: translate(-50%, -50%) scale(0.98); opacity: 1; }
+  50% { transform: translate(-50%, -50%) scale(1.06); opacity: 0.98; }
+  100% { transform: translate(-50%, -50%) scale(0.98); opacity: 1; }
+}
+
+/* انتقالات ناعمة للأيقونات */
+.send-inside .stop-icon,
+.send-inside .send-icon {
+  transition: opacity .18s ease, transform .18s ease, background .22s ease;
+  will-change: opacity, transform, background;
 }
   .sr-only{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
 
