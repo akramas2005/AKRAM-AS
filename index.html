@@ -2747,6 +2747,15 @@ if (!analysisText) {
       function escapeHtml(str){ return String(str).replace(/[&<>"]/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s])); }
 
       // === Helpers for deletions ===
+
+      // 🟢 Helper: لفك تشفير أسماء الملفات (خصوصاً العربية)
+function decodeFilename(name) {
+  try {
+    return decodeURIComponent(escape(name));
+  } catch (e) {
+    return name;
+  }
+}
 function scheduleDeletionOnServer(url, opts = {}) {
   if (!url) return;
   fetch(url, Object.assign({ method: 'DELETE' }, opts)).then(resp=>{
