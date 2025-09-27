@@ -997,6 +997,42 @@ body.dark-mode .msg.user {
 
 /* small feedback when pressing stop */
 .send-inside.stopping{ transform: translateY(-50%) scale(.98); transition: transform .14s ease; }
+
+  /* --- pending (ظاهر لكن غير قابل للضغط) --- */
+.send-inside.is-pending {
+  cursor: not-allowed;
+  /* لو تريد تخفيف اللمعان قليلاً أثناء الانتظار */
+  opacity: 0.98;
+}
+
+/* مربع الإيقاف أثناء pending — لون رمادي */
+.send-inside.is-pending .stop-icon {
+  background: linear-gradient(180deg,#bdbdbd,#e0e0e0);
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(.92);
+  transition: background .22s ease, transform .18s ease, opacity .18s ease;
+}
+
+/* أخفّ إظهار للسهم أثناء pending (نخفي السهم عادة) */
+.send-inside.is-pending .send-icon {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(.7);
+}
+
+/* الانتقال إلى الحالة المفعلة (is-generating) — ستظهر بأزرق حسب قواعدك الحالية */
+.send-inside.is-generating .stop-icon {
+  /* اللون الأزرق الذي تريده عند التفعيل */
+  background: linear-gradient(180deg,#1f7bff,#005ee6);
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+  transition: background .22s ease, transform .18s ease, opacity .18s ease;
+}
+
+/* تأكد من وجود انتقال سلس لكل التغييرات */
+.send-inside .stop-icon,
+.send-inside .send-icon {
+  transition: opacity .18s ease, transform .18s ease, background .22s ease;
+}
  
   .edit-cancel{
     display:none;
@@ -3710,9 +3746,13 @@ async function sendMessage(text, parentIndex = null) {
   clearIndicator();
   showTyping();
 
-  // علامـة التوليد: لتظهر أيقونة الـ Stop
+  // ========= الجديد: نضع الزر في حالة "pending" (ظاهر ولكن غير قابل للضغط) =========
   shouldStopGeneration = false;
-  try { sendInsideBtn.classList.add('is-generating'); sendInsideBtn.classList.add('visible'); } catch(e){}
+  try {
+    sendInsideBtn.classList.add('is-pending');   // يظهر المربع لكن رمادي/غير قابل للضغط
+    sendInsideBtn.classList.add('visible');
+    sendInsideBtn.disabled = true;               // يمنع النقر برمجياً (browser-level)
+  } catch(e){}
 
   let assistantEl = null;
   let bubbleEl = null;
@@ -3732,18 +3772,13 @@ async function sendMessage(text, parentIndex = null) {
   try {
     const response = await puter.ai.chat(buildChatPrompt(messages), { model: 'gpt-5-nano', stream: true });
 
-    // **احصل على الـ async iterator الحقيقي** و خزّنه لتمكين الإلغاء
     const iterator = (typeof response[Symbol.asyncIterator] === 'function') ? response[Symbol.asyncIterator]() : response;
     currentStreamingIterator = iterator;
 
     for await (const part of iterator) {
-      // فحص طلب الإيقاف من المستخدم فوراً
+      // لو طلب المستخدم الإيقاف بعد أن أصبح الزر مفعّلاً، نتحقق من العلم
       if (shouldStopGeneration) {
-        // محاولة إنهاء الـ iterator إن أمكن
-        try { if (currentStreamingIterator && typeof currentStreamingIterator.return === 'function') {
-            await currentStreamingIterator.return();
-          }
-        } catch(e){}
+        try { if (currentStreamingIterator && typeof currentStreamingIterator.return === 'function') await currentStreamingIterator.return(); } catch(e){}
         break;
       }
 
@@ -3751,6 +3786,7 @@ async function sendMessage(text, parentIndex = null) {
       if (!piece) continue;
 
       if (isFirstChunk) {
+        // عند أول chunk: الرد بدأ فعلاً -> نفعّل زر الإيقاف (رمادي -> أزرق)
         clearIndicator();
         assistantMessage = { id: genId(), role: 'assistant', content: '', parent: messages.length - 1, meta: {} };
         messages.push(assistantMessage);
@@ -3758,6 +3794,14 @@ async function sendMessage(text, parentIndex = null) {
         messagesEl.appendChild(assistantEl);
         requestAnimationFrame(() => setTimeout(() => assistantEl.classList.add('show'), 20));
         bubbleEl = assistantEl.querySelector('.bubble');
+
+        // ===== تنقل الحالة من pending -> generating (تفعل الزر) =====
+        try {
+          sendInsideBtn.classList.remove('is-pending');
+          sendInsideBtn.classList.add('is-generating');
+          sendInsideBtn.disabled = false; // now clickable
+        } catch(e){}
+
         isFirstChunk = false;
 
         // ابدأ المؤقت الزمني للتحديث كل 150ms
@@ -3788,12 +3832,12 @@ async function sendMessage(text, parentIndex = null) {
     const errorMsg = { id: genId(), role: 'assistant', content: 'عذرًا، حدث خطأ ما.', meta: {} };
     appendMessage(errorMsg, messages.length);
   } finally {
-    // تنظيف المَرَكِز المرجعي ومظهر الزر
+    // تنظيف المرجع والحالات البصرية، وإزالة حالة pending/generating
     currentStreamingIterator = null;
     shouldStopGeneration = false;
-    abortController = null;
     try {
-      sendInsideBtn.classList.remove('is-generating');
+      sendInsideBtn.classList.remove('is-generating', 'is-pending');
+      sendInsideBtn.disabled = false;
       if ((composer.value || '').trim().length === 0) {
         sendInsideBtn.classList.remove('visible');
       }
@@ -3973,6 +4017,8 @@ async function regenerateAssistantForParent(parentIdx){
 
      sendInsideBtn.addEventListener('click', async (e) => {
   e.preventDefault();
+       // safety: if still pending, ignore
+  if (sendInsideBtn.classList.contains('is-pending')) return;
 
   if (sendInsideBtn.classList.contains('is-generating')) {
     shouldStopGeneration = true;
