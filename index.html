@@ -932,6 +932,7 @@ body.dark-mode .msg.user {
   .input-field:focus{ box-shadow: 0 10px 30px rgba(0,120,255,0.08), inset 0 2px 10px rgba(0,0,0,0.03); border-color: rgba(0,120,255,0.22); transform: translateY(-1px); }
 
   /* زر الإرسال: حاوية */
+/* زر الإرسال */
 .send-inside {
   position: absolute;
   right: 8px;
@@ -943,14 +944,14 @@ body.dark-mode .msg.user {
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  background: linear-gradient(180deg,#1f7bff,#005ee6);
+  background: linear-gradient(180deg,#9b59b6,#8e44ad); /* بنفسجي افتراضي */
   color: white;
   border: none;
   cursor: pointer;
   opacity: 0;
   pointer-events: none;
   transition: opacity .22s ease, transform .22s ease, background .22s ease;
-  box-shadow: 0 8px 20px rgba(0,120,255,0.18);
+  box-shadow: 0 8px 20px rgba(155,89,182,0.18);
   overflow: visible;
   will-change: transform, opacity, background;
 }
@@ -975,19 +976,19 @@ body.dark-mode .msg.user {
   will-change: opacity, transform, background;
 }
 
-/* arrow visuals (unchanged) */
+/* arrow visuals */
 .send-inside .send-icon::before{
   content:''; position:absolute; left:50%; bottom:10%;
   transform:translateX(-50%);
   width:3px; height:9px; border-radius:2px;
-  background: linear-gradient(180deg,#ffffff,#dbeeff);
+  background: linear-gradient(180deg,#ffffff,#f3eaff);
   transition: opacity .15s ease, transform .15s ease;
 }
 .send-inside .send-icon::after{
   content:''; position:absolute; left:50%; top:0;
   transform:translateX(-50%) rotate(0deg);
   width:11px; height:7px;
-  background: linear-gradient(180deg,#ffffff,#dbeeff);
+  background: linear-gradient(180deg,#ffffff,#f3eaff);
   clip-path: polygon(50% 0, 100% 100%, 0 100%);
   transition: opacity .15s ease, transform .15s ease;
 }
@@ -1001,7 +1002,7 @@ body.dark-mode .msg.user {
   border-radius: 3px;
   background: transparent;
   box-shadow: none;
-  z-index: 20; /* ensure always above arrow */
+  z-index: 20;
   border: 0;
 }
 
@@ -1011,28 +1012,22 @@ body.dark-mode .msg.user {
 /* quick press feedback */
 .send-inside.stopping{ transform: translateY(-50%) scale(.98); transition: transform .14s ease; }
 
-/* === PENDING ===
-   - Gray background
-   - Square visible (solid, with light inner border), arrow fully hidden
-*/
+/* === PENDING === (رمادي بنفسجي باهت + مربع أبيض) */
 .send-inside.is-pending {
   cursor: not-allowed;
   opacity: 0.98;
   pointer-events: none;
-  background: linear-gradient(180deg,#e6e6e6,#cfcfcf);
+  background: linear-gradient(180deg,#e2d6f9,#c7aef5); /* بنفسجي فاتح باهت */
 }
-
-/* pending: show square with subtle border to separate from bg */
 .send-inside.is-pending .stop-icon {
-  background: #ffffff; /* أبيض صريح */
+  background: #ffffff;
   opacity: 1 !important;
   transform: translate(-50%, -50%) scale(.9) !important;
   border-radius: 3px;
-  border: 2px solid #b0b0b0; /* إطار رمادي يوضح المربع */
-  box-shadow: 0 0 2px rgba(0,0,0,0.15) inset;
+  border: 2px solid #bfaee3; /* إطار بنفسجي فاتح */
+  box-shadow: 0 0 2px rgba(0,0,0,0.12) inset;
 }
-
-/* hide arrow explicitly (including pseudo-elements) while pending */
+/* إخفاء السهم */
 .send-inside.is-pending .send-icon,
 .send-inside.is-pending .send-icon::before,
 .send-inside.is-pending .send-icon::after {
@@ -1041,28 +1036,22 @@ body.dark-mode .msg.user {
   transition: opacity .12s ease, transform .12s ease;
 }
 
-/* === GENERATING ===
-   - Blue background
-   - Square visible and prominent, subtle shadow + pulse
-*/
+/* === GENERATING === (بنفسجي غني + مربع أبيض نابض) */
 .send-inside.is-generating {
   pointer-events: auto;
   cursor: pointer;
-  background: linear-gradient(180deg,#1f7bff,#005ee6);
+  background: linear-gradient(180deg,#9b59b6,#8e44ad); /* بنفسجي غني */
 }
-
-/* stop icon: blue square, border + glow, pulse */
 .send-inside.is-generating .stop-icon {
-  background: #ffffff; /* أبيض واضح وسط الأزرق */
+  background: #ffffff;
   opacity: 1 !important;
   transform: translate(-50%, -50%) scale(.9) !important;
   border-radius: 3px;
-  border: 2px solid #1f7bff; /* إطار أزرق يوضح المربع */
-  box-shadow: 0 0 4px rgba(0,95,255,0.3);
+  border: 2px solid #8e44ad; /* إطار بنفسجي داكن */
+  box-shadow: 0 0 4px rgba(155,89,182,0.3);
   animation: stop-pulse 1.35s ease-in-out infinite;
 }
-
-/* hide arrow completely while generating (explicit) */
+/* إخفاء السهم */
 .send-inside.is-generating .send-icon,
 .send-inside.is-generating .send-icon::before,
 .send-inside.is-generating .send-icon::after {
