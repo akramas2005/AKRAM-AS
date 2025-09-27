@@ -915,111 +915,145 @@ body.dark-mode .msg.user {
   }
   .input-field:focus{ box-shadow: 0 10px 30px rgba(0,120,255,0.08), inset 0 2px 10px rgba(0,0,0,0.03); border-color: rgba(0,120,255,0.22); transform: translateY(-1px); }
 
-  /* زر الإرسال: حاوية */
+ /* --- START: Final Animated Send/Stop Button --- */
+
+/* Keyframes للأنيميشن */
+@keyframes spin-glow {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+/* 1. حاوية الزر الرئيسية */
 .send-inside {
   position: absolute;
   right: 8px;
   top: 50%;
-  transform: translateY(-50%) translateX(0);
+  transform: translateY(-50%);
   width: 36px;
   height: 36px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  background: linear-gradient(135deg, #0078ff, #00aaff); /* اللون الأزرق الافتراضي */
-  color: white;
+  background: linear-gradient(135deg, #0078ff, #00aaff);
   border: none;
   cursor: pointer;
   opacity: 0;
   pointer-events: none;
   box-shadow: 0 8px 20px rgba(0, 120, 255, 0.18);
-  transition: opacity .22s ease, transform .22s ease, background .3s ease;
+  transition: opacity .22s ease, transform .22s ease, background .3s ease, box-shadow .3s ease;
+  /* مهم جداً للسماح بوجود العنصر الوهمي خلف الزر */
+  z-index: 1; 
 }
 
-/* حالة الظهور العادية (أيقونة الإرسال) */
+/* 2. العنصر الوهمي (مسؤول عن الهالة والخيط الدوار) */
+.send-inside::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(100% + 8px); /* أكبر قليلاً من الزر */
+  height: calc(100% + 8px);
+  z-index: -1; /* خلف الزر */
+  border-radius: 999px;
+  opacity: 0; /* مخفي افتراضياً */
+  
+  /* الألوان المختارة: تدرج لوني مريح للعين */
+  background: conic-gradient(
+    from 90deg,
+    #a389f4, /* بنفسجي فاتح */
+    #89f7fe, /* سماوي مشرق */
+    #66a6ff, /* أزرق سماوي */
+    #a389f4  /* العودة للبنفسجي لإكمال الدائرة */
+  );
+  
+  /* إعدادات الأنيميشن والانتقال */
+  animation: spin-glow 4s linear infinite;
+  transition: opacity 0.4s ease, -webkit-mask 0.4s ease, mask 0.4s ease;
+  
+  /* الحالة الافتراضية: هالة ضوئية كاملة */
+  -webkit-mask: radial-gradient(transparent, transparent);
+  mask: radial-gradient(transparent, transparent);
+}
+
+
+/* 3. حالة الظهور العادية */
 .send-inside.visible {
   opacity: 1;
   pointer-events: auto;
 }
 
-/* الأيقونات (السهم والمربع) */
-.send-inside .send-icon,
-.send-inside .stop-icon {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: 16px;
-  height: 16px;
-  pointer-events: none;
+/* 4. أيقونات السهم والمربع (بدون تغيير) */
+.send-inside .send-icon, .send-inside .stop-icon {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: 16px; height: 16px; pointer-events: none;
   transition: opacity .25s ease, transform .25s ease;
 }
-
-/* أيقونة الإرسال (السهم) - مكونة من جزئين */
-.send-inside .send-icon::before,
-.send-inside .send-icon::after {
-  content: '';
-  position: absolute;
-  background: #fff; /* لون أبيض بسيط */
+.send-inside .send-icon::before, .send-inside .send-icon::after {
+  content: ''; position: absolute; background: #fff;
 }
 .send-inside .send-icon::before {
-  left: 50%;
-  bottom: 10%;
-  transform: translateX(-50%);
-  width: 3px;
-  height: 9px;
-  border-radius: 2px;
+  left: 50%; bottom: 10%; transform: translateX(-50%);
+  width: 3px; height: 9px; border-radius: 2px;
 }
 .send-inside .send-icon::after {
-  left: 50%;
-  top: 0;
-  transform: translateX(-50%);
-  width: 11px;
-  height: 7px;
-  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  left: 50%; top: 0; transform: translateX(-50%);
+  width: 11px; height: 7px; clip-path: polygon(50% 0, 100% 100%, 0 100%);
 }
-
-/* أيقونة الإيقاف (المربع) - الحالة الافتراضية */
 .send-inside .stop-icon {
-  width: 10px;      /* حجم المربع */
-  height: 10px;     /* حجم المربع */
-  background: #fff; /* <<< هذا هو الحل لمشكلة الاختفاء */
-  border-radius: 2px;
-  opacity: 0; /* يكون مختفياً في البداية */
-  transform: translate(-50%, -50%) scale(0.7);
+  width: 10px; height: 10px; background: #fff;
+  border-radius: 2px; opacity: 0; transform: translate(-50%, -50%) scale(0.7);
 }
 
-/* --- التحكم في الحالات --- */
+/* --- التحكم في الحالات والأنيميشن --- */
 
-/* 1. حالة الانتظار (Pending) - رمادي وغير قابل للضغط */
+/* 5. حالة الانتظار (Pending) - تفعيل الهالة الضوئية */
 .send-inside.is-pending {
-  background: linear-gradient(135deg, #B0BEC5, #90A4AE); /* اللون الرمادي */
+  background: linear-gradient(135deg, #B0BEC5, #90A4AE);
   box-shadow: 0 6px 16px rgba(100, 110, 120, 0.2);
   cursor: not-allowed;
-  pointer-events: auto; /* مهم ليبقى الزر ظاهراً */
+}
+
+/* إظهار الهالة الضوئية في حالة الانتظار */
+.send-inside.is-pending::before {
   opacity: 1;
 }
 
-/* 2. حالة توليد الرد (Generating) - أزرق وقابل للضغط */
+/* 6. حالة توليد الرد (Generating) - تحويل الهالة إلى خيط دوار */
 .send-inside.is-generating {
-  background: linear-gradient(135deg, #0078ff, #00aaff); /* العودة للأزرق */
-  box-shadow: 0 8px 20px rgba(0, 120, 255, 0.18);
+  background: linear-gradient(135deg, #0078ff, #00aaff);
   cursor: pointer;
 }
 
-/* إظهار / إخفاء الأيقونات حسب الحالة */
+/* إظهار الخيط وتغيير سرعة دورانه */
+.send-inside.is-generating::before {
+  opacity: 1;
+  animation-duration: 1.5s; /* زيادة سرعة الدوران */
+  
+  /* استخدام القناع لقص المركز وترك خيط بعرض 2px */
+  -webkit-mask: radial-gradient(transparent 19px, #000 20px);
+  mask: radial-gradient(transparent 19px, #000 20px);
+}
+
+
+/* 7. التحكم في ظهور وإخفاء الأيقونات الداخلية */
 .send-inside.is-pending .send-icon,
 .send-inside.is-generating .send-icon {
   opacity: 0;
-  transform: translate(-50%, -50%) scale(0.5); /* إخفاء السهم */
+  transform: translate(-50%, -50%) scale(0.5);
 }
 
 .send-inside.is-pending .stop-icon,
 .send-inside.is-generating .stop-icon {
   opacity: 1;
-  transform: translate(-50%, -50%) scale(1); /* إظهار المربع */
+  transform: translate(-50%, -50%) scale(1);
 }
+
+/* --- END: Final Animated Send/Stop Button --- */
  
   .edit-cancel{
     display:none;
