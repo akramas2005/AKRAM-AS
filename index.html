@@ -946,36 +946,30 @@ body.dark-mode .msg.user {
   pointer-events: none;
   box-shadow: 0 8px 20px rgba(0, 120, 255, 0.18);
   transition: opacity .22s ease, transform .22s ease, background .3s ease, box-shadow .3s ease;
-  /* مهم جداً للسماح بوجود العنصر الوهمي خلف الزر */
   z-index: 1; 
+  isolation: isolate; /* <<< أضف هذا السطر لحل مشكلة الإضاءة */
 }
 
-/* 2. العنصر الوهمي (مسؤول عن الهالة والخيط الدوار) */
+/* 2. تأكد من أن العنصر الوهمي z-index الخاص به هو -1 */
 .send-inside::before {
   content: '';
   position: absolute;
   left: 50%;
   top: 50%;
-  width: calc(100% + 8px); /* أكبر قليلاً من الزر */
+  width: calc(100% + 8px);
   height: calc(100% + 8px);
-  z-index: -1; /* خلف الزر */
+  z-index: -1; /* <<< تأكد أن هذه القيمة -1 */
   border-radius: 999px;
-  opacity: 0; /* مخفي افتراضياً */
-  
-  /* الألوان المختارة: تدرج لوني مريح للعين */
+  opacity: 0;
   background: conic-gradient(
     from 90deg,
-    #a389f4, /* بنفسجي فاتح */
-    #89f7fe, /* سماوي مشرق */
-    #66a6ff, /* أزرق سماوي */
-    #a389f4  /* العودة للبنفسجي لإكمال الدائرة */
+    #a389f4,
+    #89f7fe,
+    #66a6ff,
+    #a389f4
   );
-  
-  /* إعدادات الأنيميشن والانتقال */
   animation: spin-glow 4s linear infinite;
   transition: opacity 0.4s ease, -webkit-mask 0.4s ease, mask 0.4s ease;
-  
-  /* الحالة الافتراضية: هالة ضوئية كاملة */
   -webkit-mask: radial-gradient(transparent, transparent);
   mask: radial-gradient(transparent, transparent);
 }
@@ -4037,71 +4031,72 @@ async function regenerateAssistantForParent(parentIdx){
       });
 
      sendInsideBtn.addEventListener('click', async (e) => {
-  e.preventDefault();
-       // safety: if still pending, ignore
-  if (sendInsideBtn.classList.contains('is-pending')) return;
+    e.preventDefault();
 
-  if (sendInsideBtn.classList.contains('is-generating')) {
-    shouldStopGeneration = true;
-    try {
-      if (currentStreamingIterator && typeof currentStreamingIterator.return === 'function') {
-        await currentStreamingIterator.return();
-      }
-    } catch (err) { /* ignore */ }
-    if (abortController) {
-      try { abortController.abort(); } catch(e){}
+    // safety: if still pending, ignore
+    if (sendInsideBtn.classList.contains('is-pending')) return;
+
+    if (sendInsideBtn.classList.contains('is-generating')) {
+        shouldStopGeneration = true;
+        try {
+            if (currentStreamingIterator && typeof currentStreamingIterator.return === 'function') {
+                await currentStreamingIterator.return();
+            }
+        } catch (err) { /* ignore */ }
+        if (abortController) {
+            try { abortController.abort(); } catch(e){}
+        }
+
+        // 🔴 أوقف المؤشر (3 نقاط) عند الإيقاف
+        clearIndicator();
+
+        sendInsideBtn.classList.add('stopping');
+        setTimeout(()=> sendInsideBtn.classList.remove('stopping'), 300);
+        if ((composer.value || '').trim().length === 0) {
+            sendInsideBtn.classList.remove('visible');
+        }
+        return;
     }
 
-    // 🔴 أوقف المؤشر (3 نقاط) عند الإيقاف
-    clearIndicator();
+    // خلاف ذلك: سلوك الإرسال/التحرير العادي
+    const t = composer.value.trim();
+    if (!t && !pendingAttachment) return;
+    
+    // ---> التعديل الرئيسي هنا: قم بتفعيل الحالة الرمادية فورًا <---
+    sendInsideBtn.classList.add('is-pending');
 
-    sendInsideBtn.classList.add('stopping');
-    setTimeout(()=> sendInsideBtn.classList.remove('stopping'), 300);
-    if ((composer.value || '').trim().length === 0) {
-      sendInsideBtn.classList.remove('visible');
-    }
-    return;
-}
+    setTimeout(() => {
+        // ====== edit branch (نفس منطق ملفك) ======
+        if (editIndex !== null && editIndex >= 0) {
+            const t = composer.value.trim();
+            messages[editIndex].content = t;
+            const editedMsgEl = messagesEl.querySelector(`.msg[data-index="${editIndex}"] .bubble`);
+            if (editedMsgEl) {
+                editedMsgEl.innerHTML = marked.parse(t);
+                // (ابقَ على منطق التحديث الإضافي هنا كما في ملفك)
+            }
+            regenerateAssistantForParent(oldIndex);
+            return;
+        }
+        // ====== end edit branch ======
+        else {
+            if (pendingAttachment) {
+                sendAttachmentNow();
+            } else {
+                composer.value = '';
+                updateSendVisibility();
+                autoGrowTextarea();
 
-  // خلاف ذلك: سلوك الإرسال/التحرير العادي
-  const t = composer.value.trim();
-  if(!t && !pendingAttachment) return;
+                // قبل بدء التوليد: نؤكد أن علم الإيقاف على false
+                shouldStopGeneration = false;
 
-  sendInsideBtn.classList.add('sending');
-  setTimeout(()=>{
-    sendInsideBtn.classList.remove('sending');
+                // start generation — sendMessage سيقوم بتبديل is-pending إلى is-generating
+                sendMessage(t);
+            }
+        }
 
-    // ====== edit branch (نفس منطق ملفك) ======
-    if (editIndex !== null && editIndex >= 0) {
-      const t = composer.value.trim();
-      messages[editIndex].content = t;
-      const editedMsgEl = messagesEl.querySelector(`.msg[data-index="${editIndex}"] .bubble`);
-      if (editedMsgEl) {
-        editedMsgEl.innerHTML = marked.parse(t);
-        // (ابقَ على منطق التحديث الإضافي هنا كما في ملفك)
-      }
-      regenerateAssistantForParent(oldIndex);
-      return;
-    }
-    // ====== end edit branch ======
-    else {
-      if (pendingAttachment) {
-        sendAttachmentNow();
-      } else {
-        composer.value = '';
-        updateSendVisibility();
-        autoGrowTextarea();
-
-        // قبل بدء التوليد: نؤكد أن علم الإيقاف على false
-        shouldStopGeneration = false;
-
-        // start generation — sendMessage سيقوم بإضافة is-generating على الزر
-        sendMessage(t);
-      }
-    }
-
-    startRotatorIfNeeded();
-  }, 260);
+        startRotatorIfNeeded();
+    }, 260);
 });
 
       composer.addEventListener('keydown', (e)=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendInsideBtn.click(); } });
