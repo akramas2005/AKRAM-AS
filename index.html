@@ -3903,6 +3903,20 @@ msg.appendChild(content);
   // 🟢 الجديد: نُرجع العنصر
   return msg;
 }
+      function resetSendButton() {
+  try {
+    const btn = document.getElementById('sendInsideBtn');
+    if (btn) {
+      btn.classList.remove('is-generating', 'is-pending', 'visible');
+      btn.disabled = false;
+      if (btn._stopHandler) {
+        btn.removeEventListener('click', btn._stopHandler);
+        btn._stopHandler = null;
+      }
+      btn._abortCurrentResponse = null;
+    }
+  } catch(e) { console.warn("resetSendButton failed", e); }
+}
       // Safe fallback for simulatedAssistantReply if not defined elsewhere
       function simulatedAssistantReply(text){
         try {
