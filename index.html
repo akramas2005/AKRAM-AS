@@ -4356,6 +4356,8 @@ if (editIndex !== null && editIndex >= 0) {
     // regenerate reply for edited message
   regenerateAssistantForParent(oldIndex);
   if (typeof reindexDom === 'function') reindexDom();
+  // 🟢 تنظيف حالة الزر حتى لا يبقى في وضع pending
+  resetSendButton();
   return;
 }
 // ====== END: edit branch replacement ======
