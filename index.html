@@ -802,6 +802,21 @@ body.dark-mode .msg.user {
 .msg.assistant.typing-indicator .feedback-row {
   display: none !important;
 }
+
+  /* الرسائل: دخول سلس مع Fade + Slide */
+.msg {
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity .35s ease, transform .35s ease;
+}
+
+.msg.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+  .bubble {
+  transition: opacity .2s ease;
+}
   /* --- START: Final Arabic Text Alignment Fix --- */
 .msg .bubble[dir="rtl"] p {
     text-align: right;
