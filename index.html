@@ -2847,6 +2847,29 @@ async function sendAttachmentNow() {
       conversation_id: currentConversationId || null,
       meta: {}
     };
+
+    // --- helper: reset send button state globally ---
+function resetSendButton(){
+  try {
+    const btn = document.getElementById('sendInsideBtn');
+    if (!btn) return;
+    // إزالة الحالات
+    btn.classList.remove('is-generating', 'is-pending', 'stopping');
+    // إعادة تفعيل الزر
+    btn.disabled = false;
+    // إزالة أي مستمع إيقاف تم تسجيله
+    if (btn._stopHandler) {
+      try { btn.removeEventListener('click', btn._stopHandler); } catch(e){}
+      btn._stopHandler = null;
+    }
+    // تفريغ أي مرجع لإيقاف الستريم
+    try { btn._abortCurrentResponse = null; } catch(e){}
+    // إعادة قيمة العلامة البولية
+    try { window._userRequestedStop = false; } catch(e){}
+  } catch(e){
+    console.warn('resetSendButton failed', e);
+  }
+}
     // helper: returns 'image' | 'file' | 'default'
 function getAttachmentType(att) {
   if (!att) return 'default';
@@ -2901,12 +2924,16 @@ if (!analysisText) {
     regenerateAssistantForParent(messages.length - 1);
 }
 
-  } catch (e) {
+   } catch (e) {
     console.error('sendAttachmentNow error', e);
+    // تنظيف زر الإرسال لو كان عالقاً
+    resetSendButton();
     toast('Send failed');
-    clearIndicator(); // كإجراء احترازي: قم بإزالة المؤشر عند حدوث خطأ عام
+    clearIndicator(); // كإجراء احترازي
   } finally {
     try { if (pendingAttachment) pendingAttachment._sending = false; } catch (e) {}
+    // حماية نهائية: أعد حالة الزر
+    resetSendButton();
   }
 }
       document.addEventListener('click', (e)=>{ if(attachPanel.classList.contains('open') && !attachPanel.contains(e.target) && !attachBtn.contains(e.target)) closeAttach(); }, true);
@@ -3275,15 +3302,16 @@ async function analyzeImageWithPuter(imageUrl, userPrompt = null, indicator = nu
       saveSession();
       return botMsg ? botMsg.content : null;
     }
-  } catch (err) {
+    } catch (err) {
     console.warn('analyzeImageWithPuter failed', err);
+    // تنظيف زر الإرسال لو كان معلقاً
+    resetSendButton();
   }
 
   clearTimeout(toAnalyzingTimer);
   clearIndicator();
   return null;
 }
-
       // === Extract text from PDF (supports File or URL) ===
 async function extractPdfText(input) {
   // input: File object OR URL string
@@ -3375,8 +3403,10 @@ const toAnalyzingTimer = setTimeout(() => {
       }
     }
 
-    if (!textContent) {
+        if (!textContent) {
       clearIndicator();
+      // تنظيف زر الإرسال لأننا قد نكون في حالة pending
+      resetSendButton();
       toast('Could not read the file content.');
       return null;
     }
@@ -3440,8 +3470,10 @@ if (bubbleEl) {
     saveSession();
     return assistantMessage.content;
 
-  } catch (e) {
+   } catch (e) {
     console.error('analyzeFileWithPuter error', e);
+    // تنظيف زر الإرسال
+    resetSendButton();
     clearIndicator();
     return null;
   }
@@ -3889,6 +3921,7 @@ async function sendMessage(text, parentIndex = null) {
         sendAttachmentNow();
         return;
     }
+  let updateInterval = null; // المؤقت الزمني
 
     const userMessage = { id: genId(), role: 'user', content: textToUse, parent: parentIndex, meta: {} };
     messages.push(userMessage);
@@ -3914,7 +3947,6 @@ async function sendMessage(text, parentIndex = null) {
 
         // --- START: Smart Update Logic ---
         let contentBuffer = ''; // مخزن مؤقت للنص
-        let updateInterval = null; // المؤقت الزمني
 
         const updateUI = () => {
             if (bubbleEl) {
@@ -4008,11 +4040,19 @@ async function sendMessage(text, parentIndex = null) {
         }
         saveSession();
 
-    } catch (error) {
+        } catch (error) {
         console.error("Puter.js Error:", error);
         clearIndicator();
+        // تنظيف حالة الزر عند حدوث خطأ
+        resetSendButton();
+
         const errorMsg = { id: genId(), role: 'assistant', content: 'عذرًا، حدث خطأ ما.', meta: {} };
         appendMessage(errorMsg, messages.length);
+    } finally {
+        // بعض المتغيرات (مثل updateInterval) قد تكون محلية داخل try. حاول تنظيف أي مؤقت إن وُجد.
+        try { if (typeof updateInterval !== 'undefined' && updateInterval) clearInterval(updateInterval); } catch(e){}
+        // دائماً أعد حالة الزر كحماية نهائية
+        resetSendButton();
     }
 }
       
