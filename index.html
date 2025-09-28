@@ -937,11 +937,10 @@ body.dark-mode .msg.user {
    ============================ */
 
 /* متغيّرات للألوان (سهلة التعديل لاحقاً) */
+/* زر الإرسال */
 .send-inside {
   --sky-1: #7fdcf7;   /* أعلى التدرج */
   --sky-2: #38c8f3;   /* أسفل التدرج */
-  --ring-accent: rgba(255,255,255,0.95);
-  --ring-accent-soft: rgba(255,255,255,0.28);
 
   position: absolute;
   right: 8px;
@@ -953,7 +952,7 @@ body.dark-mode .msg.user {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: linear-gradient(180deg, var(--sky-1), var(--sky-2)); /* أزرق سماوي */
+  background: linear-gradient(180deg, var(--sky-1), var(--sky-2));
   color: white;
   border: none;
   cursor: pointer;
@@ -965,10 +964,10 @@ body.dark-mode .msg.user {
   will-change: transform, opacity, background;
 }
 
-/* visible state */
+/* يظهر عند الحاجة */
 .send-inside.visible { opacity: 1; pointer-events: auto; }
 
-/* أيقونات داخل الزر — نفس البنية القديمة */
+/* أيقونات */
 .send-inside .send-icon,
 .send-inside .stop-icon {
   position: absolute !important;
@@ -983,13 +982,12 @@ body.dark-mode .msg.user {
   will-change: opacity, transform, background;
 }
 
-/* سهم الإرسال (كما في مشروعك) */
+/* السهم */
 .send-inside .send-icon::before{
   content:''; position:absolute; left:50%; bottom:10%;
   transform:translateX(-50%);
   width:3px; height:9px; border-radius:2px;
   background: linear-gradient(180deg,#ffffff,#dbeeff);
-  transition: opacity .15s ease, transform .15s ease;
 }
 .send-inside .send-icon::after{
   content:''; position:absolute; left:50%; top:0;
@@ -997,10 +995,9 @@ body.dark-mode .msg.user {
   width:11px; height:7px;
   background: linear-gradient(180deg,#ffffff,#dbeeff);
   clip-path: polygon(50% 0, 100% 100%, 0 100%);
-  transition: opacity .15s ease, transform .15s ease;
 }
 
-/* مربع الإيقاف الافتراضي (مخفي) */
+/* مربع الإيقاف */
 .send-inside .stop-icon {
   opacity: 0;
   transform: translate(-50%, -50%) scale(.7);
@@ -1008,38 +1005,29 @@ body.dark-mode .msg.user {
   height: 12px;
   border-radius: 3px;
   background: transparent;
-  box-shadow: none;
   z-index: 20;
   border: 0;
 }
-
-/* سهم تحت المربع */
 .send-inside .send-icon { z-index: 10; }
 
-/* تأثير ضغط خفيف */
+/* تأثير ضغط */
 .send-inside.stopping{ transform: translateY(-50%) scale(.98); transition: transform .14s ease; }
 
 /* -------------------------
-   PENDING (بعد الضغط) — أزرق سماوي فاتح
+   PENDING
    ------------------------- */
 .send-inside.is-pending {
   cursor: not-allowed;
   pointer-events: none;
-  background: linear-gradient(180deg,#dff6fb,#bfeaf9); /* أزرق سماوي فاتح */
+  background: linear-gradient(180deg,#dff6fb,#bfeaf9);
   opacity: 0.98;
 }
-
-/* مربع أبيض داخل pending */
 .send-inside.is-pending .stop-icon {
   background: #ffffff;
   opacity: 1 !important;
   transform: translate(-50%, -50%) scale(.9) !important;
-  border-radius: 3px;
   border: 2px solid rgba(56,200,243,0.35);
-  box-shadow: 0 0 2px rgba(0,0,0,0.08) inset;
 }
-
-/* إخفاء السهم تماماً أثناء pending */
 .send-inside.is-pending .send-icon,
 .send-inside.is-pending .send-icon::before,
 .send-inside.is-pending .send-icon::after {
@@ -1048,15 +1036,13 @@ body.dark-mode .msg.user {
 }
 
 /* -------------------------
-   GENERATING (أثناء وجود الرد) — أزرق سماوي قوي + حلقة
+   GENERATING
    ------------------------- */
 .send-inside.is-generating {
   pointer-events: auto;
   cursor: pointer;
-  background: linear-gradient(180deg,var(--sky-1),var(--sky-2)); /* استعاد اللون الرئيسي */
+  background: linear-gradient(180deg,var(--sky-1),var(--sky-2));
 }
-
-/* مربع أبيض مع إطار أثناء التوليد */
 .send-inside.is-generating .stop-icon {
   background: #ffffff;
   opacity: 1 !important;
@@ -1066,8 +1052,6 @@ body.dark-mode .msg.user {
   box-shadow: 0 0 6px rgba(56,200,243,0.22);
   animation: stop-pulse 1.35s ease-in-out infinite;
 }
-
-/* إخفاء السهم نهائياً أثناء التوليد (ضمان) */
 .send-inside.is-generating .send-icon,
 .send-inside.is-generating .send-icon::before,
 .send-inside.is-generating .send-icon::after {
@@ -1076,65 +1060,41 @@ body.dark-mode .msg.user {
 }
 
 /* =========================
-   الحَلْقَة (ring) المحيطة — تستخدم pseudo-element
-   - نحيفة، متدرجة لونية، وتتحرك: من 0 → 360deg → 0
+   الحلقة الجديدة (Glow Ring)
    ========================= */
-
-/* الحلقة — حافة نحيفة ومتدرجة الألوان */
-.send-inside::after {
+.send-inside.is-generating::before {
   content: "";
   position: absolute;
-  inset: -3px; /* قريب جداً من الحواف */
+  inset: -4px;
   border-radius: 50%;
-  pointer-events: none;
-
-  /* ألوان متدرجة متغيرة */
-  background: conic-gradient(
-    from 0deg,
-    #7fdcf7 0deg,
-    #38c8f3 90deg,
-    #a77dfc 180deg,
-    #7fdcf7 270deg,
-    transparent 360deg
-  );
-
-  /* جعلها حافة نحيفة باستخدام القناع */
-  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), black calc(100% - 0px));
-  mask: radial-gradient(farthest-side, transparent calc(100% - 2px), black calc(100% - 0px));
-
-  opacity: 0;
-  transform: rotate(0deg) scale(1);
-  transition: opacity .22s ease, transform .22s ease;
-  mix-blend-mode: screen;
+  z-index: 1;
+  animation: rotate_3922 2s linear infinite;
+  background-image: linear-gradient(#9b59b6, #84cdfa, #5ad1cd);
+  box-shadow:
+    0 0 4px  #84cdfa,
+    0 0 8px  #9b59b6,
+    0 0 12px #5ad1cd;
+  opacity: 0.9;
 }
-
-/* أثناء is-generating تظهر وتتحرك */
 .send-inside.is-generating::after {
-  opacity: 1;
-  animation: ring-progress 2.2s linear infinite;
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: inset 0 0 0 2px #0f1720; /* لون خلفية الحقل */
+  z-index: 2;
+}
+@keyframes rotate_3922 {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
-/* أنيميشن الحلقة — مع الدوران والتغير */
-@keyframes ring-progress {
-  0%   { transform: rotate(0deg)   scale(1);   opacity: .95; }
-  40%  { transform: rotate(180deg) scale(1.02); opacity: .7; }
-  50%  { transform: rotate(240deg) scale(1.03); opacity: .6; }
-  90%  { transform: rotate(420deg) scale(1.01); opacity: .8; }
-  100% { transform: rotate(540deg) scale(1);   opacity: .95; }
-}
-
-/* نبض المربع الصغير أثناء التوليد (كما كانت لديك) */
+/* نبض المربع */
 @keyframes stop-pulse {
   0% { transform: translate(-50%, -50%) scale(0.98); opacity: 1; }
   50% { transform: translate(-50%, -50%) scale(1.06); opacity: 0.98; }
   100% { transform: translate(-50%, -50%) scale(0.98); opacity: 1; }
-}
-
-/* انتقالات ناعمة للأيقونات */
-.send-inside .stop-icon,
-.send-inside .send-icon {
-  transition: opacity .18s ease, transform .18s ease, background .22s ease;
-  will-change: opacity, transform, background;
 }
   .sr-only{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
 
