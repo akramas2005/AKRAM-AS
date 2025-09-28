@@ -3277,6 +3277,31 @@ async function analyzeImageWithPuter(imageUrl, userPrompt = null, indicator = nu
           botEl = messagesEl.querySelector(`.msg[data-index="${botIndex}"] .bubble`);
           isFirstChunk = false;
         }
+        // 🟢 عند أول رد: بدّل الزر من pending إلى generating
+try {
+  const btn = document.getElementById('sendInsideBtn');
+  if (btn) {
+    btn.classList.remove('is-pending');
+    btn.classList.add('is-generating', 'visible');
+    btn.disabled = false;
+    btn._abortCurrentResponse = response;
+
+    if (!btn._stopHandler) {
+      btn._stopHandler = function(ev) {
+        ev.stopPropagation();
+        window._userRequestedStop = true;
+        try {
+          if (btn._abortCurrentResponse && typeof btn._abortCurrentResponse.return === 'function') {
+            btn._abortCurrentResponse.return();
+          }
+        } catch(e){}
+        btn.classList.add('stopping');
+        setTimeout(()=> btn.classList.remove('stopping'), 160);
+      };
+      btn.addEventListener('click', btn._stopHandler);
+    }
+  }
+} catch(e) { console.warn('send-button state error (image)', e); }
 
         botMsg.content += piece;
         if (botEl) {
@@ -3440,6 +3465,31 @@ const toAnalyzingTimer = setTimeout(() => {
         bubbleEl = assistantEl.querySelector('.bubble');
         isFirstChunk = false;
       }
+      // 🟢 عند أول رد: بدّل الزر من pending إلى generating
+try {
+  const btn = document.getElementById('sendInsideBtn');
+  if (btn) {
+    btn.classList.remove('is-pending');
+    btn.classList.add('is-generating', 'visible');
+    btn.disabled = false;
+    btn._abortCurrentResponse = response;
+
+    if (!btn._stopHandler) {
+      btn._stopHandler = function(ev) {
+        ev.stopPropagation();
+        window._userRequestedStop = true;
+        try {
+          if (btn._abortCurrentResponse && typeof btn._abortCurrentResponse.return === 'function') {
+            btn._abortCurrentResponse.return();
+          }
+        } catch(e){}
+        btn.classList.add('stopping');
+        setTimeout(()=> btn.classList.remove('stopping'), 160);
+      };
+      btn.addEventListener('click', btn._stopHandler);
+    }
+  }
+} catch(e) { console.warn('send-button state error (image)', e); }
 
       assistantMessage.content += piece;
 if (bubbleEl) {
@@ -4148,6 +4198,31 @@ async function regenerateAssistantForParent(parentIdx){
                 bubbleEl = assistantEl.querySelector('.bubble');
                 isFirstChunk = false;
             }
+          // 🟢 عند أول رد: بدّل الزر من pending إلى generating
+try {
+  const btn = document.getElementById('sendInsideBtn');
+  if (btn) {
+    btn.classList.remove('is-pending');
+    btn.classList.add('is-generating', 'visible');
+    btn.disabled = false;
+    btn._abortCurrentResponse = response;
+
+    if (!btn._stopHandler) {
+      btn._stopHandler = function(ev) {
+        ev.stopPropagation();
+        window._userRequestedStop = true;
+        try {
+          if (btn._abortCurrentResponse && typeof btn._abortCurrentResponse.return === 'function') {
+            btn._abortCurrentResponse.return();
+          }
+        } catch(e){}
+        btn.classList.add('stopping');
+        setTimeout(()=> btn.classList.remove('stopping'), 160);
+      };
+      btn.addEventListener('click', btn._stopHandler);
+    }
+  }
+} catch(e) { console.warn('send-button state error (image)', e); }
             assistantMessage.content += piece;
         }
         
