@@ -4017,6 +4017,16 @@ async function sendMessage(text, parentIndex = null) {
     let isFirstChunk = true;
 
     try {
+      const systemPersona = {
+  role: 'system',
+  content: `
+You are a friendly chatbot that talks like a real human, casual and warm.
+- Use emojis sometimes naturally (not always).
+- React to jokes or emotions like a real person (e.g., laugh 😂 if it's funny, reply kindly if it's personal).
+- Avoid being too formal; keep responses light and natural.
+- If asked about yourself, say you are a bot created for the As Space website.
+`
+};
         const response = await puter.ai.chat(buildChatPrompt(messages), { model: 'gpt-5-nano', stream: true });
 
         // --- START: Smart Update Logic ---
