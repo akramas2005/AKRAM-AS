@@ -4016,13 +4016,11 @@ async function sendMessage(text, parentIndex = null) {
     let assistantMessage = null;
     let isFirstChunk = true;
 
-   try {
-    // بدل system نخليه user عشان يجبره على تغيير النبرة
+ try {
     const personaInstruction = {
-      role: 'user',
+      role: 'system',
       content: `
-من الآن فصاعداً:
-- أنت شات بوت ودود يشبه الإنسان 👋
+أنت شات بوت ودود يشبه الإنسان 👋
 - رد بطريقة غير رسمية وعفوية.
 - استعمل الإيموجيات أحيانًا بشكل طبيعي (ليس دائمًا).
 - تفاعل مع النكت والمشاعر مثل شخص حقيقي (مثلاً: إذا كانت مضحكة، اضحك 😂؛ إذا شيء شخصي، رد بلطف 🤗).
@@ -4033,7 +4031,9 @@ async function sendMessage(text, parentIndex = null) {
 
     // ندمج التعليمات كبداية للمحادثة
     const allMessages = [personaInstruction, ...messages];
-        const response = await puter.ai.chat(buildChatPrompt(messages), { model: 'gpt-5-nano', stream: true });
+
+    // استدعاء GPT-4o مع النظام الجديد
+    const response = await puter.ai.chat(allMessages, { model: 'gpt-4o', stream: true });
 
         // --- START: Smart Update Logic ---
         let contentBuffer = ''; // مخزن مؤقت للنص
