@@ -1697,6 +1697,16 @@ body.dark-mode .msg.user {
 <link rel="stylesheet" id="highlight-theme" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/stackoverflow-light.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
+  <!-- 👇 أولاً: إعداد MathJax -->
+<script>
+  window.MathJax = {
+    tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
+    svg: { fontCache: 'global' }
+  };
+</script>
+
+<!-- 👇 ثانياً: تحميل مكتبة MathJax -->
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 </head>
 <body>
   <div class="wrap">
@@ -4068,6 +4078,10 @@ async function sendMessage(text, parentIndex = null) {
             if (bubbleEl) {
                 bubbleEl.innerHTML = DOMPurify.sanitize(marked.parse(assistantMessage.content));
                 enhanceCodeBlocks(bubbleEl);
+               // 👇 هنا نطلب من MathJax إعادة معالجة المعادلات
+        if (window.MathJax) {
+            MathJax.typesetPromise([bubbleEl]).catch((err) => console.error("MathJax render error:", err));
+        }
                 const isUserAtBottom = messagesEl.scrollHeight - messagesEl.clientHeight <= messagesEl.scrollTop + 20;
                 if (isUserAtBottom) {
                     messagesEl.scrollTop = messagesEl.scrollHeight;
