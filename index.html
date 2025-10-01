@@ -3325,9 +3325,11 @@ try {
 
         botMsg.content += piece;
         if (botEl) {
-          botEl.innerHTML = marked.parse(botMsg.content);
-          enhanceCodeBlocks(botEl);
-        }
+  const html = DOMPurify.sanitize(marked.parse(botMsg.content || ''));
+  botEl.innerHTML = html;
+  enhanceCodeBlocks(botEl);
+  typesetMathIfNeeded(botEl, html);
+}
         messagesEl.scrollTop = messagesEl.scrollHeight;
       }
             // --- تنظيف حالة الزر بعد انتهاء stream الصورة ---
@@ -3513,8 +3515,10 @@ try {
 
       assistantMessage.content += piece;
 if (bubbleEl) {
-  bubbleEl.innerHTML = DOMPurify.sanitize(marked.parse(assistantMessage.content));
+  const html = DOMPurify.sanitize(marked.parse(assistantMessage.content || ''));
+  bubbleEl.innerHTML = html;
   enhanceCodeBlocks(bubbleEl);
+  typesetMathIfNeeded(bubbleEl, html);
 }
       messagesEl.scrollTop = messagesEl.scrollHeight;
     }
@@ -3672,6 +3676,21 @@ if (bubbleEl) {
         codeBlock.classList.add('hljs-enhanced'); 
     });
 }
+      // === MathJax helper: typeset only if content contains math delimiters ===
+function typesetMathIfNeeded(container, html) {
+  if (!window.MathJax) return;
+  try {
+    // اختبر بشكل بسيط وجود دلائل LaTeX داخل الـ html ليقلّل الاستدعاءات غير الضرورية
+    if (typeof html === 'string' && (html.includes('$$') || html.includes('\\(') || html.includes('\\[') || html.includes('$'))) {
+      // typesetPromise موجود في MathJax v3 — نستخدمه بحذر
+      if (typeof MathJax.typesetPromise === 'function') {
+        MathJax.typesetPromise([container]).catch(()=>{});
+      } else if (typeof MathJax.typeset === 'function') {
+        try { MathJax.typeset([container]); } catch(e) {}
+      }
+    }
+  } catch (e) { /* ignore */ }
+}
 
       function saveDraft(){ localStorage.setItem(DRAFT_KEY, composer.value || ''); }
       function loadDraft(){
@@ -3690,9 +3709,12 @@ bubble.setAttribute('dir', 'auto'); // <-- هذا هو السطر الجديد �
 
         if (m.content && typeof m.content === 'string' && String(m.content||'').trim()) {
   const txt = document.createElement('div');
- txt.innerHTML = DOMPurify.sanitize(marked.parse(m.content || ''));
+  const html = DOMPurify.sanitize(marked.parse(m.content || ''));
+  txt.innerHTML = html;
   bubble.appendChild(txt);
   enhanceCodeBlocks(bubble);
+  // 🟢 عرض المعادلات الرياضية إذا وُجدت
+  typesetMathIfNeeded(bubble, html);
 }
 
         
@@ -4075,19 +4097,20 @@ async function sendMessage(text, parentIndex = null) {
         let contentBuffer = ''; // مخزن مؤقت للنص
 
         const updateUI = () => {
-            if (bubbleEl) {
-                bubbleEl.innerHTML = DOMPurify.sanitize(marked.parse(assistantMessage.content));
-                enhanceCodeBlocks(bubbleEl);
-               // 👇 هنا نطلب من MathJax إعادة معالجة المعادلات
-        if (window.MathJax) {
-            MathJax.typesetPromise([bubbleEl]).catch((err) => console.error("MathJax render error:", err));
+    if (bubbleEl) {
+        const html = DOMPurify.sanitize(marked.parse(assistantMessage.content || ''));
+        bubbleEl.innerHTML = html;
+        enhanceCodeBlocks(bubbleEl);
+
+        // typeset math lazily (if present)
+        typesetMathIfNeeded(bubbleEl, html);
+
+        const isUserAtBottom = messagesEl.scrollHeight - messagesEl.clientHeight <= messagesEl.scrollTop + 20;
+        if (isUserAtBottom) {
+            messagesEl.scrollTop = messagesEl.scrollHeight;
         }
-                const isUserAtBottom = messagesEl.scrollHeight - messagesEl.clientHeight <= messagesEl.scrollTop + 20;
-                if (isUserAtBottom) {
-                    messagesEl.scrollTop = messagesEl.scrollHeight;
-                }
-            }
-        };
+    }
+};
         // --- END: Smart Update Logic ---
 
         for await (const part of response) {
