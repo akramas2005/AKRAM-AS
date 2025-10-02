@@ -3726,9 +3726,16 @@ messagesEl.scrollTop = messagesEl.scrollHeight;
 function typesetMathIfNeeded(container, html) {
   if (!window.MathJax) return;
   try {
-    // اختبر بشكل بسيط وجود دلائل LaTeX داخل الـ html ليقلّل الاستدعاءات غير الضرورية
     if (typeof html === 'string' && (html.includes('$$') || html.includes('\\(') || html.includes('\\[') || html.includes('$'))) {
-      // typesetPromise موجود في MathJax v3 — نستخدمه بحذر
+      
+      // 👇 إصلاح مشكلة النص العربي الملتصق بالمعادلات
+      if (container && container.innerHTML) {
+        container.innerHTML = container.innerHTML
+          .replace(/(\$\$.*?\$\$)([\u0600-\u06FF]+)/g, '$1 <span dir="rtl">$2</span>')
+          .replace(/(\\\(.*?\\\))([\u0600-\u06FF]+)/g, '$1 <span dir="rtl">$2</span>');
+      }
+
+      // 🔄 تشغيل MathJax
       if (typeof MathJax.typesetPromise === 'function') {
         MathJax.typesetPromise([container]).catch(()=>{});
       } else if (typeof MathJax.typeset === 'function') {
