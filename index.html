@@ -3017,6 +3017,15 @@ function scheduleDeletionOnServer(url, opts = {}) {
   });
 }
 
+      function autoWrapInlineMath(text) {
+  // يلتقط أي معادلة قصيرة داخل أقواس عادية () تحتوي رموز رياضية
+  return text.replace(/\(([^()]*[=+\-*/^].*?)\)/g, (match, inner) => {
+    // إذا كانت أصلاً مغلفة بـ \( \) أو $$ ... $$ نخليها
+    if (match.includes('\\(') || match.includes('$$')) return match;
+    return `\\(${inner}\\)`; 
+  });
+}
+
       // ========================
 // Math formatting helper
 // يحاول تحويل نصٍ يبدو كمعادلة إلى LaTeX (عرض باستخدام $$ ... $$)
@@ -3745,15 +3754,35 @@ messagesEl.scrollTop = messagesEl.scrollHeight;
     });
 }
 
-      function renderWithMath(container, rawText) {
+      // 🟢 دالة مساعدة للف المعادلات القصيرة inline
+function autoWrapInlineMath(text) {
+  return text.replace(/\(([^()]*[=+\-*/^].*?)\)/g, (match, inner) => {
+    if (match.includes('\\(') || match.includes('$$')) return match; 
+    return `\\(${inner}\\)`; 
+  });
+}
+
+// 🟢 دالة مساعدة للف المعادلات القصيرة inline
+function autoWrapInlineMath(text) {
+  return text.replace(/\(([^()]*[=+\-*/^].*?)\)/g, (match, inner) => {
+    if (match.includes('\\(') || match.includes('$$')) return match; 
+    return `\\(${inner}\\)`; 
+  });
+}
+
+// 🟢 الدالة الرئيسية لعرض النص + المعادلات
+function renderWithMath(container, rawText) {
+  // لفّ inline math إذا موجود
+  const processedText = autoWrapInlineMath(rawText || '');
+
   // مرّر النص عبر marked + sanitize
-  const safeHtml = DOMPurify.sanitize(marked.parse(rawText));
+  const safeHtml = DOMPurify.sanitize(marked.parse(processedText));
 
   // إنشاء div مؤقت
   const tempDiv = document.createElement('div');
   tempDiv.innerHTML = safeHtml;
 
-  // مرّ على كل child، إذا فيه $$ أو \(...\) خليه مع MathJax، غيره اعتبره نص عادي
+  // مرّ على كل child
   Array.from(tempDiv.childNodes).forEach(node => {
     if (node.nodeType === Node.TEXT_NODE || (node.innerHTML && !node.innerHTML.includes('$$') && !node.innerHTML.includes('\\('))) {
       // نص عربي/انجليزي عادي
@@ -3762,12 +3791,12 @@ messagesEl.scrollTop = messagesEl.scrollHeight;
       span.textContent = node.textContent;
       container.appendChild(span);
     } else {
-      // فيه معادلة
+      // فيه معادلة (MathJax يتكفل بيها)
       container.appendChild(node);
     }
   });
 
-  // أعد تهيئة MathJax فقط للمعادلات
+  // 🟢 إعادة تهيئة MathJax للمعادلات
   if (window.MathJax && typeof MathJax.typesetPromise === "function") {
     MathJax.typesetPromise([container]).catch(()=>{});
   }
@@ -4224,8 +4253,7 @@ async function sendMessage(text, parentIndex = null) {
         const updateUI = () => {
     if (bubbleEl) {
         const processed = autoWrapMath(assistantMessage.content || '');
-bubbleEl.innerHTML = "";
-renderWithMath(bubbleEl, formatMath(assistantMessage.content || ''));
+renderWithMath(bubbleEl, assistantMessage.content || '');
 enhanceCodeBlocks(bubbleEl);
       }
 
