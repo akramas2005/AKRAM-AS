@@ -3367,10 +3367,11 @@ try {
 
         botMsg.content += piece;
        if (botEl) {
-  const html = DOMPurify.sanitize(marked.parse(formatMath(botMsg.content || '')));
-  botEl.innerHTML = html;
-  enhanceCodeBlocks(botEl);
-  typesetMathIfNeeded(botEl, html);
+  const processed = autoWrapMath(botMsg.content || '');
+const html = DOMPurify.sanitize(marked.parse(formatMath(processed)));
+botEl.innerHTML = html;
+enhanceCodeBlocks(botEl);
+typesetMathIfNeeded(botEl, html);
 }
         messagesEl.scrollTop = messagesEl.scrollHeight;
       }
@@ -3614,10 +3615,12 @@ if (bubbleEl) {
       if (piece) {
         botMsg.content += piece;
        if (botEl) {
-  const html = DOMPurify.sanitize(marked.parse(formatMath(botMsg.content || '')));
-  botEl.innerHTML = html;
-  enhanceCodeBlocks(botEl);
-  typesetMathIfNeeded(botEl, html);
+ const processed = autoWrapMath(assistantMessage.content || '');
+const processed = autoWrapMath(botMsg.content || '');
+const html = DOMPurify.sanitize(marked.parse(formatMath(processed)));
+botEl.innerHTML = html;
+enhanceCodeBlocks(botEl);
+typesetMathIfNeeded(botEl, html);
 }
 messagesEl.scrollTop = messagesEl.scrollHeight;
       }
@@ -3734,6 +3737,16 @@ function typesetMathIfNeeded(container, html) {
       }
     }
   } catch (e) { /* ignore */ }
+}
+
+      function autoWrapMath(text) {
+  // إذا النص فيه رموز رياضية واضحة
+  const mathRegex = /(?<!\$)\(([^()]*\\frac|\\sqrt|\\int|\\sum|[a-zA-Z]\^|_)\)(?!\$)/g;
+
+  // لفّ المحتوى داخل \( ... \)
+  return text.replace(mathRegex, (match) => {
+    return `\\(${match.slice(1, -1)}\\)`; 
+  });
 }
 
       function saveDraft(){ localStorage.setItem(DRAFT_KEY, composer.value || ''); }
@@ -4165,11 +4178,12 @@ async function sendMessage(text, parentIndex = null) {
 
         const updateUI = () => {
     if (bubbleEl) {
-        const html = DOMPurify.sanitize(marked.parse(formatMath(assistantMessage.content || '')));
-        bubbleEl.innerHTML = html;
-        enhanceCodeBlocks(bubbleEl);
-        typesetMathIfNeeded(bubbleEl, html);
-    }
+        const processed = autoWrapMath(assistantMessage.content || '');
+const html = DOMPurify.sanitize(marked.parse(formatMath(processed)));
+bubbleEl.innerHTML = html;
+enhanceCodeBlocks(bubbleEl);
+typesetMathIfNeeded(bubbleEl, html);
+      }
 
     const isUserAtBottom = messagesEl.scrollHeight - messagesEl.clientHeight <= messagesEl.scrollTop + 20;
     if (isUserAtBottom) {
