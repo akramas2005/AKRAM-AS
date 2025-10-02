@@ -1700,12 +1700,15 @@ body.dark-mode .msg.user {
   <!-- 👇 أولاً: إعداد MathJax -->
 <script>
   window.MathJax = {
-    tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
+    tex: { 
+      inlineMath: [['$', '$'], ['\\(', '\\)']], 
+      displayMath: [['$$','$$']] 
+    },
     svg: { fontCache: 'global' }
   };
 </script>
 
-<!-- 👇 ثانياً: تحميل مكتبة MathJax -->
+<!-- 👇 تحميل مكتبة MathJax -->
 <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 </head>
 <body>
@@ -2992,6 +2995,45 @@ function scheduleDeletionOnServer(url, opts = {}) {
   });
 }
 
+      // ========================
+// Math formatting helper
+// يحاول تحويل نصٍ يبدو كمعادلة إلى LaTeX (عرض باستخدام $$ ... $$)
+// و يحول أقواس [ ... ] التي تحتوي رموزاً رياضية إلى $$ ... $$
+// ========================
+function formatMath(input) {
+  if (!input || typeof input !== 'string') return input;
+
+  // مؤشرات بسيطة للتعرف على محتوى رياضي/معادلات
+  const mathIndicators = /\\frac|\\sqrt|\\sum|\\int|\\bpi\b|\\balpha\b|\\bbeta\b|\\btheta\b|[=<>]|[\^_]|\\frac|\\d\s*[+\-×÷*\/]\s*\d/;
+
+  // 1) استبدال الكتل المحاطة بمربعات [ ... ] إذا بدا داخلها رياضياً -> $$ ... $$
+  let out = input.replace(/\[([\s\S]*?)\]/g, (m, inner) => {
+    if (mathIndicators.test(inner)) {
+      return `$$ ${inner.trim()} $$`;
+    }
+    return m;
+  });
+
+  // 2) تحليل سطري: إذا السطر يبدو كمعادلة (مؤشرات) ولم يكن مُعلّمًا سابقًا بالـ LaTeX، لفّه بـ$$
+  out = out.split('\n').map(line => {
+    const trimmed = line.trim();
+    if (!trimmed) return line;
+
+    // تجنب تغيير الأسطر الموجودة مسبقًا بصيغة LaTeX أو داخل code fences
+    if (/\$\$[\s\S]*\$\$/.test(line) || /\$[^$]+\$/.test(line) || /\\\(|\\\)/.test(line) || /^```/.test(trimmed)) {
+      return line;
+    }
+
+    // لو السطر يحتوي مؤشرات رياضية -> لفه
+    if (mathIndicators.test(line)) {
+      return `$$ ${line.trim()} $$`;
+    }
+    return line;
+  }).join('\n');
+
+  return out;
+}
+
 async function flushPendingDeletions() {
   try {
     const key = 'pendingDeletions';
@@ -3324,8 +3366,8 @@ try {
 } catch(e) { console.warn('send-button state error (image)', e); }
 
         botMsg.content += piece;
-        if (botEl) {
-  const html = DOMPurify.sanitize(marked.parse(botMsg.content || ''));
+       if (botEl) {
+  const html = DOMPurify.sanitize(marked.parse(formatMath(botMsg.content || '')));
   botEl.innerHTML = html;
   enhanceCodeBlocks(botEl);
   typesetMathIfNeeded(botEl, html);
@@ -3515,7 +3557,7 @@ try {
 
       assistantMessage.content += piece;
 if (bubbleEl) {
-  const html = DOMPurify.sanitize(marked.parse(assistantMessage.content || ''));
+  const html = DOMPurify.sanitize(marked.parse(formatMath(assistantMessage.content || '')));
   bubbleEl.innerHTML = html;
   enhanceCodeBlocks(bubbleEl);
   typesetMathIfNeeded(bubbleEl, html);
@@ -3571,11 +3613,13 @@ if (bubbleEl) {
       const piece = part.text || (part.message && part.message.content) || '';
       if (piece) {
         botMsg.content += piece;
-        if (botEl) {
-          botEl.innerHTML = marked.parse(botMsg.content);
-          enhanceCodeBlocks(botEl);
-        }
-        messagesEl.scrollTop = messagesEl.scrollHeight;
+       if (botEl) {
+  const html = DOMPurify.sanitize(marked.parse(formatMath(botMsg.content || '')));
+  botEl.innerHTML = html;
+  enhanceCodeBlocks(botEl);
+  typesetMathIfNeeded(botEl, html);
+}
+messagesEl.scrollTop = messagesEl.scrollHeight;
       }
     }
 
@@ -3709,12 +3753,20 @@ bubble.setAttribute('dir', 'auto'); // <-- هذا هو السطر الجديد �
 
         if (m.content && typeof m.content === 'string' && String(m.content||'').trim()) {
   const txt = document.createElement('div');
-  const html = DOMPurify.sanitize(marked.parse(m.content || ''));
-  txt.innerHTML = html;
+
+  // مرّر النص عبر formatMath قبل تحويله إلى HTML
+  const html = marked.parse(formatMath(m.content || ''));
+  txt.innerHTML = DOMPurify.sanitize(html);
+
   bubble.appendChild(txt);
   enhanceCodeBlocks(bubble);
-  // 🟢 عرض المعادلات الرياضية إذا وُجدت
-  typesetMathIfNeeded(bubble, html);
+
+  // اطلب من MathJax عمل typeset لهذا العنصر إن وُجد (ديناميكي)
+  try {
+    if (window.MathJax && MathJax.typesetPromise) {
+      MathJax.typesetPromise([bubble]).catch(()=>{});
+    }
+  } catch(e){}
 }
 
         
@@ -4059,16 +4111,17 @@ async function sendMessage(text, parentIndex = null) {
 - كن ودودًا وغير رسمي إلى درجة معتدلة، واستخدم الإيموجيات بشكل محدود وذكي (في المواضيع الترفيهية أو المضحة فقط).
 - إذا سألك شخص "من أنت؟" اعرف بنفسك: "أنا بوت مخصص لموقع As Space لمساعدة الزوار في الدراسة والكتب، ولكن يمكنني الدردشة في مواضيع أخرى أيضًا."
 
-⚙️ قواعد عرض الرياضيات والرموز:
-- عند كتابة معادلات أو خطوات رياضية/فيزيائية/كيميائية:
-  - ضع المعادلات دائمًا داخل $$ ... $$ (للعرض في سطر مستقل).
-  - إذا كانت معادلة قصيرة ضمن النص، ضعها داخل \\( ... \\).
-  - لا تستخدم الأقواس المربعة [ ] لعرض المعادلات.
-  - مثال صحيح:
-    $$ 2x + 3 - 3 = 7 - 3 $$
-    $$ x = 2 $$
-  - مثال inline صحيح:
-    قيمة \\( x = 2 \\).
+⚙️ قواعد عرض الرياضيات والرموز (قاعدة إلزامية):
+- أي معادلة أو خطوة تحتوي رموز رياضية (حتى لو كانت عملية بسيطة مثل 2+2=4) يجب أن تُعرض باستخدام LaTeX.
+- لا تستخدم النص العادي أو الأقواس المربعة أبداً لكتابة المعادلات.
+- جميع المعادلات والخطوات الحسابية تُعرض كالآتي:
+  • معادلة في سطر مستقل: بين $$ ... $$.
+  • معادلة قصيرة داخل النص: بين \( ... \).
+- الرد غير صحيح إذا لم يُطبق هذا التنسيق.
+- مثال صحيح:
+  $$ 2x + 3 - 3 = 7 - 3 $$
+  $$ x = 2 $$
+  وقيمة \( x = 2 \).
 
 🧩 سياسة حلّ المسائل:
 (… باقي القوانين مثل اللي عندك …)
@@ -4112,9 +4165,11 @@ async function sendMessage(text, parentIndex = null) {
 
         const updateUI = () => {
     if (bubbleEl) {
-        const html = DOMPurify.sanitize(marked.parse(assistantMessage.content || ''));
-        bubbleEl.innerHTML = html;
-        enhanceCodeBlocks(bubbleEl);
+  const html = DOMPurify.sanitize(marked.parse(formatMath(assistantMessage.content || '')));
+  bubbleEl.innerHTML = html;
+  enhanceCodeBlocks(bubbleEl);
+  typesetMathIfNeeded(bubbleEl, html);
+}
 
         // typeset math lazily (if present)
         typesetMathIfNeeded(bubbleEl, html);
