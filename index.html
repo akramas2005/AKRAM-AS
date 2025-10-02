@@ -3728,14 +3728,16 @@ function typesetMathIfNeeded(container, html) {
   try {
     if (typeof html === 'string' && (html.includes('$$') || html.includes('\\(') || html.includes('\\[') || html.includes('$'))) {
       
-      // 👇 إصلاح مشكلة النص العربي الملتصق بالمعادلات
       if (container && container.innerHTML) {
+        // ✨ أضف مسافة غير قابلة للكسر بين المعادلات والنص العربي بدل ما نلمس داخل المعادلة
         container.innerHTML = container.innerHTML
-          .replace(/(\$\$.*?\$\$)([\u0600-\u06FF]+)/g, '$1 <span dir="rtl">$2</span>')
-          .replace(/(\\\(.*?\\\))([\u0600-\u06FF]+)/g, '$1 <span dir="rtl">$2</span>');
+          .replace(/(\$\$.*?\$\$)(?=[\u0600-\u06FF])/g, '$1&nbsp;')
+          .replace(/(\\\(.*?\\\))(?=[\u0600-\u06FF])/g, '$1&nbsp;')
+          .replace(/([\u0600-\u06FF])(\$\$.*?\$\$)/g, '$1&nbsp;$2')
+          .replace(/([\u0600-\u06FF])(\\\(.*?\\\))/g, '$1&nbsp;$2');
       }
 
-      // 🔄 تشغيل MathJax
+      // 🔄 شغّل MathJax على المحتوى
       if (typeof MathJax.typesetPromise === 'function') {
         MathJax.typesetPromise([container]).catch(()=>{});
       } else if (typeof MathJax.typeset === 'function') {
