@@ -3595,7 +3595,7 @@ if (bubbleEl) {
   }
 }
 
-      async function genericFileAnalysis(file, userPrompt, fileType = "file") {
+     async function genericFileAnalysis(file, userPrompt, fileType = "file") {
   try {
     const basePrompt = (userPrompt && String(userPrompt).trim())
       ? `${String(userPrompt).trim()}\n\nهذا ملف من نوع ${fileType}. حاول تلخيص أو وصف محتواه بناءً على النوع.`
@@ -3613,25 +3613,30 @@ if (bubbleEl) {
       const piece = part.text || (part.message && part.message.content) || '';
       if (piece) {
         botMsg.content += piece;
-if (botEl) {
-  const html = DOMPurify.sanitize(marked.parse(formatMath(botMsg.content || '')));
-  botEl.innerHTML = html;
-  enhanceCodeBlocks(botEl);
 
-  if (window.MathJax && typeof MathJax.typesetPromise === 'function') {
-    MathJax.typesetPromise([botEl]).catch(err => console.warn('MathJax typesetting error:', err));
+        if (botEl) {
+          const html = DOMPurify.sanitize(marked.parse(formatMath(botMsg.content || '')));
+          botEl.innerHTML = html;
+          enhanceCodeBlocks(botEl);
+
+          if (window.MathJax && typeof MathJax.typesetPromise === 'function') {
+            MathJax.typesetPromise([botEl]).catch(err => console.warn('MathJax typesetting error:', err));
+          }
+        }
+
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+    }
+
+    // ✅ بعد انتهاء حلقة for await
+    clearIndicator();
+    return botMsg.content;
+
+  } catch (e) {
+    console.warn("genericFileAnalysis failed", e);
+    clearIndicator();
+    return null;
   }
-}
-
-messagesEl.scrollTop = messagesEl.scrollHeight;
-
-clearIndicator();
-return botMsg.content;
-
-} catch (e) {
-  console.warn("genericFileAnalysis failed", e);
-  clearIndicator();
-  return null;
 }
       function appendAssistantText(text) {
   if (!text) return;
