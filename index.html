@@ -4165,19 +4165,15 @@ async function sendMessage(text, parentIndex = null) {
 
         const updateUI = () => {
     if (bubbleEl) {
-  const html = DOMPurify.sanitize(marked.parse(formatMath(assistantMessage.content || '')));
-  bubbleEl.innerHTML = html;
-  enhanceCodeBlocks(bubbleEl);
-  typesetMathIfNeeded(bubbleEl, html);
-}
-
-        // typeset math lazily (if present)
+        const html = DOMPurify.sanitize(marked.parse(formatMath(assistantMessage.content || '')));
+        bubbleEl.innerHTML = html;
+        enhanceCodeBlocks(bubbleEl);
         typesetMathIfNeeded(bubbleEl, html);
+    }
 
-        const isUserAtBottom = messagesEl.scrollHeight - messagesEl.clientHeight <= messagesEl.scrollTop + 20;
-        if (isUserAtBottom) {
-            messagesEl.scrollTop = messagesEl.scrollHeight;
-        }
+    const isUserAtBottom = messagesEl.scrollHeight - messagesEl.clientHeight <= messagesEl.scrollTop + 20;
+    if (isUserAtBottom) {
+        messagesEl.scrollTop = messagesEl.scrollHeight;
     }
 };
         // --- END: Smart Update Logic ---
