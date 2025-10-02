@@ -3361,11 +3361,13 @@ try {
 
         botMsg.content += piece;
        if (botEl) {
-  const processed = autoWrapMath(botMsg.content || '');
-const html = DOMPurify.sanitize(marked.parse(formatMath(processed)));
-botEl.innerHTML = html;
-enhanceCodeBlocks(botEl);
-typesetMathIfNeeded(botEl, html);
+  const html = DOMPurify.sanitize(marked.parse(formatMath(botMsg.content || '')));
+  botEl.innerHTML = html;
+  enhanceCodeBlocks(botEl);
+
+  if (window.MathJax && typeof MathJax.typesetPromise === 'function') {
+    MathJax.typesetPromise([botEl]).catch(err => console.warn('MathJax typesetting error:', err));
+  }
 }
         messagesEl.scrollTop = messagesEl.scrollHeight;
       }
@@ -3555,7 +3557,10 @@ if (bubbleEl) {
   const html = DOMPurify.sanitize(marked.parse(formatMath(assistantMessage.content || '')));
   bubbleEl.innerHTML = html;
   enhanceCodeBlocks(bubbleEl);
-  typesetMathIfNeeded(bubbleEl, html);
+
+  if (window.MathJax && typeof MathJax.typesetPromise === 'function') {
+    MathJax.typesetPromise([bubbleEl]).catch(err => console.warn('MathJax typesetting error:', err));
+  }
 }
       messagesEl.scrollTop = messagesEl.scrollHeight;
     }
@@ -3608,24 +3613,25 @@ if (bubbleEl) {
       const piece = part.text || (part.message && part.message.content) || '';
       if (piece) {
         botMsg.content += piece;
-       if (botEl) {
-const processed = autoWrapMath(botMsg.content || '');
-const html = DOMPurify.sanitize(marked.parse(formatMath(processed)));
-botEl.innerHTML = html;
-enhanceCodeBlocks(botEl);
-typesetMathIfNeeded(botEl, html);
-}
-messagesEl.scrollTop = messagesEl.scrollHeight;
-      }
-    }
+if (botEl) {
+  const html = DOMPurify.sanitize(marked.parse(formatMath(botMsg.content || '')));
+  botEl.innerHTML = html;
+  enhanceCodeBlocks(botEl);
 
-    clearIndicator();
-    return botMsg.content;
-  } catch (e) {
-    console.warn("genericFileAnalysis failed", e);
-    clearIndicator();
-    return null;
+  if (window.MathJax && typeof MathJax.typesetPromise === 'function') {
+    MathJax.typesetPromise([botEl]).catch(err => console.warn('MathJax typesetting error:', err));
   }
+}
+
+messagesEl.scrollTop = messagesEl.scrollHeight;
+
+clearIndicator();
+return botMsg.content;
+
+} catch (e) {
+  console.warn("genericFileAnalysis failed", e);
+  clearIndicator();
+  return null;
 }
       function appendAssistantText(text) {
   if (!text) return;
