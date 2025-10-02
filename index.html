@@ -3615,7 +3615,6 @@ if (bubbleEl) {
       if (piece) {
         botMsg.content += piece;
        if (botEl) {
- const processed = autoWrapMath(assistantMessage.content || '');
 const processed = autoWrapMath(botMsg.content || '');
 const html = DOMPurify.sanitize(marked.parse(formatMath(processed)));
 botEl.innerHTML = html;
