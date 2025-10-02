@@ -828,6 +828,16 @@ body.dark-mode .msg.user {
     text-align: right;
 }
 /* --- END: RTL Text Alignment Helper --- */
+  .bubble {
+  direction: rtl;       /* النص العربي يظل يمين */
+  unicode-bidi: isolate; /* يحافظ على ترتيب النصوص والمعادلات */
+  font-family: "Segoe UI", Arial, sans-serif; /* خط يركّب الحروف */
+  white-space: normal;
+}
+.bubble mjx-container {
+  direction: ltr !important;  /* نخلي المعادلات يسار طبيعي */
+  unicode-bidi: embed !important;
+}
 
   .msg-actions{
     display:flex; align-items:center; gap:6px; margin-top:6px; opacity:.95;
@@ -3726,18 +3736,9 @@ messagesEl.scrollTop = messagesEl.scrollHeight;
 function typesetMathIfNeeded(container, html) {
   if (!window.MathJax) return;
   try {
-    if (typeof html === 'string' && (html.includes('$$') || html.includes('\\(') || html.includes('\\[') || html.includes('$'))) {
+    if (typeof html === 'string' && 
+        (html.includes('$$') || html.includes('\\(') || html.includes('\\[') || html.includes('$'))) {
       
-      if (container && container.innerHTML) {
-        // ✨ أضف مسافة غير قابلة للكسر بين المعادلات والنص العربي بدل ما نلمس داخل المعادلة
-        container.innerHTML = container.innerHTML
-          .replace(/(\$\$.*?\$\$)(?=[\u0600-\u06FF])/g, '$1&nbsp;')
-          .replace(/(\\\(.*?\\\))(?=[\u0600-\u06FF])/g, '$1&nbsp;')
-          .replace(/([\u0600-\u06FF])(\$\$.*?\$\$)/g, '$1&nbsp;$2')
-          .replace(/([\u0600-\u06FF])(\\\(.*?\\\))/g, '$1&nbsp;$2');
-      }
-
-      // 🔄 شغّل MathJax على المحتوى
       if (typeof MathJax.typesetPromise === 'function') {
         MathJax.typesetPromise([container]).catch(()=>{});
       } else if (typeof MathJax.typeset === 'function') {
