@@ -878,6 +878,18 @@ body.dark-mode .msg.user {
 }
 /* --- END: Final RTL Action Icons Alignment Fix --- */
 
+  .normal-text {
+  direction: rtl;
+  unicode-bidi: isolate;
+  font-family: "Segoe UI", Arial, sans-serif;
+  white-space: normal;
+}
+
+mjx-container {
+  direction: ltr !important;
+  unicode-bidi: embed !important;
+}
+
   /* Attachment rendering inside messages */
   .msg .att-image {
     display:block;
@@ -3732,6 +3744,35 @@ messagesEl.scrollTop = messagesEl.scrollHeight;
         codeBlock.classList.add('hljs-enhanced'); 
     });
 }
+
+      function renderWithMath(container, rawText) {
+  // مرّر النص عبر marked + sanitize
+  const safeHtml = DOMPurify.sanitize(marked.parse(rawText));
+
+  // إنشاء div مؤقت
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = safeHtml;
+
+  // مرّ على كل child، إذا فيه $$ أو \(...\) خليه مع MathJax، غيره اعتبره نص عادي
+  Array.from(tempDiv.childNodes).forEach(node => {
+    if (node.nodeType === Node.TEXT_NODE || (node.innerHTML && !node.innerHTML.includes('$$') && !node.innerHTML.includes('\\('))) {
+      // نص عربي/انجليزي عادي
+      const span = document.createElement('span');
+      span.className = "normal-text";
+      span.textContent = node.textContent;
+      container.appendChild(span);
+    } else {
+      // فيه معادلة
+      container.appendChild(node);
+    }
+  });
+
+  // أعد تهيئة MathJax فقط للمعادلات
+  if (window.MathJax && typeof MathJax.typesetPromise === "function") {
+    MathJax.typesetPromise([container]).catch(()=>{});
+  }
+}
+
       // === MathJax helper: typeset only if content contains math delimiters ===
 function typesetMathIfNeeded(container, html) {
   if (!window.MathJax) return;
@@ -4188,10 +4229,9 @@ async function sendMessage(text, parentIndex = null) {
         const updateUI = () => {
     if (bubbleEl) {
         const processed = autoWrapMath(assistantMessage.content || '');
-const html = DOMPurify.sanitize(marked.parse(formatMath(processed)));
-bubbleEl.innerHTML = html;
+bubbleEl.innerHTML = "";
+renderWithMath(bubbleEl, formatMath(assistantMessage.content || ''));
 enhanceCodeBlocks(bubbleEl);
-typesetMathIfNeeded(bubbleEl, html);
       }
 
     const isUserAtBottom = messagesEl.scrollHeight - messagesEl.clientHeight <= messagesEl.scrollTop + 20;
