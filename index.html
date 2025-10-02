@@ -3647,17 +3647,6 @@ if (bubbleEl) {
     return null;
   }
 }
-
-    // ✅ بعد انتهاء حلقة for await
-    clearIndicator();
-    return botMsg.content;
-
-  } catch (e) {
-    console.warn("genericFileAnalysis failed", e);
-    clearIndicator();
-    return null;
-  }
-}
       function appendAssistantText(text) {
   if (!text) return;
   const botMsg = {
