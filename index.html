@@ -4330,7 +4330,8 @@ async function regenerateAssistantForParent(parentIdx) {
       assistantMessage.content += piece;
 
       if (bubbleEl) {
-        const html = DOMPurify.sanitize(marked.parse(formatMath(assistantMessage.content || '')));
+        const processed = normalizeMathSyntax(formatMath(botMsg.content || ''));
+const html = DOMPurify.sanitize(marked.parse(processed));
         bubbleEl.innerHTML = html;
         enhanceCodeBlocks(bubbleEl);
         if (window.MathJax && typeof MathJax.typesetPromise === 'function') {
