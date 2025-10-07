@@ -3366,8 +3366,7 @@ async function analyzeImageWithPuter(imageUrl, userPrompt = null, indicator = nu
         botMsg.content += piece;
 
         if (botEl) {
-          const processed = normalizeMathSyntax(formatMath(botMsg.content || ''));
-const html = DOMPurify.sanitize(marked.parse(processed));
+          const html = DOMPurify.sanitize(marked.parse(formatMath(botMsg.content || '')));
           botEl.innerHTML = html;
           enhanceCodeBlocks(botEl);
           if (window.MathJax && typeof MathJax.typesetPromise === 'function') {
@@ -3499,8 +3498,7 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
       assistantMessage.content += piece;
 
       if (bubbleEl) {
-        const processed = normalizeMathSyntax(formatMath(botMsg.content || ''));
-const html = DOMPurify.sanitize(marked.parse(processed));
+        const html = DOMPurify.sanitize(marked.parse(formatMath(botMsg.content || '')));
         bubbleEl.innerHTML = html;
         enhanceCodeBlocks(bubbleEl);
         if (window.MathJax && typeof MathJax.typesetPromise === 'function') {
@@ -4330,8 +4328,7 @@ async function regenerateAssistantForParent(parentIdx) {
       assistantMessage.content += piece;
 
       if (bubbleEl) {
-        const processed = normalizeMathSyntax(formatMath(botMsg.content || ''));
-const html = DOMPurify.sanitize(marked.parse(processed));
+        const html = DOMPurify.sanitize(marked.parse(formatMath(botMsg.content || '')));
         bubbleEl.innerHTML = html;
         enhanceCodeBlocks(bubbleEl);
         if (window.MathJax && typeof MathJax.typesetPromise === 'function') {
