@@ -3293,6 +3293,59 @@ xhr.send(fd);
 }
 
 // 🟢 تحليل الصور
+// ✨ تعديل: تحليل الصور مع دعم MathJax الكامل
+بالتأكيد! شكرًا لتزويدي بشخصية البوت. لقد فهمت تمامًا ما تحتاجه: تعديل الدوال المسؤولة عن تحليل الصور والملفات وإعادة التوليد لتستخدم نفس آلية عرض المعادلات الرياضية الصحيحة، مع الحفاظ على باقي الكود كما هو.
+
+لقد قمت بإعداد الكود الكامل والجاهز للنسخ.
+
+## الخطوة 1: إضافة دالة مساعدة جديدة
+أولاً، انسخ هذه الدالة المساعدة الجديدة streamResponseToBubble وأضفها في أي مكان مع الدوال الأخرى في السكريبت الخاص بك. هذه الدالة ستمنع تكرار الكود وستضمن أن جميع الردود تُعرض بنفس الطريقة الصحيحة.
+
+JavaScript
+
+/**
+ * دالة جديدة وموحدة لعرض الرد التدريجي وتطبيق التنسيق.
+ * @param {Object} response - كائن الرد القادم من puter.ai.chat.
+ * @param {HTMLElement} bubbleEl - عنصر الفقاعة الذي سيتم عرض النص فيه.
+ * @param {Object} assistantMessage - كائن الرسالة لتخزين المحتوى.
+ */
+async function streamResponseToBubble(response, bubbleEl, assistantMessage) {
+  for await (const part of response) {
+    // تحقق مما إذا كان المستخدم قد طلب إيقاف التوليد
+    if (window._userRequestedStop) {
+        window._userRequestedStop = false; // أعد تعيين العلامة
+        resetSendButton();
+        break; // اخرج من الحلقة
+    }
+      
+    const piece = part.text || (part.message && part.message.content) || '';
+    if (!piece) continue;
+
+    assistantMessage.content += piece;
+
+    // نفس منطق العرض الموحد الذي قمنا بعمله سابقًا
+    const html = DOMPurify.sanitize(marked.parse(formatMath(assistantMessage.content || '')));
+    bubbleEl.innerHTML = html;
+    enhanceCodeBlocks(bubbleEl);
+
+    if (window.MathJax && typeof MathJax.typesetPromise === 'function') {
+      MathJax.typesetPromise([bubbleEl]).catch(err => console.warn('MathJax typesetting error:', err));
+    }
+    
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+  
+  // حفظ الجلسة وتنظيف زر الإرسال بعد اكتمال الرد
+  saveSession();
+  resetSendButton();
+}
+## الخطوة 2: استبدال الدوال القديمة بالنسخ المعدلة
+الآن، استبدل الدوال الثلاثة التالية في ملفك بالكامل بالإصدارات الجديدة والمعدلة.
+
+### 1. دالة analyzeImageWithPuter (النسخة الكاملة والمعدلة)
+JavaScript
+
+// ✨ تعديل: تحليل الصور مع دعم MathJax الكامل
 async function analyzeImageWithPuter(imageUrl, userPrompt = null, indicator = null) {
   if (!imageUrl) return null;
 
@@ -3308,89 +3361,82 @@ async function analyzeImageWithPuter(imageUrl, userPrompt = null, indicator = nu
 
   try {
     if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
-      const basePrompt = (userPrompt && String(userPrompt).trim())
-        ? `${String(userPrompt).trim()}\n\nالآن قم بتحليل الصورة التالية:`
-        : `صف محتوى هذه الصورة باختصار.`;
+      
+      // 🟢 مهم: بناء prompt مع تعليمات الـ Persona
+      const personaInstruction = {
+        role: 'system',
+        content: `
+أنت بوت دردشة ودود ومخصص لموقع As Space (قسم الدراسة والكتب) 📚 — لكن تستطيع التفاعل أيضاً مع مواضيع عامة وترفيهية.
 
-      const response = await puter.ai.chat(basePrompt, imageUrl, { model: 'gpt-5-nano', stream: true });
+⚙️ سلوك عام:
+- كن ودودًا وغير رسمي إلى درجة معتدلة، واستخدم الإيموجيات بشكل محدود وذكي (في المواضيع الترفيهية أو المضحة فقط).
+- إذا سألك شخص "من أنت؟" اعرف بنفسك: "أنا بوت مخصص لموقع As Space لمساعدة الزوار في الدراسة والكتب، ولكن يمكنني الدردشة في مواضيع أخرى أيضًا."
 
-      let botMsg = null;
-      let botEl = null;
-      let isFirstChunk = true;
+⚙️ قواعد عرض الرياضيات والرموز (مهم جدًا):
+- **دائمًا** استخدم ترميز LaTeX لعرض أي معادلات أو رموز رياضية/فيزيائية/كيميائية.
+- **القاعدة الأساسية:**
+  - للمعادلات المنفصلة التي تأخذ سطراً كاملاً: استخدم **$$ ... $$**.
+    مثال: $$ E = mc^2 $$
+  - للرموز والمعادلات القصيرة داخل جملة نصية (inline): استخدم **$ ... $**.
+    مثال: طاقة الجسم تساوي $E$، حيث $E = mc^2$.
+- لا تستخدم أبدًا \`\\[...\\]\` أو \`\\(...\\)\`. استخدم فقط \`$$\` و \`$\`.
+- التزم بهذه القواعد بصرامة لضمان العرض الصحيح.
+
+🧩 سياسة حلّ المسائل:
+(… باقي القوانين مثل اللي عندك …)
+
+🧩 سياسة حلّ المسائل والتمارين (قاعدة إلزامية):
+- عندما يكون الطلب تمرينًا، معادلة، مسألة رياضية/فيزيائية/كيميائية، تحليل نصي/لغوي/منطقي، أو كود برمجي:
+  1. **لا تعطِ النتيجة النهائية مباشرةً** دون تحليل واضح. ابدأ بـ "إعادة صياغة للمسألة" (بسطها في سطر أو سطرين).
+  2. اذكر **المعطيات والافتراضات** (الوحدات، إذا فيه تقريب، إذا بعض القيم ناقصة).
+  3. اعرض **خطة الحل** قصيرة (خطوات مرقّمة).
+  4. نفذ الحل **خطوة بخطوة** (أرقام/معادلات/حسابات وسيطة) مع شرح كل خطوة.
+  5. **تحقق** من الحل: ضع النتيجة في المسألة الأصلية أو أعد الحساب أو اختبر صحة النتيجة.
+  6. أخيراً اعرض **النتيجة النهائية** بوضوح مع تمييزها (مثلاً: "النتيجة النهائية: x = ...").
+  7. إذا كان هناك تقريب/عدم يقين، أذكر مستوى الدقة أو الفرضيات.
+
+- إذا كان النص/السؤال **مبهم أو ناقص بيانات**: اسأل توضيحاً قبل الحل.
+- إذا طلب المستخدم "تلميح" أو "الإجابة فقط" التزم بالطلب.
+
+🧑‍💻 للبرمجة:
+- اعرض الشرح خطوة بخطوة.
+- ضع الشيفرة في code blocks.
+- اذكر الحالات الحدية أو الاختبارات المقترحة.
+
+🔍 الأسلوب:
+- الردود التقنية = قليلة الإيموجيات 🙂
+- الردود الترفيهية = عفوية مع إيموجيات مناسبة 😂🤗
+- في نهاية كل حل طويل: قدم ملخص سريع (1–2 جملة).
+
+⚠️ المصداقية:
+- إذا لم تكن متأكدًا، قل ذلك بصراحة واقترح طريقة للتحقق.
+`
+      };
+      const userMessagePrompt = {
+        role: 'user',
+        content: (userPrompt && String(userPrompt).trim()) 
+          ? `${String(userPrompt).trim()}\n\nالآن قم بتحليل الصورة التالية:`
+          : `صف محتوى هذه الصورة باختصار.`
+      };
+      
+      const response = await puter.ai.chat([personaInstruction, userMessagePrompt], imageUrl, { model: 'gpt-4o', stream: true });
 
       clearTimeout(toAnalyzingTimer);
+      clearIndicator();
 
-      for await (const part of response) {
-        const piece = part.text || (part.message && part.message.content) || '';
-        if (!piece) continue;
+      // إنشاء عنصر الرسالة الفارغ
+      const botMsg = { id: genId(), role: 'assistant', content: '', meta: {} };
+      messages.push(botMsg);
+      appendMessage(botMsg, messages.length - 1);
+      const botEl = messagesEl.querySelector(`.msg[data-index="${messages.length - 1}"] .bubble`);
 
-        if (isFirstChunk) {
-          clearIndicator(); // 🟢 إزالة المؤشر
-          botMsg = { id: genId(), role: 'assistant', content: '', meta: {} };
-          messages.push(botMsg);
-          appendMessage(botMsg, messages.length - 1);
-          const botIndex = messages.length - 1;
-          botEl = messagesEl.querySelector(`.msg[data-index="${botIndex}"] .bubble`);
-          isFirstChunk = false;
-        }
-        // 🟢 عند أول رد: بدّل الزر من pending إلى generating
-try {
-  const btn = document.getElementById('sendInsideBtn');
-  if (btn) {
-    btn.classList.remove('is-pending');
-    btn.classList.add('is-generating', 'visible');
-    btn.disabled = false;
-    btn._abortCurrentResponse = response;
+      // 🟢 استخدام الدالة الموحدة الجديدة لعرض الرد
+      await streamResponseToBubble(response, botEl, botMsg);
 
-    if (!btn._stopHandler) {
-      btn._stopHandler = function(ev) {
-        ev.stopPropagation();
-        window._userRequestedStop = true;
-        try {
-          if (btn._abortCurrentResponse && typeof btn._abortCurrentResponse.return === 'function') {
-            btn._abortCurrentResponse.return();
-          }
-        } catch(e){}
-        btn.classList.add('stopping');
-        setTimeout(()=> btn.classList.remove('stopping'), 160);
-      };
-      btn.addEventListener('click', btn._stopHandler);
+      return botMsg.content;
     }
-  }
-} catch(e) { console.warn('send-button state error (image)', e); }
-
-        botMsg.content += piece;
-       if (botEl) {
-  const html = DOMPurify.sanitize(marked.parse(formatMath(botMsg.content || '')));
-  botEl.innerHTML = html;
-  enhanceCodeBlocks(botEl);
-
-  if (window.MathJax && typeof MathJax.typesetPromise === 'function') {
-    MathJax.typesetPromise([botEl]).catch(err => console.warn('MathJax typesetting error:', err));
-  }
-}
-        messagesEl.scrollTop = messagesEl.scrollHeight;
-      }
-            // --- تنظيف حالة الزر بعد انتهاء stream الصورة ---
-      try {
-        const btn = document.getElementById('sendInsideBtn');
-        if (btn) {
-          btn.classList.remove('is-generating', 'is-pending');
-          btn.disabled = false;
-          if (btn._stopHandler) {
-            btn.removeEventListener('click', btn._stopHandler);
-            btn._stopHandler = null;
-          }
-          btn._abortCurrentResponse = null;
-        }
-      } catch(e){}
-
-      saveSession();
-      return botMsg ? botMsg.content : null;
-    }
-    } catch (err) {
+  } catch (err) {
     console.warn('analyzeImageWithPuter failed', err);
-    // تنظيف زر الإرسال لو كان معلقاً
     resetSendButton();
   }
 
@@ -3445,150 +3491,133 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
   try {
     if (!fileOrUrl) return null;
 
-   clearIndicator();
-const indicator = showTyping("file");
+    clearIndicator();
+    const indicator = showTyping("file");
 
-// 🟢 نفس منطق الصور: بعد ثواني يتحول لـ Analyzing file
-const delay = Math.floor(Math.random() * (5000 - 3000 + 1)) + 3000;
-const toAnalyzingTimer = setTimeout(() => {
-  try { setToAnalyzing(indicator); } catch(e) {}
-}, delay);
+    const delay = Math.floor(Math.random() * (5000 - 3000 + 1)) + 3000;
+    const toAnalyzingTimer = setTimeout(() => {
+      try { setToAnalyzing(indicator); } catch(e) {}
+    }, delay);
 
     let textContent = '';
     let fileType = 'file';
 
     // -- استخراج النص من المصادر المختلفة --
-    if (typeof fileOrUrl === 'string') { // حالة الرابط
-      const lower = fileOrUrl.toLowerCase();
-      if (lower.match(/\.(png|jpe?g|webp|gif|bmp)(?:[?#].*)?$/)) {
-        return await analyzeImageWithPuter(fileOrUrl, userPrompt);
-      }
-      const resp = await fetch(fileOrUrl);
-      if (resp.ok) {
-        const mime = resp.headers.get("content-type") || "";
-        if (mime.includes('pdf')) {
-          fileType = 'PDF';
-          const arrayBuffer = await resp.arrayBuffer();
-          textContent = await extractPdfText(new Blob([arrayBuffer]));
-        } else if (mime.startsWith('text/')) {
-          fileType = 'text file';
-          textContent = await resp.text();
+    if (typeof fileOrUrl === 'string') {
+        const lower = fileOrUrl.toLowerCase();
+        if (lower.match(/\.(png|jpe?g|webp|gif|bmp)(?:[?#].*)?$/)) {
+            return await analyzeImageWithPuter(fileOrUrl, userPrompt);
         }
-      }
-    } else if (fileOrUrl instanceof File) { // حالة الملف المحلي
-      const ext = (fileOrUrl.name || '').split('.').pop().toLowerCase();
-      if (fileOrUrl.type && fileOrUrl.type.startsWith('image/')) {
-        return await analyzeImageWithPuter(fileOrUrl, userPrompt);
-      }
-      if (ext === 'pdf') {
-        fileType = 'PDF';
-        textContent = await extractPdfText(fileOrUrl);
-      } else {
-        fileType = `${ext} file`;
-        textContent = await fileOrUrl.text();
-      }
+        const resp = await fetch(fileOrUrl);
+        if (resp.ok) {
+            const mime = resp.headers.get("content-type") || "";
+            if (mime.includes('pdf')) {
+                fileType = 'PDF';
+                const arrayBuffer = await resp.arrayBuffer();
+                textContent = await extractPdfText(new Blob([arrayBuffer]));
+            } else if (mime.startsWith('text/')) {
+                fileType = 'text file';
+                textContent = await resp.text();
+            }
+        }
+    } else if (fileOrUrl instanceof File) {
+        const ext = (fileOrUrl.name || '').split('.').pop().toLowerCase();
+        if (fileOrUrl.type && fileOrUrl.type.startsWith('image/')) {
+            return await analyzeImageWithPuter(fileOrUrl, userPrompt);
+        }
+        if (ext === 'pdf') {
+            fileType = 'PDF';
+            textContent = await extractPdfText(fileOrUrl);
+        } else {
+            fileType = `${ext} file`;
+            textContent = await fileOrUrl.text();
+        }
     }
 
-        if (!textContent) {
-      clearIndicator();
-      // تنظيف زر الإرسال لأننا قد نكون في حالة pending
-      resetSendButton();
-      toast('Could not read the file content.');
-      return null;
+    if (!textContent) {
+        clearIndicator();
+        resetSendButton();
+        toast('Could not read the file content.');
+        return null;
     }
 
-    // -- الآن، بعد الحصول على النص، نبدأ عملية الرد --
-    const basePrompt = (userPrompt && String(userPrompt).trim())
-      ? `${String(userPrompt).trim()}\n\nThis is the content of a ${fileType}:\n\n${textContent.slice(0, 8000)}`
-      : `Analyze this ${fileType} and provide a summary:\n\n${textContent.slice(0, 8000)}`;
+    // -- بناء prompt مع تعليمات الـ Persona --
+    const personaInstruction = {
+        role: 'system',
+        content: `
+أنت بوت دردشة ودود ومخصص لموقع As Space (قسم الدراسة والكتب) 📚 — لكن تستطيع التفاعل أيضاً مع مواضيع عامة وترفيهية.
 
-    // نفس منطق الرد التدريجي المستخدم في sendMessage
-    let assistantEl = null;
-    let bubbleEl = null;
-    let assistantMessage = null;
-    let isFirstChunk = true;
+⚙️ سلوك عام:
+- كن ودودًا وغير رسمي إلى درجة معتدلة، واستخدم الإيموجيات بشكل محدود وذكي (في المواضيع الترفيهية أو المضحة فقط).
+- إذا سألك شخص "من أنت؟" اعرف بنفسك: "أنا بوت مخصص لموقع As Space لمساعدة الزوار في الدراسة والكتب، ولكن يمكنني الدردشة في مواضيع أخرى أيضًا."
 
-    const response = await puter.ai.chat(basePrompt, null, { model: 'gpt-5-nano', stream: true });
+⚙️ قواعد عرض الرياضيات والرموز (مهم جدًا):
+- **دائمًا** استخدم ترميز LaTeX لعرض أي معادلات أو رموز رياضية/فيزيائية/كيميائية.
+- **القاعدة الأساسية:**
+  - للمعادلات المنفصلة التي تأخذ سطراً كاملاً: استخدم **$$ ... $$**.
+    مثال: $$ E = mc^2 $$
+  - للرموز والمعادلات القصيرة داخل جملة نصية (inline): استخدم **$ ... $**.
+    مثال: طاقة الجسم تساوي $E$، حيث $E = mc^2$.
+- لا تستخدم أبدًا \`\\[...\\]\` أو \`\\(...\\)\`. استخدم فقط \`$$\` و \`$\`.
+- التزم بهذه القواعد بصرامة لضمان العرض الصحيح.
 
-  
+🧩 سياسة حلّ المسائل:
+(… باقي القوانين مثل اللي عندك …)
+
+🧩 سياسة حلّ المسائل والتمارين (قاعدة إلزامية):
+- عندما يكون الطلب تمرينًا، معادلة، مسألة رياضية/فيزيائية/كيميائية، تحليل نصي/لغوي/منطقي، أو كود برمجي:
+  1. **لا تعطِ النتيجة النهائية مباشرةً** دون تحليل واضح. ابدأ بـ "إعادة صياغة للمسألة" (بسطها في سطر أو سطرين).
+  2. اذكر **المعطيات والافتراضات** (الوحدات، إذا فيه تقريب، إذا بعض القيم ناقصة).
+  3. اعرض **خطة الحل** قصيرة (خطوات مرقّمة).
+  4. نفذ الحل **خطوة بخطوة** (أرقام/معادلات/حسابات وسيطة) مع شرح كل خطوة.
+  5. **تحقق** من الحل: ضع النتيجة في المسألة الأصلية أو أعد الحساب أو اختبر صحة النتيجة.
+  6. أخيراً اعرض **النتيجة النهائية** بوضوح مع تمييزها (مثلاً: "النتيجة النهائية: x = ...").
+  7. إذا كان هناك تقريب/عدم يقين، أذكر مستوى الدقة أو الفرضيات.
+
+- إذا كان النص/السؤال **مبهم أو ناقص بيانات**: اسأل توضيحاً قبل الحل.
+- إذا طلب المستخدم "تلميح" أو "الإجابة فقط" التزم بالطلب.
+
+🧑‍💻 للبرمجة:
+- اعرض الشرح خطوة بخطوة.
+- ضع الشيفرة في code blocks.
+- اذكر الحالات الحدية أو الاختبارات المقترحة.
+
+🔍 الأسلوب:
+- الردود التقنية = قليلة الإيموجيات 🙂
+- الردود الترفيهية = عفوية مع إيموجيات مناسبة 😂🤗
+- في نهاية كل حل طويل: قدم ملخص سريع (1–2 جملة).
+
+⚠️ المصداقية:
+- إذا لم تكن متأكدًا، قل ذلك بصراحة واقترح طريقة للتحقق.
+`
+    };
+    const userMessagePrompt = {
+        role: 'user',
+        content: (userPrompt && String(userPrompt).trim())
+        ? `${String(userPrompt).trim()}\n\nThis is the content of a ${fileType}:\n\n${textContent.slice(0, 8000)}`
+        : `Analyze this ${fileType} and provide a summary:\n\n${textContent.slice(0, 8000)}`
+    };
+
+    const response = await puter.ai.chat([personaInstruction, userMessagePrompt], null, { model: 'gpt-4o', stream: true });
+
     clearTimeout(toAnalyzingTimer);
-    for await (const part of response) {
-      const piece = part.text || (part.message && part.message.content) || '';
-      if (!piece) continue;
+    clearIndicator();
 
-      if (isFirstChunk) {
-        clearIndicator(); // إزالة مؤشر "Analyzing"
-        assistantMessage = { id: genId(), role: 'assistant', content: '', meta: {} };
-        messages.push(assistantMessage);
-        assistantEl = createMessageElement(assistantMessage, messages.length - 1);
-        messagesEl.appendChild(assistantEl);
-        requestAnimationFrame(() => setTimeout(() => assistantEl.classList.add('show'), 20));
-        bubbleEl = assistantEl.querySelector('.bubble');
-        isFirstChunk = false;
-      }
-      // 🟢 عند أول رد: بدّل الزر من pending إلى generating
-try {
-  const btn = document.getElementById('sendInsideBtn');
-  if (btn) {
-    btn.classList.remove('is-pending');
-    btn.classList.add('is-generating', 'visible');
-    btn.disabled = false;
-    btn._abortCurrentResponse = response;
-
-    if (!btn._stopHandler) {
-      btn._stopHandler = function(ev) {
-        ev.stopPropagation();
-        window._userRequestedStop = true;
-        try {
-          if (btn._abortCurrentResponse && typeof btn._abortCurrentResponse.return === 'function') {
-            btn._abortCurrentResponse.return();
-          }
-        } catch(e){}
-        btn.classList.add('stopping');
-        setTimeout(()=> btn.classList.remove('stopping'), 160);
-      };
-      btn.addEventListener('click', btn._stopHandler);
-    }
-  }
-} catch(e) { console.warn('send-button state error (image)', e); }
-
-      assistantMessage.content += piece;
-if (bubbleEl) {
-  const html = DOMPurify.sanitize(marked.parse(formatMath(assistantMessage.content || '')));
-  bubbleEl.innerHTML = html;
-  enhanceCodeBlocks(bubbleEl);
-
-  if (window.MathJax && typeof MathJax.typesetPromise === 'function') {
-    MathJax.typesetPromise([bubbleEl]).catch(err => console.warn('MathJax typesetting error:', err));
-  }
-}
-      messagesEl.scrollTop = messagesEl.scrollHeight;
-    }
-
-    if (assistantEl) {
-        const codeBlocksToHighlight = assistantEl.querySelectorAll('pre code');
-        codeBlocksToHighlight.forEach(block => { hljs.highlightElement(block); });
-    }
-
-        // --- تنظيف حالة الزر بعد انتهاء stream الملف ---
-    try {
-      const btn = document.getElementById('sendInsideBtn');
-      if (btn) {
-        btn.classList.remove('is-generating', 'is-pending');
-        btn.disabled = false;
-        if (btn._stopHandler) {
-          btn.removeEventListener('click', btn._stopHandler);
-          btn._stopHandler = null;
-        }
-        btn._abortCurrentResponse = null;
-      }
-    } catch(e){}
-    saveSession();
+    // إنشاء عنصر الرسالة الفارغ
+    const assistantMessage = { id: genId(), role: 'assistant', content: '', meta: {} };
+    messages.push(assistantMessage);
+    const assistantEl = createMessageElement(assistantMessage, messages.length - 1);
+    messagesEl.appendChild(assistantEl);
+    requestAnimationFrame(() => setTimeout(() => assistantEl.classList.add('show'), 20));
+    const bubbleEl = assistantEl.querySelector('.bubble');
+    
+    // 🟢 استخدام الدالة الموحدة الجديدة لعرض الرد
+    await streamResponseToBubble(response, bubbleEl, assistantMessage);
+    
     return assistantMessage.content;
 
-   } catch (e) {
+  } catch (e) {
     console.error('analyzeFileWithPuter error', e);
-    // تنظيف زر الإرسال
     resetSendButton();
     clearIndicator();
     return null;
@@ -3749,6 +3778,35 @@ messagesEl.scrollTop = messagesEl.scrollHeight;
     MathJax.typesetPromise([container]).catch(()=>{});
   }
 }
+
+      /**
+ * دالة جديدة وموحدة لعرض الرد التدريجي وتطبيق التنسيق.
+ * @param {Object} response - كائن الرد القادم من puter.ai.chat.
+ * @param {HTMLElement} bubbleEl - عنصر الفقاعة الذي سيتم عرض النص فيه.
+ * @param {Object} assistantMessage - كائن الرسالة لتخزين المحتوى.
+ */
+async function streamResponseToBubble(response, bubbleEl, assistantMessage) {
+  for await (const part of response) {
+    const piece = part.text || (part.message && part.message.content) || '';
+    if (!piece) continue;
+
+    assistantMessage.content += piece;
+
+    // نفس منطق العرض الموحد الذي قمنا بعمله سابقًا
+    const html = DOMPurify.sanitize(marked.parse(formatMath(assistantMessage.content || '')));
+    bubbleEl.innerHTML = html;
+    enhanceCodeBlocks(bubbleEl);
+
+    if (window.MathJax && typeof MathJax.typesetPromise === 'function') {
+      MathJax.typesetPromise([bubbleEl]).catch(err => console.warn('MathJax typesetting error:', err));
+    }
+    
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+  
+  // حفظ الجلسة بعد اكتمال الرد
+  saveSession();
+
 
       // === MathJax helper: typeset only if content contains math delimiters ===
 function typesetMathIfNeeded(container) {
@@ -4321,139 +4379,113 @@ async function sendMessage(text, parentIndex = null) {
       
 
 // Regenerate assistant reply for a given parent message index
-async function regenerateAssistantForParent(parentIdx){
-    try {
-        if (window._regenLock) return;
-        window._regenLock = true;
+async function regenerateAssistantForParent(parentIdx) {
+  try {
+    if (window._regenLock) return;
+    window._regenLock = true;
 
-        if (typeof parentIdx !== 'number' || !messages[parentIdx]) {
-            window._regenLock = false;
-            return;
-        }
-        
-        const parentMessage = messages[parentIdx];
-        const attachment = parentMessage?.attachment;
-        let imageUrl = null;
-        let attachmentType = 'default'; // النوع الافتراضي
-
-        // 1. تحقق من وجود ونوع المرفق
-        if (attachment && attachment.url) {
-            if (attachment.mime_type?.startsWith('image/')) {
-                imageUrl = attachment.url;
-                attachmentType = 'image';
-            } else {
-                attachmentType = 'file'; // أي نوع آخر هو "ملف"
-            }
-        }
-
-        shouldStopGeneration = false;
-        sendInsideBtn.classList.add('is-generating');
-        sendInsideBtn.classList.add('visible');
-
-        // 2. أظهر الأنيميشن المناسب بناءً على نوع المرفق
-        clearIndicator();
-        showTyping(attachmentType);
-
-        let assistantEl = null;
-        let bubbleEl = null;
-        let assistantMessage = null;
-        let isFirstChunk = true;
-
-        // 3. استدعاء الذكاء الاصطناعي (فقط الصور يتم إرسالها للتحليل البصري)
-        let response;
-        const prompt = buildChatPrompt(messages, parentIdx);
-        if (imageUrl) {
-            // إذا كانت هناك صورة، أرسل النص والصورة معًا
-            response = await puter.ai.chat(prompt, imageUrl, { model: 'gpt-5-nano', stream: true });
-        } else {
-            // للملفات الأخرى والنصوص، أرسل النص فقط (السياق موجود فيه)
-            response = await puter.ai.chat(prompt, { model: 'gpt-5-nano', stream: true });
-        }
-        
-        // ... (بقية الدالة لمعالجة الرد التدريجي تبقى كما هي تمامًا) ...
-        let updateInterval = setInterval(() => {
-            if (bubbleEl) {
-                bubbleEl.innerHTML = DOMPurify.sanitize(marked.parse(assistantMessage.content));
-                enhanceCodeBlocks(bubbleEl);
-                const isUserAtBottom = messagesEl.scrollHeight - messagesEl.clientHeight <= messagesEl.scrollTop + 20;
-                if (isUserAtBottom) {
-                    messagesEl.scrollTop = messagesEl.scrollHeight;
-                }
-            }
-        }, 150);
-
-        for await (const part of response) {
-            if (shouldStopGeneration) { break; }
-            const piece = part.text || (part.message && part.message.content) || '';
-            if (!piece) continue;
-
-            if (isFirstChunk) {
-                clearIndicator();
-                assistantMessage = { id: genId(), role: 'assistant', content: '', parent: parentIdx, meta: {} };
-                messages.push(assistantMessage);
-                assistantEl = createMessageElement(assistantMessage, messages.length - 1);
-                messagesEl.appendChild(assistantEl);
-                requestAnimationFrame(() => setTimeout(() => assistantEl.classList.add('show'), 20));
-                bubbleEl = assistantEl.querySelector('.bubble');
-                isFirstChunk = false;
-            }
-          // 🟢 عند أول رد: بدّل الزر من pending إلى generating
-try {
-  const btn = document.getElementById('sendInsideBtn');
-  if (btn) {
-    btn.classList.remove('is-pending');
-    btn.classList.add('is-generating', 'visible');
-    btn.disabled = false;
-    btn._abortCurrentResponse = response;
-
-    if (!btn._stopHandler) {
-      btn._stopHandler = function(ev) {
-        ev.stopPropagation();
-        window._userRequestedStop = true;
-        try {
-          if (btn._abortCurrentResponse && typeof btn._abortCurrentResponse.return === 'function') {
-            btn._abortCurrentResponse.return();
-          }
-        } catch(e){}
-        btn.classList.add('stopping');
-        setTimeout(()=> btn.classList.remove('stopping'), 160);
-      };
-      btn.addEventListener('click', btn._stopHandler);
+    if (typeof parentIdx !== 'number' || !messages[parentIdx]) {
+      window._regenLock = false;
+      return;
     }
+
+    const parentMessage = messages[parentIdx];
+    const attachment = parentMessage?.attachment;
+    let imageUrl = null;
+    let attachmentType = 'default';
+
+    if (attachment && attachment.url) {
+      if (attachment.mime_type?.startsWith('image/')) {
+        imageUrl = attachment.url;
+        attachmentType = 'image';
+      } else {
+        attachmentType = 'file';
+      }
+    }
+
+    clearIndicator();
+    showTyping(attachmentType);
+
+    // 🟢 مهم: أضف تعليمات الـ Persona قبل سجل المحادثة
+    const personaInstruction = {
+        role: 'system',
+        content: `
+أنت بوت دردشة ودود ومخصص لموقع As Space (قسم الدراسة والكتب) 📚 — لكن تستطيع التفاعل أيضاً مع مواضيع عامة وترفيهية.
+
+⚙️ سلوك عام:
+- كن ودودًا وغير رسمي إلى درجة معتدلة، واستخدم الإيموجيات بشكل محدود وذكي (في المواضيع الترفيهية أو المضحة فقط).
+- إذا سألك شخص "من أنت؟" اعرف بنفسك: "أنا بوت مخصص لموقع As Space لمساعدة الزوار في الدراسة والكتب، ولكن يمكنني الدردشة في مواضيع أخرى أيضًا."
+
+⚙️ قواعد عرض الرياضيات والرموز (مهم جدًا):
+- **دائمًا** استخدم ترميز LaTeX لعرض أي معادلات أو رموز رياضية/فيزيائية/كيميائية.
+- **القاعدة الأساسية:**
+  - للمعادلات المنفصلة التي تأخذ سطراً كاملاً: استخدم **$$ ... $$**.
+    مثال: $$ E = mc^2 $$
+  - للرموز والمعادلات القصيرة داخل جملة نصية (inline): استخدم **$ ... $**.
+    مثال: طاقة الجسم تساوي $E$، حيث $E = mc^2$.
+- لا تستخدم أبدًا \`\\[...\\]\` أو \`\\(...\\)\`. استخدم فقط \`$$\` و \`$\`.
+- التزم بهذه القواعد بصرامة لضمان العرض الصحيح.
+
+🧩 سياسة حلّ المسائل:
+(… باقي القوانين مثل اللي عندك …)
+
+🧩 سياسة حلّ المسائل والتمارين (قاعدة إلزامية):
+- عندما يكون الطلب تمرينًا، معادلة، مسألة رياضية/فيزيائية/كيميائية، تحليل نصي/لغوي/منطقي، أو كود برمجي:
+  1. **لا تعطِ النتيجة النهائية مباشرةً** دون تحليل واضح. ابدأ بـ "إعادة صياغة للمسألة" (بسطها في سطر أو سطرين).
+  2. اذكر **المعطيات والافتراضات** (الوحدات، إذا فيه تقريب، إذا بعض القيم ناقصة).
+  3. اعرض **خطة الحل** قصيرة (خطوات مرقّمة).
+  4. نفذ الحل **خطوة بخطوة** (أرقام/معادلات/حسابات وسيطة) مع شرح كل خطوة.
+  5. **تحقق** من الحل: ضع النتيجة في المسألة الأصلية أو أعد الحساب أو اختبر صحة النتيجة.
+  6. أخيراً اعرض **النتيجة النهائية** بوضوح مع تمييزها (مثلاً: "النتيجة النهائية: x = ...").
+  7. إذا كان هناك تقريب/عدم يقين، أذكر مستوى الدقة أو الفرضيات.
+
+- إذا كان النص/السؤال **مبهم أو ناقص بيانات**: اسأل توضيحاً قبل الحل.
+- إذا طلب المستخدم "تلميح" أو "الإجابة فقط" التزم بالطلب.
+
+🧑‍💻 للبرمجة:
+- اعرض الشرح خطوة بخطوة.
+- ضع الشيفرة في code blocks.
+- اذكر الحالات الحدية أو الاختبارات المقترحة.
+
+🔍 الأسلوب:
+- الردود التقنية = قليلة الإيموجيات 🙂
+- الردود الترفيهية = عفوية مع إيموجيات مناسبة 😂🤗
+- في نهاية كل حل طويل: قدم ملخص سريع (1–2 جملة).
+
+⚠️ المصداقية:
+- إذا لم تكن متأكدًا، قل ذلك بصراحة واقترح طريقة للتحقق.
+`
+    };
+    
+    const messagesForPrompt = [
+      personaInstruction,
+      ...messages.slice(0, parentIdx + 1)
+    ];
+
+    const response = await puter.ai.chat(messagesForPrompt, imageUrl, { model: 'gpt-4o', stream: true });
+
+    clearIndicator();
+
+    // إنشاء عنصر الرسالة الفارغ
+    const assistantMessage = { id: genId(), role: 'assistant', content: '', parent: parentIdx, meta: {} };
+    messages.push(assistantMessage);
+    const assistantEl = createMessageElement(assistantMessage, messages.length - 1);
+    messagesEl.appendChild(assistantEl);
+    requestAnimationFrame(() => setTimeout(() => assistantEl.classList.add('show'), 20));
+    const bubbleEl = assistantEl.querySelector('.bubble');
+
+    // 🟢 استخدام الدالة الموحدة الجديدة لعرض الرد
+    await streamResponseToBubble(response, bubbleEl, assistantMessage);
+
+  } catch (error) {
+    console.error("regenerateAssistantForParent Error:", error);
+    clearIndicator();
+    const errorMsg = { id: genId(), role: 'assistant', content: 'حدث خطأ. يرجى المحاولة مرة أخرى.', meta: {} };
+    appendMessage(errorMsg, messages.length);
+  } finally {
+    resetSendButton();
+    window._regenLock = false;
   }
-} catch(e) { console.warn('send-button state error (image)', e); }
-            assistantMessage.content += piece;
-        }
-        
-        clearInterval(updateInterval);
-        if (bubbleEl) {
-            bubbleEl.innerHTML = DOMPurify.sanitize(marked.parse(assistantMessage.content));
-            enhanceCodeBlocks(bubbleEl);
-        }
-
-        if (assistantEl) {
-            const codeBlocksToHighlight = assistantEl.querySelectorAll('pre code');
-            codeBlocksToHighlight.forEach(block => { hljs.highlightElement(block); });
-            const finalBubble = assistantEl.querySelector('.bubble');
-            if (finalBubble && isRTL(assistantMessage.content)) {
-                finalBubble.classList.add('rtl-text');
-                assistantEl.classList.add('msg-rtl');
-            }
-        }
-        saveSession();
-
-    } catch (error) {
-        console.error("regenerateAssistantForParent Error:", error);
-        clearIndicator();
-        const errorMsg = { id: genId(), role: 'assistant', content: 'حدث خطأ. يرجى المحاولة مرة أخرى.', meta: {} };
-        appendMessage(errorMsg, messages.length);
-    } finally {
-        sendInsideBtn.classList.remove('is-generating');
-        if (composer.value.trim().length === 0) {
-            sendInsideBtn.classList.remove('visible');
-        }
-        window._regenLock = false;
-    }
 }
 // OPEN/CLOSE CHAT (use history for back-button order)
       function openChatSimple(){
