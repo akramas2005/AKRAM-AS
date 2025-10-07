@@ -3292,60 +3292,6 @@ xhr.send(fd);
   });
 }
 
-// 🟢 تحليل الصور
-// ✨ تعديل: تحليل الصور مع دعم MathJax الكامل
-بالتأكيد! شكرًا لتزويدي بشخصية البوت. لقد فهمت تمامًا ما تحتاجه: تعديل الدوال المسؤولة عن تحليل الصور والملفات وإعادة التوليد لتستخدم نفس آلية عرض المعادلات الرياضية الصحيحة، مع الحفاظ على باقي الكود كما هو.
-
-لقد قمت بإعداد الكود الكامل والجاهز للنسخ.
-
-## الخطوة 1: إضافة دالة مساعدة جديدة
-أولاً، انسخ هذه الدالة المساعدة الجديدة streamResponseToBubble وأضفها في أي مكان مع الدوال الأخرى في السكريبت الخاص بك. هذه الدالة ستمنع تكرار الكود وستضمن أن جميع الردود تُعرض بنفس الطريقة الصحيحة.
-
-JavaScript
-
-/**
- * دالة جديدة وموحدة لعرض الرد التدريجي وتطبيق التنسيق.
- * @param {Object} response - كائن الرد القادم من puter.ai.chat.
- * @param {HTMLElement} bubbleEl - عنصر الفقاعة الذي سيتم عرض النص فيه.
- * @param {Object} assistantMessage - كائن الرسالة لتخزين المحتوى.
- */
-async function streamResponseToBubble(response, bubbleEl, assistantMessage) {
-  for await (const part of response) {
-    // تحقق مما إذا كان المستخدم قد طلب إيقاف التوليد
-    if (window._userRequestedStop) {
-        window._userRequestedStop = false; // أعد تعيين العلامة
-        resetSendButton();
-        break; // اخرج من الحلقة
-    }
-      
-    const piece = part.text || (part.message && part.message.content) || '';
-    if (!piece) continue;
-
-    assistantMessage.content += piece;
-
-    // نفس منطق العرض الموحد الذي قمنا بعمله سابقًا
-    const html = DOMPurify.sanitize(marked.parse(formatMath(assistantMessage.content || '')));
-    bubbleEl.innerHTML = html;
-    enhanceCodeBlocks(bubbleEl);
-
-    if (window.MathJax && typeof MathJax.typesetPromise === 'function') {
-      MathJax.typesetPromise([bubbleEl]).catch(err => console.warn('MathJax typesetting error:', err));
-    }
-    
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-  }
-  
-  // حفظ الجلسة وتنظيف زر الإرسال بعد اكتمال الرد
-  saveSession();
-  resetSendButton();
-}
-## الخطوة 2: استبدال الدوال القديمة بالنسخ المعدلة
-الآن، استبدل الدوال الثلاثة التالية في ملفك بالكامل بالإصدارات الجديدة والمعدلة.
-
-### 1. دالة analyzeImageWithPuter (النسخة الكاملة والمعدلة)
-JavaScript
-
-// ✨ تعديل: تحليل الصور مع دعم MathJax الكامل
 async function analyzeImageWithPuter(imageUrl, userPrompt = null, indicator = null) {
   if (!imageUrl) return null;
 
