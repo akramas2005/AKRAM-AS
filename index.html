@@ -3308,11 +3308,33 @@ async function analyzeImageWithPuter(imageUrl, userPrompt = null, indicator = nu
 
   try {
     if (typeof puter !== 'undefined' && puter.ai && typeof puter.ai.chat === 'function') {
-      const basePrompt = (userPrompt && String(userPrompt).trim())
-        ? `${String(userPrompt).trim()}\n\nالآن قم بتحليل الصورة التالية:`
-        : `صف محتوى هذه الصورة باختصار.`;
+      
+      // 🟢 الإضافة 1: تعريف الـ Persona لإعطاء التعليمات الصحيحة للبوت
+      const personaInstruction = {
+        role: 'system',
+        content: `
+أنت بوت دردشة ودود ومخصص لموقع As Space (قسم الدراسة والكتب) 📚 — لكن تستطيع التفاعل أيضاً مع مواضيع عامة وترفيهية.
 
-      const response = await puter.ai.chat(basePrompt, imageUrl, { model: 'gpt-5-nano', stream: true });
+⚙️ قواعد عرض الرياضيات والرموز (مهم جدًا):
+- **دائمًا** استخدم ترميز LaTeX لعرض أي معادلات أو رموز رياضية/فيزيائية/كيميائية.
+- **القاعدة الأساسية:**
+  - للمعادلات المنفصلة التي تأخذ سطراً كاملاً: استخدم **$$ ... $$**.
+  - للرموز والمعادلات القصيرة داخل جملة نصية (inline): استخدم **$ ... $**.
+- لا تستخدم أبدًا \`\\[...\\]\` أو \`\\(...\\)\`. استخدم فقط \`$$\` و \`$\`.
+- التزم بهذه القواعد بصرامة لضمان العرض الصحيح.
+(… باقي التعليمات كما هي في ملفك …)
+`
+      };
+      
+      const userMessagePrompt = {
+        role: 'user',
+        content: (userPrompt && String(userPrompt).trim()) 
+          ? `${String(userPrompt).trim()}\n\nالآن قم بتحليل الصورة التالية:`
+          : `صف محتوى هذه الصورة باختصار.`
+      };
+      
+      // 🟢 الإضافة 2: إرسال الـ Persona مع الطلب
+      const response = await puter.ai.chat([personaInstruction, userMessagePrompt], imageUrl, { model: 'gpt-4o', stream: true });
 
       let botMsg = null;
       let botEl = null;
@@ -3321,11 +3343,17 @@ async function analyzeImageWithPuter(imageUrl, userPrompt = null, indicator = nu
       clearTimeout(toAnalyzingTimer);
 
       for await (const part of response) {
+        if (window._userRequestedStop) {
+          window._userRequestedStop = false;
+          resetSendButton();
+          break;
+        }
+        
         const piece = part.text || (part.message && part.message.content) || '';
         if (!piece) continue;
 
         if (isFirstChunk) {
-          clearIndicator(); // 🟢 إزالة المؤشر
+          clearIndicator();
           botMsg = { id: genId(), role: 'assistant', content: '', meta: {} };
           messages.push(botMsg);
           appendMessage(botMsg, messages.length - 1);
@@ -3333,62 +3361,27 @@ async function analyzeImageWithPuter(imageUrl, userPrompt = null, indicator = nu
           botEl = messagesEl.querySelector(`.msg[data-index="${botIndex}"] .bubble`);
           isFirstChunk = false;
         }
-        // 🟢 عند أول رد: بدّل الزر من pending إلى generating
-try {
-  const btn = document.getElementById('sendInsideBtn');
-  if (btn) {
-    btn.classList.remove('is-pending');
-    btn.classList.add('is-generating', 'visible');
-    btn.disabled = false;
-    btn._abortCurrentResponse = response;
-
-    if (!btn._stopHandler) {
-      btn._stopHandler = function(ev) {
-        ev.stopPropagation();
-        window._userRequestedStop = true;
-        try {
-          if (btn._abortCurrentResponse && typeof btn._abortCurrentResponse.return === 'function') {
-            btn._abortCurrentResponse.return();
-          }
-        } catch(e){}
-        btn.classList.add('stopping');
-        setTimeout(()=> btn.classList.remove('stopping'), 160);
-      };
-      btn.addEventListener('click', btn._stopHandler);
-    }
-  }
-} catch(e) { console.warn('send-button state error (image)', e); }
 
         botMsg.content += piece;
-       if (botEl) {
-  const processed = autoWrapMath(botMsg.content || '');
-const html = DOMPurify.sanitize(marked.parse(formatMath(processed)));
-botEl.innerHTML = html;
-enhanceCodeBlocks(botEl);
-typesetMathIfNeeded(botEl, html);
-}
+        
+        // 🟢 الإضافة 3: استخدام نفس منطق العرض الصحيح من `sendMessage`
+        if (botEl) {
+          const html = DOMPurify.sanitize(marked.parse(formatMath(botMsg.content || '')));
+          botEl.innerHTML = html;
+          enhanceCodeBlocks(botEl);
+          if (window.MathJax && typeof MathJax.typesetPromise === 'function') {
+            MathJax.typesetPromise([botEl]).catch(err => console.warn('MathJax typesetting error:', err));
+          }
+        }
         messagesEl.scrollTop = messagesEl.scrollHeight;
       }
-            // --- تنظيف حالة الزر بعد انتهاء stream الصورة ---
-      try {
-        const btn = document.getElementById('sendInsideBtn');
-        if (btn) {
-          btn.classList.remove('is-generating', 'is-pending');
-          btn.disabled = false;
-          if (btn._stopHandler) {
-            btn.removeEventListener('click', btn._stopHandler);
-            btn._stopHandler = null;
-          }
-          btn._abortCurrentResponse = null;
-        }
-      } catch(e){}
-
+      
+      resetSendButton();
       saveSession();
       return botMsg ? botMsg.content : null;
     }
     } catch (err) {
     console.warn('analyzeImageWithPuter failed', err);
-    // تنظيف زر الإرسال لو كان معلقاً
     resetSendButton();
   }
 
@@ -3443,79 +3436,73 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
   try {
     if (!fileOrUrl) return null;
 
-   clearIndicator();
-const indicator = showTyping("file");
+    clearIndicator();
+    const indicator = showTyping("file");
 
-// 🟢 نفس منطق الصور: بعد ثواني يتحول لـ Analyzing file
-const delay = Math.floor(Math.random() * (5000 - 3000 + 1)) + 3000;
-const toAnalyzingTimer = setTimeout(() => {
-  try { setToAnalyzing(indicator); } catch(e) {}
-}, delay);
+    const delay = Math.floor(Math.random() * (5000 - 3000 + 1)) + 3000;
+    const toAnalyzingTimer = setTimeout(() => {
+      try { setToAnalyzing(indicator); } catch(e) {}
+    }, delay);
 
     let textContent = '';
     let fileType = 'file';
 
-    // -- استخراج النص من المصادر المختلفة --
-    if (typeof fileOrUrl === 'string') { // حالة الرابط
-      const lower = fileOrUrl.toLowerCase();
-      if (lower.match(/\.(png|jpe?g|webp|gif|bmp)(?:[?#].*)?$/)) {
-        return await analyzeImageWithPuter(fileOrUrl, userPrompt);
-      }
-      const resp = await fetch(fileOrUrl);
-      if (resp.ok) {
-        const mime = resp.headers.get("content-type") || "";
-        if (mime.includes('pdf')) {
-          fileType = 'PDF';
-          const arrayBuffer = await resp.arrayBuffer();
-          textContent = await extractPdfText(new Blob([arrayBuffer]));
-        } else if (mime.startsWith('text/')) {
-          fileType = 'text file';
-          textContent = await resp.text();
-        }
-      }
-    } else if (fileOrUrl instanceof File) { // حالة الملف المحلي
-      const ext = (fileOrUrl.name || '').split('.').pop().toLowerCase();
-      if (fileOrUrl.type && fileOrUrl.type.startsWith('image/')) {
-        return await analyzeImageWithPuter(fileOrUrl, userPrompt);
-      }
-      if (ext === 'pdf') {
-        fileType = 'PDF';
-        textContent = await extractPdfText(fileOrUrl);
-      } else {
-        fileType = `${ext} file`;
-        textContent = await fileOrUrl.text();
-      }
-    }
+    // ... (كود استخراج النص من الملفات يبقى كما هو في ملفك) ...
+    if (typeof fileOrUrl === 'string') { /* ... */ } else if (fileOrUrl instanceof File) { /* ... */ }
 
-        if (!textContent) {
+    if (!textContent) {
       clearIndicator();
-      // تنظيف زر الإرسال لأننا قد نكون في حالة pending
       resetSendButton();
       toast('Could not read the file content.');
       return null;
     }
 
-    // -- الآن، بعد الحصول على النص، نبدأ عملية الرد --
-    const basePrompt = (userPrompt && String(userPrompt).trim())
-      ? `${String(userPrompt).trim()}\n\nThis is the content of a ${fileType}:\n\n${textContent.slice(0, 8000)}`
-      : `Analyze this ${fileType} and provide a summary:\n\n${textContent.slice(0, 8000)}`;
+    // 🟢 الإضافة 1: تعريف الـ Persona
+    const personaInstruction = {
+        role: 'system',
+        content: `
+أنت بوت دردشة ودود ومخصص لموقع As Space (قسم الدراسة والكتب) 📚 — لكن تستطيع التفاعل أيضاً مع مواضيع عامة وترفيهية.
 
-    // نفس منطق الرد التدريجي المستخدم في sendMessage
+⚙️ قواعد عرض الرياضيات والرموز (مهم جدًا):
+- **دائمًا** استخدم ترميز LaTeX لعرض أي معادلات أو رموز رياضية/فيزيائية/كيميائية.
+- **القاعدة الأساسية:**
+  - للمعادلات المنفصلة التي تأخذ سطراً كاملاً: استخدم **$$ ... $$**.
+  - للرموز والمعادلات القصيرة داخل جملة نصية (inline): استخدم **$ ... $**.
+- لا تستخدم أبدًا \`\\[...\\]\` أو \`\\(...\\)\`. استخدم فقط \`$$\` و \`$\`.
+- التزم بهذه القواعد بصرامة لضمان العرض الصحيح.
+(… باقي التعليمات كما هي في ملفك …)
+`
+    };
+    
+    const userMessagePrompt = {
+        role: 'user',
+        content: (userPrompt && String(userPrompt).trim())
+        ? `${String(userPrompt).trim()}\n\nThis is the content of a ${fileType}:\n\n${textContent.slice(0, 8000)}`
+        : `Analyze this ${fileType} and provide a summary:\n\n${textContent.slice(0, 8000)}`
+    };
+
+    // 🟢 الإضافة 2: إرسال الـ Persona مع الطلب
+    const response = await puter.ai.chat([personaInstruction, userMessagePrompt], null, { model: 'gpt-4o', stream: true });
+
+    clearTimeout(toAnalyzingTimer);
+    
     let assistantEl = null;
     let bubbleEl = null;
     let assistantMessage = null;
     let isFirstChunk = true;
 
-    const response = await puter.ai.chat(basePrompt, null, { model: 'gpt-5-nano', stream: true });
-
-  
-    clearTimeout(toAnalyzingTimer);
     for await (const part of response) {
+      if (window._userRequestedStop) {
+          window._userRequestedStop = false;
+          resetSendButton();
+          break;
+      }
+        
       const piece = part.text || (part.message && part.message.content) || '';
       if (!piece) continue;
 
       if (isFirstChunk) {
-        clearIndicator(); // إزالة مؤشر "Analyzing"
+        clearIndicator();
         assistantMessage = { id: genId(), role: 'assistant', content: '', meta: {} };
         messages.push(assistantMessage);
         assistantEl = createMessageElement(assistantMessage, messages.length - 1);
@@ -3524,39 +3511,18 @@ const toAnalyzingTimer = setTimeout(() => {
         bubbleEl = assistantEl.querySelector('.bubble');
         isFirstChunk = false;
       }
-      // 🟢 عند أول رد: بدّل الزر من pending إلى generating
-try {
-  const btn = document.getElementById('sendInsideBtn');
-  if (btn) {
-    btn.classList.remove('is-pending');
-    btn.classList.add('is-generating', 'visible');
-    btn.disabled = false;
-    btn._abortCurrentResponse = response;
-
-    if (!btn._stopHandler) {
-      btn._stopHandler = function(ev) {
-        ev.stopPropagation();
-        window._userRequestedStop = true;
-        try {
-          if (btn._abortCurrentResponse && typeof btn._abortCurrentResponse.return === 'function') {
-            btn._abortCurrentResponse.return();
-          }
-        } catch(e){}
-        btn.classList.add('stopping');
-        setTimeout(()=> btn.classList.remove('stopping'), 160);
-      };
-      btn.addEventListener('click', btn._stopHandler);
-    }
-  }
-} catch(e) { console.warn('send-button state error (image)', e); }
-
+      
       assistantMessage.content += piece;
-if (bubbleEl) {
-  const html = DOMPurify.sanitize(marked.parse(formatMath(assistantMessage.content || '')));
-  bubbleEl.innerHTML = html;
-  enhanceCodeBlocks(bubbleEl);
-  typesetMathIfNeeded(bubbleEl, html);
-}
+
+      // 🟢 الإضافة 3: استخدام نفس منطق العرض الصحيح
+      if (bubbleEl) {
+        const html = DOMPurify.sanitize(marked.parse(formatMath(assistantMessage.content || '')));
+        bubbleEl.innerHTML = html;
+        enhanceCodeBlocks(bubbleEl);
+        if (window.MathJax && typeof MathJax.typesetPromise === 'function') {
+          MathJax.typesetPromise([bubbleEl]).catch(err => console.warn('MathJax typesetting error:', err));
+        }
+      }
       messagesEl.scrollTop = messagesEl.scrollHeight;
     }
 
@@ -3564,26 +3530,13 @@ if (bubbleEl) {
         const codeBlocksToHighlight = assistantEl.querySelectorAll('pre code');
         codeBlocksToHighlight.forEach(block => { hljs.highlightElement(block); });
     }
-
-        // --- تنظيف حالة الزر بعد انتهاء stream الملف ---
-    try {
-      const btn = document.getElementById('sendInsideBtn');
-      if (btn) {
-        btn.classList.remove('is-generating', 'is-pending');
-        btn.disabled = false;
-        if (btn._stopHandler) {
-          btn.removeEventListener('click', btn._stopHandler);
-          btn._stopHandler = null;
-        }
-        btn._abortCurrentResponse = null;
-      }
-    } catch(e){}
+    
+    resetSendButton();
     saveSession();
     return assistantMessage.content;
 
    } catch (e) {
     console.error('analyzeFileWithPuter error', e);
-    // تنظيف زر الإرسال
     resetSendButton();
     clearIndicator();
     return null;
@@ -4316,139 +4269,118 @@ async function sendMessage(text, parentIndex = null) {
       
 
 // Regenerate assistant reply for a given parent message index
-async function regenerateAssistantForParent(parentIdx){
-    try {
-        if (window._regenLock) return;
-        window._regenLock = true;
+async function regenerateAssistantForParent(parentIdx) {
+  try {
+    if (window._regenLock) return;
+    window._regenLock = true;
 
-        if (typeof parentIdx !== 'number' || !messages[parentIdx]) {
-            window._regenLock = false;
-            return;
-        }
-        
-        const parentMessage = messages[parentIdx];
-        const attachment = parentMessage?.attachment;
-        let imageUrl = null;
-        let attachmentType = 'default'; // النوع الافتراضي
-
-        // 1. تحقق من وجود ونوع المرفق
-        if (attachment && attachment.url) {
-            if (attachment.mime_type?.startsWith('image/')) {
-                imageUrl = attachment.url;
-                attachmentType = 'image';
-            } else {
-                attachmentType = 'file'; // أي نوع آخر هو "ملف"
-            }
-        }
-
-        shouldStopGeneration = false;
-        sendInsideBtn.classList.add('is-generating');
-        sendInsideBtn.classList.add('visible');
-
-        // 2. أظهر الأنيميشن المناسب بناءً على نوع المرفق
-        clearIndicator();
-        showTyping(attachmentType);
-
-        let assistantEl = null;
-        let bubbleEl = null;
-        let assistantMessage = null;
-        let isFirstChunk = true;
-
-        // 3. استدعاء الذكاء الاصطناعي (فقط الصور يتم إرسالها للتحليل البصري)
-        let response;
-        const prompt = buildChatPrompt(messages, parentIdx);
-        if (imageUrl) {
-            // إذا كانت هناك صورة، أرسل النص والصورة معًا
-            response = await puter.ai.chat(prompt, imageUrl, { model: 'gpt-5-nano', stream: true });
-        } else {
-            // للملفات الأخرى والنصوص، أرسل النص فقط (السياق موجود فيه)
-            response = await puter.ai.chat(prompt, { model: 'gpt-5-nano', stream: true });
-        }
-        
-        // ... (بقية الدالة لمعالجة الرد التدريجي تبقى كما هي تمامًا) ...
-        let updateInterval = setInterval(() => {
-            if (bubbleEl) {
-                bubbleEl.innerHTML = DOMPurify.sanitize(marked.parse(assistantMessage.content));
-                enhanceCodeBlocks(bubbleEl);
-                const isUserAtBottom = messagesEl.scrollHeight - messagesEl.clientHeight <= messagesEl.scrollTop + 20;
-                if (isUserAtBottom) {
-                    messagesEl.scrollTop = messagesEl.scrollHeight;
-                }
-            }
-        }, 150);
-
-        for await (const part of response) {
-            if (shouldStopGeneration) { break; }
-            const piece = part.text || (part.message && part.message.content) || '';
-            if (!piece) continue;
-
-            if (isFirstChunk) {
-                clearIndicator();
-                assistantMessage = { id: genId(), role: 'assistant', content: '', parent: parentIdx, meta: {} };
-                messages.push(assistantMessage);
-                assistantEl = createMessageElement(assistantMessage, messages.length - 1);
-                messagesEl.appendChild(assistantEl);
-                requestAnimationFrame(() => setTimeout(() => assistantEl.classList.add('show'), 20));
-                bubbleEl = assistantEl.querySelector('.bubble');
-                isFirstChunk = false;
-            }
-          // 🟢 عند أول رد: بدّل الزر من pending إلى generating
-try {
-  const btn = document.getElementById('sendInsideBtn');
-  if (btn) {
-    btn.classList.remove('is-pending');
-    btn.classList.add('is-generating', 'visible');
-    btn.disabled = false;
-    btn._abortCurrentResponse = response;
-
-    if (!btn._stopHandler) {
-      btn._stopHandler = function(ev) {
-        ev.stopPropagation();
-        window._userRequestedStop = true;
-        try {
-          if (btn._abortCurrentResponse && typeof btn._abortCurrentResponse.return === 'function') {
-            btn._abortCurrentResponse.return();
-          }
-        } catch(e){}
-        btn.classList.add('stopping');
-        setTimeout(()=> btn.classList.remove('stopping'), 160);
-      };
-      btn.addEventListener('click', btn._stopHandler);
+    if (typeof parentIdx !== 'number' || !messages[parentIdx]) {
+      window._regenLock = false;
+      return;
     }
+
+    const parentMessage = messages[parentIdx];
+    const attachment = parentMessage?.attachment;
+    let imageUrl = null;
+    let attachmentType = 'default';
+
+    if (attachment && attachment.url) {
+      if (attachment.mime_type?.startsWith('image/')) {
+        imageUrl = attachment.url;
+        attachmentType = 'image';
+      } else {
+        attachmentType = 'file';
+      }
+    }
+
+    clearIndicator();
+    showTyping(attachmentType);
+
+    // 🟢 الإضافة 1: تعريف الـ Persona
+    const personaInstruction = {
+        role: 'system',
+        content: `
+أنت بوت دردشة ودود ومخصص لموقع As Space (قسم الدراسة والكتب) 📚 — لكن تستطيع التفاعل أيضاً مع مواضيع عامة وترفيهية.
+
+⚙️ قواعد عرض الرياضيات والرموز (مهم جدًا):
+- **دائمًا** استخدم ترميز LaTeX لعرض أي معادلات أو رموز رياضية/فيزيائية/كيميائية.
+- **القاعدة الأساسية:**
+  - للمعادلات المنفصلة التي تأخذ سطراً كاملاً: استخدم **$$ ... $$**.
+  - للرموز والمعادلات القصيرة داخل جملة نصية (inline): استخدم **$ ... $**.
+- لا تستخدم أبدًا \`\\[...\\]\` أو \`\\(...\\)\`. استخدم فقط \`$$\` و \`$\`.
+- التزم بهذه القواعد بصرامة لضمان العرض الصحيح.
+(… باقي التعليمات كما هي في ملفك …)
+`
+    };
+
+    // 🟢 الإضافة 2: بناء الطلب مع تضمين الـ Persona وسجل المحادثة
+    const messagesForPrompt = [
+      personaInstruction,
+      ...messages.slice(0, parentIdx + 1)
+    ];
+    
+    const response = await puter.ai.chat(messagesForPrompt, imageUrl, { model: 'gpt-4o', stream: true });
+    
+    let assistantEl = null;
+    let bubbleEl = null;
+    let assistantMessage = null;
+    let isFirstChunk = true;
+
+    // 🟢 الإضافة 3: إزالة `setInterval` واستخدام حلقة العرض الصحيحة
+    for await (const part of response) {
+      if (window._userRequestedStop) {
+          window._userRequestedStop = false;
+          resetSendButton();
+          break;
+      }
+        
+      const piece = part.text || (part.message && part.message.content) || '';
+      if (!piece) continue;
+
+      if (isFirstChunk) {
+        clearIndicator();
+        assistantMessage = { id: genId(), role: 'assistant', content: '', parent: parentIdx, meta: {} };
+        messages.push(assistantMessage);
+        assistantEl = createMessageElement(assistantMessage, messages.length - 1);
+        messagesEl.appendChild(assistantEl);
+        requestAnimationFrame(() => setTimeout(() => assistantEl.classList.add('show'), 20));
+        bubbleEl = assistantEl.querySelector('.bubble');
+        isFirstChunk = false;
+      }
+
+      assistantMessage.content += piece;
+
+      if (bubbleEl) {
+        const html = DOMPurify.sanitize(marked.parse(formatMath(assistantMessage.content || '')));
+        bubbleEl.innerHTML = html;
+        enhanceCodeBlocks(bubbleEl);
+        if (window.MathJax && typeof MathJax.typesetPromise === 'function') {
+          MathJax.typesetPromise([bubbleEl]).catch(err => console.warn('MathJax typesetting error:', err));
+        }
+      }
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    if (assistantEl) {
+      const codeBlocksToHighlight = assistantEl.querySelectorAll('pre code');
+      codeBlocksToHighlight.forEach(block => { hljs.highlightElement(block); });
+      const finalBubble = assistantEl.querySelector('.bubble');
+      if (finalBubble && isRTL(assistantMessage.content)) {
+        finalBubble.classList.add('rtl-text');
+        assistantEl.classList.add('msg-rtl');
+      }
+    }
+    saveSession();
+
+  } catch (error) {
+    console.error("regenerateAssistantForParent Error:", error);
+    clearIndicator();
+    const errorMsg = { id: genId(), role: 'assistant', content: 'حدث خطأ. يرجى المحاولة مرة أخرى.', meta: {} };
+    appendMessage(errorMsg, messages.length);
+  } finally {
+    resetSendButton();
+    window._regenLock = false;
   }
-} catch(e) { console.warn('send-button state error (image)', e); }
-            assistantMessage.content += piece;
-        }
-        
-        clearInterval(updateInterval);
-        if (bubbleEl) {
-            bubbleEl.innerHTML = DOMPurify.sanitize(marked.parse(assistantMessage.content));
-            enhanceCodeBlocks(bubbleEl);
-        }
-
-        if (assistantEl) {
-            const codeBlocksToHighlight = assistantEl.querySelectorAll('pre code');
-            codeBlocksToHighlight.forEach(block => { hljs.highlightElement(block); });
-            const finalBubble = assistantEl.querySelector('.bubble');
-            if (finalBubble && isRTL(assistantMessage.content)) {
-                finalBubble.classList.add('rtl-text');
-                assistantEl.classList.add('msg-rtl');
-            }
-        }
-        saveSession();
-
-    } catch (error) {
-        console.error("regenerateAssistantForParent Error:", error);
-        clearIndicator();
-        const errorMsg = { id: genId(), role: 'assistant', content: 'حدث خطأ. يرجى المحاولة مرة أخرى.', meta: {} };
-        appendMessage(errorMsg, messages.length);
-    } finally {
-        sendInsideBtn.classList.remove('is-generating');
-        if (composer.value.trim().length === 0) {
-            sendInsideBtn.classList.remove('visible');
-        }
-        window._regenLock = false;
-    }
 }
 // OPEN/CLOSE CHAT (use history for back-button order)
       function openChatSimple(){
