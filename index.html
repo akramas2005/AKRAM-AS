@@ -3002,6 +3002,23 @@ function decodeFilename(name) {
     return name;
   }
 }
+
+      // ✅ دالة تصحيح تلقائي لصيغ الرياضيات
+function normalizeMathSyntax(text) {
+  if (!text) return text;
+
+  // 1. تحويل أي معادلة في سطر مستقل مثل [ ... ] إلى $$ ... $$
+  text = text.replace(/^\s*\[([^\]]+)\]\s*$/gm, (m, eq) => `$$${eq.trim()}$$`);
+
+  // 2. تحويل معادلات بين أقواس فقط مثل (a+b)/2 إلى inline إذا فيها رموز رياضية
+  text = text.replace(/(?<!\$)\(([^\)]+\\frac|\\sqrt|=|\\sum|\\int|\\pi|\\sin|\\cos|\\tan|_|\^)[^\)]*\)(?!\$)/g,
+                      (m, eq) => `$(${eq})$`);
+
+  // 3. تصحيح أي حالات مضاعفة مثل $$$$...$$$$ (أخطاء محتملة)
+  text = text.replace(/\${3,}/g, '$$');
+
+  return text;
+}
 function scheduleDeletionOnServer(url, opts = {}) {
   if (!url) return;
   fetch(url, Object.assign({ method: 'DELETE' }, opts)).then(resp=>{
@@ -3349,7 +3366,8 @@ async function analyzeImageWithPuter(imageUrl, userPrompt = null, indicator = nu
         botMsg.content += piece;
 
         if (botEl) {
-          const html = DOMPurify.sanitize(marked.parse(formatMath(botMsg.content || '')));
+          const processed = normalizeMathSyntax(formatMath(botMsg.content || ''));
+const html = DOMPurify.sanitize(marked.parse(processed));
           botEl.innerHTML = html;
           enhanceCodeBlocks(botEl);
           if (window.MathJax && typeof MathJax.typesetPromise === 'function') {
@@ -3481,7 +3499,8 @@ async function analyzeFileWithPuter(fileOrUrl, userPrompt = null) {
       assistantMessage.content += piece;
 
       if (bubbleEl) {
-        const html = DOMPurify.sanitize(marked.parse(formatMath(assistantMessage.content || '')));
+        const processed = normalizeMathSyntax(formatMath(botMsg.content || ''));
+const html = DOMPurify.sanitize(marked.parse(processed));
         bubbleEl.innerHTML = html;
         enhanceCodeBlocks(bubbleEl);
         if (window.MathJax && typeof MathJax.typesetPromise === 'function') {
