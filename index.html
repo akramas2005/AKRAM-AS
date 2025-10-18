@@ -1306,6 +1306,24 @@ document.querySelector('.myVideoSwiper').addEventListener('click', (e) => {
         });
         // --- نهاية منطق التحكم في التشغيل التلقائي ---
 
+        // 🟢 الكود الجديد: إعادة تمكين المُنزلق عند لمس المستخدم أو النقر
+document.querySelector('.myVideoSwiper').addEventListener('mousedown', attemptEnableSwiper);
+document.querySelector('.myVideoSwiper').addEventListener('touchstart', attemptEnableSwiper);
+
+function attemptEnableSwiper() {
+    // 1. التحقق من أن المُنزلق مُعطّل حالياً
+    if (videoSwiper && videoSwiper.disabled) {
+        
+        // 2. إعادة تفعيل المُنزلق للسماح بالتمرير اليدوي
+        videoSwiper.enable();
+        
+        // 3. استئناف التشغيل التلقائي (في حال كان متوقفاً)
+        if (!videoSwiper.autoplay.running) {
+             videoSwiper.autoplay.start();
+        }
+    }
+}
+
         // 🟢 الكود الجديد: إيقاف الفيديو واستئناف التمرير عند تغيير الشريحة يدوياً
 videoSwiper.on('slideChange', () => {
     // 1. إيقاف أي فيديو قيد التشغيل في الشريحة السابقة
@@ -1674,6 +1692,7 @@ videoSwiper.on('slideChange', () => {
 </body>
 
 </html>
+
 
 
 
