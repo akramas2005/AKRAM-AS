@@ -1151,23 +1151,34 @@ async function fetchAndPopulateVideos() {
 
         if (videos && videos.length > 0) {
             
-            // 2. إنشاء محتوى الشرائح الجديدة
-            const slideHTML = videos.map(video => `
-                <div class="swiper-slide">
-                    <a href="https://www.youtube.com/watch?v=${video.id}" target="_blank" rel="noopener noreferrer" style="display:block; position:relative; width:100%; height:100%;">
-                        <img 
-    src="https://img.youtube.com/vi/${video.id}/maxresdefault.jpg" 
-    alt="${video.title}" 
-    style="width:100%; height:100%; object-fit:cover; border-radius:10px;"
-    onerror="this.onerror=null; this.src='https://img.youtube.com/vi/${video.id}/hqdefault.jpg';"
->
-                        <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:rgba(0,0,0,0.6); border-radius:50%; padding:10px;">
-                            <svg width="48" height="48" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M8 5v14l11-7L8 5z" fill="white"/>
-                            </svg>
-                        </div>
-                    </a>
+           // 1. إنشاء محتوى الشرائح الجديدة - تم التعديل لعرض العنوان وهيكل التشغيل
+    const slideHTML = videos.map(video => `
+        <div class="swiper-slide">
+            <div class="video-item" data-video-id="${video.id}">
+                
+                <div class="video-placeholder" style="position:relative; cursor:pointer; width:100%; height:100%; min-height:180px;">
+                    <img 
+                        src="https://img.youtube.com/vi/${video.id}/maxresdefault.jpg" 
+                        alt="${video.title}" 
+                        style="width:100%; height:100%; object-fit:cover; border-radius:10px;"
+                        onerror="this.onerror=null; this.src='https://img.youtube.com/vi/${video.id}/hqdefault.jpg';"
+                    >
+                    <div class="play-icon" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:rgba(0,0,0,0.6); border-radius:50%; padding:10px; transition:opacity 0.2s;">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M8 5v14l11-7L8 5z" fill="white"/>
+                        </svg>
+                    </div>
                 </div>
+
+                <div class="video-embed-container" style="position:absolute; top:0; left:0; width:100%; height:100%; border-radius:10px; overflow:hidden; display:none;">
+                    </div>
+
+                <p style="margin-top: 8px; font-size: 14px; font-weight: 600; color: #333; text-align: center; max-height: 3.6em; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">
+                    ${video.title}
+                </p>
+
+            </div>
+        </div>
             `).join('');
 
             // 3. إدراج الشرائح وتحديث Swiper
@@ -1191,6 +1202,43 @@ async function fetchAndPopulateVideos() {
 // استدعاء الدالة لبدء العملية
 fetchAndPopulateVideos();
 // 🔴 نهاية الكود الجديد
+
+        // 🟢 الكود الجديد لتفعيل تشغيل الفيديو داخل الصفحة عند النقر
+document.querySelector('.myVideoSwiper').addEventListener('click', (e) => {
+    
+    // 1. تحديد ما إذا كان النقر على واجهة العرض (الصورة المصغرة)
+    const placeholder = e.target.closest('.video-placeholder');
+    
+    if (placeholder) {
+        // نوقف التمرير التلقائي
+        if (videoSwiper && videoSwiper.autoplay.running) {
+            videoSwiper.autoplay.stop();
+        }
+
+        const videoItem = placeholder.closest('.video-item');
+        const videoId = videoItem.dataset.videoId;
+        
+        const embedContainer = videoItem.querySelector('.video-embed-container');
+
+        // 2. إنشاء كود iframe لمشغل YouTube
+        const iframeHTML = `
+            <iframe 
+                width="100%" 
+                height="100%" 
+                src="https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&showinfo=0" 
+                frameborder="0" 
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                allowfullscreen 
+                title="${videoItem.querySelector('img').alt}"
+            ></iframe>
+        `;
+        
+        // 3. عرض المشغل وإخفاء الواجهة
+        embedContainer.innerHTML = iframeHTML;
+        embedContainer.style.display = 'block';
+        placeholder.style.display = 'none';
+    }
+});
         
         // --- منطق التحكم في التشغيل التلقائي للفيديوهات ---
         let userStoppedAutoplay = false;
@@ -1586,3 +1634,4 @@ document.querySelector('.myVideoSwiper').addEventListener('click', (e) => {
 </body>
 
 </html>
+
