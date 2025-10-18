@@ -1222,9 +1222,7 @@ document.querySelector('.myVideoSwiper').addEventListener('click', (e) => {
     // 2. 🌟 الجزء الحاسم: إيقاف التمرير التلقائي الآن
     if (videoSwiper) {
         // نوقف التشغيل التلقائي بشكل قاطع
-        videoSwiper.autoplay.stop();
-        // قد نحتاج أيضًا لإيقاف تشغيل Swiper بالكامل لمنع أي تأخير:
-        // videoSwiper.disable(); // (إذا لم ينجح التوقف العادي، يمكن تجربة هذا)
+       videoSwiper.disable();
     }
 
         const videoItem = placeholder.closest('.video-item');
@@ -1313,9 +1311,10 @@ videoSwiper.on('slideChange', () => {
     // 1. إيقاف أي فيديو قيد التشغيل في الشريحة السابقة
     stopCurrentVideo(); 
     
-    // 2. استئناف التمرير التلقائي (في حال كان قد توقف بالنقر على فيديو)
-    if (!videoSwiper.autoplay.running) {
-        videoSwiper.autoplay.start();
+    // 2. استئناف التمرير: تفعيل المُنزلق أولاً ثم بدء التشغيل التلقائي
+    if (videoSwiper && videoSwiper.disabled) {
+        videoSwiper.enable(); // ⬅️ إعادة التفعيل هنا
+        videoSwiper.autoplay.start(); 
     }
 });
 
@@ -1675,6 +1674,7 @@ videoSwiper.on('slideChange', () => {
 </body>
 
 </html>
+
 
 
 
