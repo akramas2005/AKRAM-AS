@@ -449,19 +449,20 @@
     }
 
     /* تأثير الضبابية على الحافة اليسرى (يظهر فوق جزء الشريحة التالية) */
-    .video-swiper-container::before,
-    .swiper-frame::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 25px; /* مساحة الضبابية */
-        height: 100%;
-        /* تدرج من لون الخلفية #f7f9fc إلى الشفافية */
-        background: linear-gradient(to right, #f7f9fc 30%, rgba(247, 249, 252, 0) 100%);
-        pointer-events: none;
-        z-index: 10;
-    }
+   .video-swiper-container::before,
+.swiper-frame::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0; /* ⬅️ تم تغييرها من left: 0 إلى right: 0 */
+    left: initial; /* ⬅️ التأكد من إلغاء الإزاحة اليسرى */
+    width: 25px; /* مساحة الضبابية */
+    height: 100%;
+    /* تدرج يتجه إلى اليسار (عكس الاتجاه) */
+    background: linear-gradient(to left, #f7f9fc 30%, rgba(247, 249, 252, 0) 100%);
+    pointer-events: none;
+    z-index: 10;
+}
   }
 
   /* =========================
@@ -1203,14 +1204,19 @@ async function fetchAndPopulateVideos() {
 fetchAndPopulateVideos();
 // 🔴 نهاية الكود الجديد
 
+        
+
         // 🟢 الكود الجديد لتفعيل تشغيل الفيديو داخل الصفحة عند النقر
 document.querySelector('.myVideoSwiper').addEventListener('click', (e) => {
     
     // 1. تحديد ما إذا كان النقر على واجهة العرض (الصورة المصغرة)
     const placeholder = e.target.closest('.video-placeholder');
     
-    if (placeholder) {
-        // نوقف التمرير التلقائي
+   if (placeholder) {
+        // 1. إيقاف أي فيديو آخر قيد التشغيل أولاً (مهم)
+        stopCurrentVideo(); 
+        
+        // 2. نوقف التمرير التلقائي
         if (videoSwiper && videoSwiper.autoplay.running) {
             videoSwiper.autoplay.stop();
         }
@@ -1242,6 +1248,24 @@ document.querySelector('.myVideoSwiper').addEventListener('click', (e) => {
         
         // --- منطق التحكم في التشغيل التلقائي للفيديوهات ---
         let userStoppedAutoplay = false;
+
+        // 🟢 الدالة المساعدة: لإيقاف تشغيل أي فيديو حالي واستعادة الصورة المصغرة
+function stopCurrentVideo() {
+    document.querySelectorAll('.video-embed-container').forEach(embed => {
+        // نتحقق مما إذا كان المشغل iframe ظاهراً
+        if (embed.style.display !== 'none') {
+            const videoItem = embed.closest('.video-item');
+            const placeholder = videoItem.querySelector('.video-placeholder');
+            
+            // 1. إفراغ مشغل الفيديو لإيقاف التشغيل الفوري
+            embed.innerHTML = '';
+            embed.style.display = 'none';
+            
+            // 2. إظهار الصورة المصغرة مرة أخرى
+            placeholder.style.display = 'block';
+        }
+    });
+}
 
     // 1. إيقاف التمرير عند النقر على أي شريحة فيديو (محاكاة لتشغيل الفيديو)
 // نستخدم Event Delegation ليعمل مع الشرائح المحملة ديناميكياً
@@ -1277,6 +1301,17 @@ document.querySelector('.myVideoSwiper').addEventListener('click', (e) => {
             }
         });
         // --- نهاية منطق التحكم في التشغيل التلقائي ---
+
+        // 🟢 الكود الجديد: إيقاف الفيديو واستئناف التمرير عند تغيير الشريحة يدوياً
+videoSwiper.on('slideChange', () => {
+    // 1. إيقاف أي فيديو قيد التشغيل في الشريحة السابقة
+    stopCurrentVideo(); 
+    
+    // 2. استئناف التمرير التلقائي (في حال كان قد توقف بالنقر على فيديو)
+    if (!videoSwiper.autoplay.running) {
+        videoSwiper.autoplay.start();
+    }
+});
 
         /* ===== Explore (mobile) ===== */
         const exploreBtn = document.getElementById('exploreBtn');
@@ -1634,4 +1669,5 @@ document.querySelector('.myVideoSwiper').addEventListener('click', (e) => {
 </body>
 
 </html>
+
 
