@@ -1154,33 +1154,36 @@ async function fetchAndPopulateVideos() {
             
            // 1. إنشاء محتوى الشرائح الجديدة - تم التعديل لعرض العنوان وهيكل التشغيل
     const slideHTML = videos.map(video => `
-        <div class="swiper-slide">
-            <div class="video-item" data-video-id="${video.id}">
+    <div class="swiper-slide">
+        <div class="video-item" data-video-id="${video.id}" style="height: 100%; position: relative;">
+            
+            <div class="video-placeholder" style="position:relative; cursor:pointer; width:100%; height:100%; border-radius:10px; overflow:hidden;">
+                <img 
+                    src="https://img.youtube.com/vi/${video.id}/maxresdefault.jpg" 
+                    alt="${video.title}" 
+                    style="width:100%; height:100%; object-fit:cover;"
+                    onerror="this.onerror=null; this.src='https://img.youtube.com/vi/${video.id}/hqdefault.jpg';"
+                >
                 
-                <div class="video-placeholder" style="position:relative; cursor:pointer; width:100%; height:100%; min-height:180px;">
-                    <img 
-                        src="https://img.youtube.com/vi/${video.id}/maxresdefault.jpg" 
-                        alt="${video.title}" 
-                        style="width:100%; height:100%; object-fit:cover; border-radius:10px;"
-                        onerror="this.onerror=null; this.src='https://img.youtube.com/vi/${video.id}/hqdefault.jpg';"
-                    >
-                    <div class="play-icon" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:rgba(0,0,0,0.6); border-radius:50%; padding:10px; transition:opacity 0.2s;">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M8 5v14l11-7L8 5z" fill="white"/>
-                        </svg>
-                    </div>
+                <div class="title-overlay" style="position:absolute; bottom:0; left:0; width:100%; padding:10px; box-sizing:border-box; background:linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%);">
+                    <p style="font-size: 14px; font-weight: 600; color: white; margin: 0; text-align: right; max-height: 3.6em; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">
+                        ${video.title}
+                    </p>
                 </div>
 
-                <div class="video-embed-container" style="position:absolute; top:0; left:0; width:100%; height:100%; border-radius:10px; overflow:hidden; display:none;">
-                    </div>
+                <div class="play-icon" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:rgba(0,0,0,0.6); border-radius:50%; padding:10px; transition:opacity 0.2s;">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M8 5v14l11-7L8 5z" fill="white"/>
+                    </svg>
+                </div>
+            </div>
 
-                <p style="margin-top: 8px; font-size: 14px; font-weight: 600; color: #333; text-align: center; max-height: 3.6em; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">
-                    ${video.title}
-                </p>
+            <div class="video-embed-container" style="position:absolute; top:0; left:0; width:100%; height:100%; border-radius:10px; overflow:hidden; display:none;">
+                </div>
 
             </div>
-        </div>
-            `).join('');
+    </div>
+`).join('');
 
             // 3. إدراج الشرائح وتحديث Swiper
             swiperWrapper.innerHTML = slideHTML;
@@ -1212,14 +1215,17 @@ document.querySelector('.myVideoSwiper').addEventListener('click', (e) => {
     // 1. تحديد ما إذا كان النقر على واجهة العرض (الصورة المصغرة)
     const placeholder = e.target.closest('.video-placeholder');
     
-   if (placeholder) {
-        // 1. إيقاف أي فيديو آخر قيد التشغيل أولاً (مهم)
-        stopCurrentVideo(); 
-        
-        // 2. نوقف التمرير التلقائي
-        if (videoSwiper && videoSwiper.autoplay.running) {
-            videoSwiper.autoplay.stop();
-        }
+ if (placeholder) {
+    // 1. إيقاف أي فيديو آخر قيد التشغيل أولاً
+    stopCurrentVideo(); 
+    
+    // 2. 🌟 الجزء الحاسم: إيقاف التمرير التلقائي الآن
+    if (videoSwiper) {
+        // نوقف التشغيل التلقائي بشكل قاطع
+        videoSwiper.autoplay.stop();
+        // قد نحتاج أيضًا لإيقاف تشغيل Swiper بالكامل لمنع أي تأخير:
+        // videoSwiper.disable(); // (إذا لم ينجح التوقف العادي، يمكن تجربة هذا)
+    }
 
         const videoItem = placeholder.closest('.video-item');
         const videoId = videoItem.dataset.videoId;
@@ -1669,5 +1675,6 @@ videoSwiper.on('slideChange', () => {
 </body>
 
 </html>
+
 
 
