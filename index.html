@@ -239,7 +239,9 @@
     
     /* 4. تعديل حجم الخطوط والأيقونات لتبدو متناسبة مع شاشة أكبر (اختياري) */
     .carousel-title {
-        font-size: 28px;
+        text-align: left;
+        margin-right: 0; /* إلغاء أي محاذاة سابقة لليمين */
+        margin-left: 20px; /* لجعله يبدأ من حافة الشريحة الأولى */
     }
     .title-overlay p {
         font-size: 16px !important;
@@ -250,6 +252,17 @@
         min-width: 300px !important; /* يجب أن يتطابق مع width: 300px للشريحة */
         max-height: 250px !important;
         height: 250px !important;
+    }
+}
+  /* 6. إخفاء الأسهم (Navigation Buttons) في وضع الكمبيوتر */
+    .swiper-button-next.video-next-btn,
+    .swiper-button-prev.video-prev-btn {
+        display: none !important;
+    }
+    
+    /* 7. إخفاء النقاط (Pagination Dots) في وضع الكمبيوتر */
+    .swiper-pagination.video-pagination {
+        display: none !important;
     }
 }
   /* Features Section */
@@ -359,7 +372,7 @@
 .video-carousel-section {
   max-width: 900px;
   margin: 40px auto 60px auto;
-  padding: 0 16px;
+  padding: 0 20px;
 }
 .carousel-title {
   text-align: center;
@@ -1006,7 +1019,7 @@
     </div>
 
  <section class="video-carousel-section">
-    <h2 class="carousel-title">أحدث الفيديوهات التعليمية</h2>
+    <h2 class="carousel-title">Latest Featured Videos</h2>
     <div class="video-swiper-container" style="position: relative;">
         
         <div class="skeleton-container" id="videoSkeletonLoader" style="display: flex; height: 280px; padding: 0 16px;">
@@ -1178,60 +1191,63 @@
           desc.classList.add('fade-in');
         }, 400);
 
-        // Initialize the existing image Swiper (mySwiper)
+     // Initialize the existing image Swiper (mySwiper)
         const imageSwiper = new Swiper(".mySwiper", {
-          slidesPerView: 1.2,
-          spaceBetween: 30,
-          loop: true,
-          // تفعيل RTL: true لتحقيق محاذاة الشريحة الحالية لليمين وظهور جزء من الشريحة السابقة
-          rtl: true, 
-          autoplay: {
-            delay: 3000,
-            disableOnInteraction: false,
-          },
-          pagination: {
-            el: ".swiper-pagination",
-            clickable: true,
-          },
-          breakpoints: {
-            768: {
-              slidesPerView: 1,
+            slidesPerView: 1.2,
+            spaceBetween: 30,
+            loop: true,
+            // تفعيل RTL: true لتحقيق محاذاة الشريحة الحالية لليمين وظهور جزء من الشريحة السابقة
+            rtl: true, 
+            autoplay: {
+                delay: 3000,
+                disableOnInteraction: false,
             },
-            1024: {
-              slidesPerView: 1.2,
+            pagination: {
+                el: ".swiper-pagination",
+                clickable: true,
+            },
+            breakpoints: {
+                768: {
+                    slidesPerView: 1,
+                },
+                1024: {
+                    slidesPerView: 1.2,
+                }
             }
-          }
         });
 
         // Initialize the NEW Video Swiper Carousel
        const videoSwiper = new Swiper('.myVideoSwiper', {
-    loop: true,
-    slidesPerView: 1.2, // القيمة الافتراضية للهاتف
-    spaceBetween: 16,
-    centeredSlides: true,
-    autoplay: {
-        delay: 5000,
-        disableOnInteraction: false,
-    },
-    pagination: {
-        el: '.video-pagination',
-        clickable: true,
-    },
-    navigation: {
-        nextEl: '.video-next-btn',
-        prevEl: '.video-prev-btn',
-    },
-    
-    // 🟢 التعديل الحاسم: إعدادات خاصة بشاشات الكمبيوتر
-    breakpoints: {
-        // عندما يكون عرض الشاشة 768 بكسل أو أكبر (البي سي)
-        768: {
-            slidesPerView: 3.5, // عرض 3 فيديوهات ونصف في الشاشة
-            spaceBetween: 24, // زيادة المسافة بين الفيديوهات
-            centeredSlides: false, // لا نريد تمرير مركزي في البي سي
-        }
-    }
-});
+            loop: true,
+            slidesPerView: 1.2, // القيمة الافتراضية للهاتف
+            spaceBetween: 16,
+            centeredSlides: true,
+            autoplay: {
+                delay: 5000,
+                disableOnInteraction: false,
+            },
+            pagination: {
+                el: '.video-pagination',
+                clickable: true,
+            },
+            navigation: {
+                nextEl: '.video-next-btn',
+                prevEl: '.video-prev-btn',
+            },
+            
+            // 🟢 التعديل الحاسم: إعدادات خاصة بشاشات الكمبيوتر
+            breakpoints: {
+                // عندما يكون عرض الشاشة 768 بكسل أو أكبر (البي سي)
+                768: {
+                    slidesPerView: 3.5, // عرض 3 فيديوهات ونصف في الشاشة
+                    spaceBetween: 24, // زيادة المسافة بين الفيديوهات
+                    centeredSlides: false, // لا نريد تمرير مركزي في البي سي
+                    // 🌟 الإضافة الجديدة: تعطيل الأسهم والنقاط في وضع البي سي
+                    navigation: false,
+                    pagination: false,
+                }
+            }
+        });
 
         // 🟢 الكود الجديد لجلب البيانات من خادم Render وملء شريط الفيديوهات
 const BACKEND_URL = "https://backend-as-space-1.onrender.com"; // ⬅️ رابط الخادم الذي تم نشره بنجاح
@@ -1830,6 +1846,7 @@ videoSwiper.on('slideChange', () => {
 </body>
 
 </html>
+
 
 
 
