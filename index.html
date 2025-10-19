@@ -157,6 +157,13 @@
   .fade-in {
     animation: fadeIn 0.6s ease forwards;
   }
+
+  .mobile-hero-search {
+    padding: 8px 16px 12px; /* هامش علوي، أفقي، وسفلي */
+    /* قد تحتاج أيضاً إلى تعديل العرض ليناسب الشاشة */
+    width: 100%;
+    box-sizing: border-box; /* للتأكد من أن الهامش لا يزيد العرض الكلي */
+    
   /* Color wave animation - full text gradient */
   @keyframes waveMove {
     0% { background-position: 0 0; }
@@ -1840,6 +1847,7 @@ videoSwiper.on('slideChange', () => {
 </body>
 
 </html>
+
 
 
 
