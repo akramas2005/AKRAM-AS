@@ -169,6 +169,51 @@
     -webkit-text-fill-color: transparent;
     animation: waveMove 3s linear infinite;
   }
+
+  /* 🟢 SKELTON LOADING CSS */
+.skeleton-container {
+    padding: 0 16px;
+    display: flex;
+    overflow: hidden; /* لمنع ظهور شريط التمرير الأفقي للهياكل */
+}
+
+/* نمط الشريط الذي يظهر أثناء التحميل */
+.skeleton-slide {
+    min-width: 250px; /* نفس عرض الشريحة الفعلية */
+    height: 100%;
+    margin-right: 16px;
+    border-radius: 10px;
+    background-color: #e0e0e0; /* لون الخلفية */
+    position: relative;
+    overflow: hidden;
+}
+
+/* تأثير الوميض (Shimmer Effect) */
+.skeleton-slide::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(to right, #e0e0e0 0%, #f0f0f0 20%, #e0e0e0 40%);
+    animation: shimmer 1.5s infinite linear;
+}
+
+/* تعريف الرسوم المتحركة للوميض */
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+/* عنصر العنوان أسفل الهيكل (اختياري) */
+.skeleton-title {
+    height: 14px;
+    width: 80%;
+    margin: 8px auto 0;
+    background-color: #e0e0e0;
+    border-radius: 4px;
+}
   /* Features Section */
   .features-section {
     max-width: 900px;
@@ -923,17 +968,26 @@
     </div>
 
  <section class="video-carousel-section">
-  <h2 class="carousel-title">أحدث الفيديوهات التعليمية</h2>
-  <div class="video-swiper-container">
-    <div class="swiper myVideoSwiper">
-      <div class="swiper-wrapper">
-    <div style="text-align:center; padding:50px; color:#999; width:100%;">جاري تحميل أحدث الفيديوهات...</div>
-</div>
-      <div class="swiper-pagination video-pagination"></div>
-      <div class="swiper-button-next video-next-btn"></div>
-      <div class="swiper-button-prev video-prev-btn"></div>
+    <h2 class="carousel-title">أحدث الفيديوهات التعليمية</h2>
+    <div class="video-swiper-container" style="position: relative;">
+        
+        <div class="skeleton-container" id="videoSkeletonLoader" style="display: flex; height: 280px; padding: 0 16px;">
+            <div class="skeleton-slide" style="min-width: 250px; margin-right: 16px;"></div>
+            <div class="skeleton-slide" style="min-width: 250px; margin-right: 16px;"></div>
+            <div class="skeleton-slide" style="min-width: 250px; margin-right: 16px;"></div>
+            <div class="skeleton-slide" style="min-width: 250px; margin-right: 16px;"></div>
+        </div>
+        
+        <div class="swiper myVideoSwiper" style="display: none;">
+            <div class="swiper-wrapper">
+                </div>
+            
+            <div class="swiper-pagination video-pagination"></div>
+            <div class="swiper-button-next video-next-btn"></div>
+            <div class="swiper-button-prev video-prev-btn"></div>
+        </div>
+        
     </div>
-  </div>
 </section>
   <section class="swiper-section-container">
     <div class="swiper-frame">
@@ -1136,8 +1190,18 @@ const BACKEND_URL = "https://backend-as-space-1.onrender.com"; // ⬅️ راب�
 const API_ENDPOINT = "/api/fetch-videos";
 
 async function fetchAndPopulateVideos() {
-    // نستخدم المتغير videoSwiper الذي تم تعريفه في الأعلى
+    // 1. تحديد العناصر الجديدة للتحكم في العرض
+    const swiperContainer = document.querySelector('.myVideoSwiper'); // ⬅️ حاوية Swiper الرئيسية
     const swiperWrapper = document.querySelector('.myVideoSwiper .swiper-wrapper');
+    const skeletonLoader = document.getElementById('videoSkeletonLoader'); // ⬅️ عنصر هيكل التحميل
+
+    // 2. 🟢 إظهار الهيكل عند بدء الجلب وإخفاء المُنزلق الحقيقي
+    if (skeletonLoader) {
+        skeletonLoader.style.display = 'flex';
+    }
+    if (swiperContainer) {
+        swiperContainer.style.display = 'none';
+    }
     
     try {
         // 1. الاتصال بخادم Render
@@ -1152,41 +1216,49 @@ async function fetchAndPopulateVideos() {
 
         if (videos && videos.length > 0) {
             
-           // 1. إنشاء محتوى الشرائح الجديدة - تم التعديل لعرض العنوان وهيكل التشغيل
-    const slideHTML = videos.map(video => `
-    <div class="swiper-slide">
-        <div class="video-item" data-video-id="${video.id}" style="height: 100%; position: relative;">
-            
-            <div class="video-placeholder" style="position:relative; cursor:pointer; width:100%; height:100%; border-radius:10px; overflow:hidden;">
-                <img 
-                    src="https://img.youtube.com/vi/${video.id}/maxresdefault.jpg" 
-                    alt="${video.title}" 
-                    style="width:100%; height:100%; object-fit:cover;"
-                    onerror="this.onerror=null; this.src='https://img.youtube.com/vi/${video.id}/hqdefault.jpg';"
-                >
-                
-                <div class="title-overlay" style="position:absolute; bottom:0; left:0; width:100%; padding:10px; box-sizing:border-box; background:linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%);">
-                    <p style="font-size: 14px; font-weight: 600; color: white; margin: 0; text-align: right; max-height: 3.6em; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">
-                        ${video.title}
-                    </p>
-                </div>
+           // 1. إنشاء محتوى الشرائح الجديدة - (نفس الكود القديم هنا)
+           const slideHTML = videos.map(video => `
+            <div class="swiper-slide">
+                <div class="video-item" data-video-id="${video.id}" style="height: 100%; position: relative;">
+                    
+                    <div class="video-placeholder" style="position:relative; cursor:pointer; width:100%; height:100%; border-radius:10px; overflow:hidden;">
+                        <img 
+                            src="https://img.youtube.com/vi/${video.id}/maxresdefault.jpg" 
+                            alt="${video.title}" 
+                            style="width:100%; height:100%; object-fit:cover;"
+                            onerror="this.onerror=null; this.src='https://img.youtube.com/vi/${video.id}/hqdefault.jpg';"
+                        >
+                        
+                        <div class="title-overlay" style="position:absolute; bottom:0; left:0; width:100%; padding:10px; box-sizing:border-box; background:linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%);">
+                            <p style="font-size: 14px; font-weight: 600; color: white; margin: 0; text-align: right; max-height: 3.6em; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">
+                                ${video.title}
+                            </p>
+                        </div>
 
-                <div class="play-icon" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:rgba(0,0,0,0.6); border-radius:50%; padding:10px; transition:opacity 0.2s;">
-                    <svg width="48" height="48" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M8 5v14l11-7L8 5z" fill="white"/>
-                    </svg>
-                </div>
+                        <div class="play-icon" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:rgba(0,0,0,0.6); border-radius:50%; padding:10px; transition:opacity 0.2s;">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M8 5v14l11-7L8 5z" fill="white"/>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <div class="video-embed-container" style="position:absolute; top:0; left:0; width:100%; height:100%; border-radius:10px; overflow:hidden; display:none;">
+                        </div>
+
+                    </div>
             </div>
-
-            <div class="video-embed-container" style="position:absolute; top:0; left:0; width:100%; height:100%; border-radius:10px; overflow:hidden; display:none;">
-                </div>
-
-            </div>
-    </div>
-`).join('');
+            `).join('');
 
             // 3. إدراج الشرائح وتحديث Swiper
             swiperWrapper.innerHTML = slideHTML;
+            
+            // 4. 🟢 إخفاء الهيكل وإظهار المُنزلق عند النجاح
+            if (skeletonLoader) {
+                skeletonLoader.style.display = 'none';
+            }
+            if (swiperContainer) {
+                swiperContainer.style.display = 'block'; // أو flex
+            }
             
             // تحديث Swiper ليقرأ الشرائح الجديدة (نستخدم المتغير videoSwiper)
             if (videoSwiper) {
@@ -1195,10 +1267,28 @@ async function fetchAndPopulateVideos() {
             }
 
         } else {
+            // 🟢 في حالة عدم وجود فيديوهات
             swiperWrapper.innerHTML = `<div style="text-align:center; padding:50px; color:#999; font-size:18px; width:100%;">تعذر تحميل الفيديوهات أو القائمة فارغة.</div>`;
+            
+            // إخفاء الهيكل وإظهار رسالة الخطأ
+            if (skeletonLoader) {
+                skeletonLoader.style.display = 'none';
+            }
+            if (swiperContainer) {
+                swiperContainer.style.display = 'block';
+            }
         }
     } catch (error) {
+        // 🟢 في حالة حدوث خطأ
         swiperWrapper.innerHTML = `<div style="text-align:center; padding:50px; color:red; font-size:18px; width:100%;">حدث خطأ أثناء جلب الفيديوهات.</div>`;
+        
+        // إخفاء الهيكل وإظهار رسالة الخطأ
+        if (skeletonLoader) {
+            skeletonLoader.style.display = 'none';
+        }
+        if (swiperContainer) {
+            swiperContainer.style.display = 'block';
+        }
         console.error("Error fetching or updating videos:", error);
     }
 }
@@ -1692,6 +1782,7 @@ videoSwiper.on('slideChange', () => {
 </body>
 
 </html>
+
 
 
 
