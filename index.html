@@ -157,13 +157,6 @@
   .fade-in {
     animation: fadeIn 0.6s ease forwards;
   }
-
-  .mobile-hero-search {
-    padding: 8px 16px 12px; /* هامش علوي، أفقي، وسفلي */
-    /* قد تحتاج أيضاً إلى تعديل العرض ليناسب الشاشة */
-    width: 100%;
-    box-sizing: border-box; /* للتأكد من أن الهامش لا يزيد العرض الكلي */
-    
   /* Color wave animation - full text gradient */
   @keyframes waveMove {
     0% { background-position: 0 0; }
@@ -1012,7 +1005,7 @@
     <a href="#" onclick="menuNavClick(event, 'support')">Support and Contact</a>
   </nav>
 
- <div class="hero">
+  <div class="hero">
     <div id="mobileHeroSearch" class="mobile-hero-search" aria-hidden="false">
       <input type="search" placeholder="Search tools, prompts…" aria-label="Mobile search" />
       <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
