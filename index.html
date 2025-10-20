@@ -1308,6 +1308,13 @@ document.querySelector('.myVideoSwiper').addEventListener('click', (e) => {
   // إخفاء الصورة المصغرة
   placeholder.style.display = 'none';
 
+   // 4. 🟢 بعد ثانية واحدة، نعيد تفعيل النقر على الفيديو
+  setTimeout(() => {
+    const iframe = embedContainer.querySelector('iframe');
+    if (iframe) iframe.style.pointerEvents = 'auto';
+  }, 1000);
+});
+
   // تعيين العنصر المشغّل حالياً
   currentPlayingVideoItem = videoItem;
 });
@@ -1870,6 +1877,7 @@ fetchAndPopulateVideos();
 </body>
 
 </html>
+
 
 
 
