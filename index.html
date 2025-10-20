@@ -1255,16 +1255,139 @@
             }
         });
 
-        let autoplayTimer = null;
-        videoSwiper.on('slideChange', () => {
-    stopCurrentVideo();
-    if (autoplayTimer) clearTimeout(autoplayTimer);
-    autoplayTimer = setTimeout(() => {
-        if (!videoSwiper.autoplay.running) {
-            videoSwiper.autoplay.start();
-        }
-    }, 5000);
+        // -----------------------------
+// Smart autoplay / video control
+// ضع هذا مباشرة بعد تعريف videoSwiper
+// -----------------------------
+
+// متغيرات حالة
+let currentPlayingVideoItem = null; // العنصر الذي يحتوي الفيديو المشغل حاليًا
+let autoplayResumeTimer = null;     // مؤقت لإعادة تشغيل الـ autoplay
+let userInitiatedInteraction = false; // true إذا بدأ المستخدم تفاعل يدوي (touch/mouse)
+
+// force start autoplay on load (helps when autoplay not starting automatically)
+try { 
+  if (videoSwiper && videoSwiper.autoplay && !videoSwiper.autoplay.running) {
+    videoSwiper.autoplay.start();
+  }
+} catch(e) { console.warn("Could not start videoSwiper autoplay on init:", e); }
+
+// استخدام Delegation لأن الشرائح تُحمّل ديناميكياً
+document.querySelector('.myVideoSwiper').addEventListener('click', (e) => {
+  const placeholder = e.target.closest('.video-placeholder');
+  if (!placeholder) return;
+
+  // إذا تم النقر على أي عنصر تشغيل:
+  // 1) إيقاف أي فيديو كان يعمل
+  stopCurrentVideo();
+
+  // 2) نوقف التمرير التلقائي فقط (لا نعطل التمرير اليدوي)
+  if (videoSwiper && videoSwiper.autoplay && videoSwiper.autoplay.running) {
+    videoSwiper.autoplay.stop();
+  }
+  // 3) نلغي أي مؤقت لإعادة التشغيل سابق
+  if (autoplayResumeTimer) { clearTimeout(autoplayResumeTimer); autoplayResumeTimer = null; }
+
+  // 4) شغل الفيديو المطلوب داخل الشريحة
+  const videoItem = placeholder.closest('.video-item');
+  if (!videoItem) return;
+  const videoId = videoItem.dataset.videoId;
+  const embedContainer = videoItem.querySelector('.video-embed-container');
+
+  // إنشاء iframe
+  const iframeHTML = `
+    <iframe width="100%" height="100%" 
+      src="https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&showinfo=0" 
+      frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+      allowfullscreen title="${videoItem.querySelector('img') ? videoItem.querySelector('img').alt : ''}">
+    </iframe>`;
+  if (embedContainer) {
+    embedContainer.innerHTML = iframeHTML;
+    embedContainer.style.display = 'block';
+  }
+  // إخفاء الصورة المصغرة
+  placeholder.style.display = 'none';
+
+  // تعيين العنصر المشغّل حالياً
+  currentPlayingVideoItem = videoItem;
 });
+
+// دالة لإيقاف أي فيديو يعمل حالياً وإرجاع الحالة إلى الصورة المصغرة
+function stopCurrentVideo() {
+  // قُم بإيقاف أي iframe موجود في جميع الشرايح
+  document.querySelectorAll('.video-embed-container').forEach(embed => {
+    if (embed && embed.style.display !== 'none') {
+      const videoItem = embed.closest('.video-item');
+      const placeholder = videoItem ? videoItem.querySelector('.video-placeholder') : null;
+      embed.innerHTML = '';
+      embed.style.display = 'none';
+      if (placeholder) placeholder.style.display = 'block';
+    }
+  });
+  currentPlayingVideoItem = null;
+}
+
+// --------- التعامل مع التمرير اليدوي/اللمس ---------
+// نعلم عندما يبدأ المستخدم التفاعل يدوياً
+document.querySelector('.myVideoSwiper').addEventListener('touchstart', () => { userInitiatedInteraction = true; });
+document.querySelector('.myVideoSwiper').addEventListener('pointerdown', () => { userInitiatedInteraction = true; });
+document.querySelector('.myVideoSwiper').addEventListener('mousedown', () => { userInitiatedInteraction = true; });
+
+// عندما ينتهي التفاعل اليدوي (touchend / mouseup) نتصرف بناءً على الحالة
+document.querySelector('.myVideoSwiper').addEventListener('touchend', handleUserInteractionEnd);
+document.querySelector('.myVideoSwiper').addEventListener('pointerup', handleUserInteractionEnd);
+document.querySelector('.myVideoSwiper').addEventListener('mouseup', handleUserInteractionEnd);
+
+function handleUserInteractionEnd() {
+  // إذا كان هناك فيديو يعمل حاليًا => أوقفه، ثم أعد autoplay بعد 3s
+  if (currentPlayingVideoItem) {
+    stopCurrentVideo();
+
+    // نُعيد تشغيل الـ autoplay بعد 3 ثواني (كما طلبت)
+    if (autoplayResumeTimer) clearTimeout(autoplayResumeTimer);
+    autoplayResumeTimer = setTimeout(() => {
+      if (videoSwiper && videoSwiper.autoplay && !videoSwiper.autoplay.running) {
+        videoSwiper.autoplay.start();
+      }
+      autoplayResumeTimer = null;
+    }, 3000);
+  } else {
+    // لا يوجد فيديو يعمل: استأنف autoplay فوراً إذا كان متوقفاً
+    if (videoSwiper && videoSwiper.autoplay && !videoSwiper.autoplay.running) {
+      videoSwiper.autoplay.start();
+    }
+  }
+  // إعادة تعيين علم التفاعل اليدوي بعد وقت قصير
+  setTimeout(() => { userInitiatedInteraction = false; }, 200);
+}
+
+// --------- عند تغيير الشريحة (سواء بالتمرير اليدوي أو التلقائي) ---------
+videoSwiper.on('slideChange', () => {
+  // إذا انتقلنا لشريحة جديدة، يجب إيقاف أي فيديو ما يزال يعمل
+  // (يعني لو كان فيديو يعمل وشغّل المستخدم التمرير التلقائي أو اليدوي، سنتأكد من إيقافه)
+  if (currentPlayingVideoItem) {
+    // إذا كان التغيير سببه تفاعل يدوي من المستخدم، نعيد autoplay بعد 3 ثواني
+    if (userInitiatedInteraction) {
+      stopCurrentVideo();
+      if (autoplayResumeTimer) clearTimeout(autoplayResumeTimer);
+      autoplayResumeTimer = setTimeout(() => {
+        if (videoSwiper && videoSwiper.autoplay && !videoSwiper.autoplay.running) {
+          videoSwiper.autoplay.start();
+        }
+        autoplayResumeTimer = null;
+      }, 3000);
+    } else {
+      // إذا كان التغيير تلقائيًا بواسطة الـ swiper نفسه، فقط نوقف الفيديو (لا نحتاج لتأخير إعادة التشغيل لأن autoplay سيستمر)
+      stopCurrentVideo();
+    }
+  } else {
+    // لا يوجد فيديو يعمل حالياً: تأكد من تشغيل autoplay (حالة بداية الصفحة أو بعد توقف سابق)
+    if (videoSwiper && videoSwiper.autoplay && !videoSwiper.autoplay.running) {
+      videoSwiper.autoplay.start();
+    }
+  }
+});
+
 
         // 🟢 الكود الجديد لجلب البيانات من خادم Render وملء شريط الفيديوهات
 const BACKEND_URL = "https://backend-as-space-1.onrender.com"; // ⬅️ رابط الخادم الذي تم نشره بنجاح
@@ -1379,132 +1502,6 @@ async function fetchAndPopulateVideos() {
 // استدعاء الدالة لبدء العملية
 fetchAndPopulateVideos();
 // 🔴 نهاية الكود الجديد
-
-        
-
-        // 🟢 الكود الجديد لتفعيل تشغيل الفيديو داخل الصفحة عند النقر
-document.querySelector('.myVideoSwiper').addEventListener('click', (e) => {
-    
-    // 1. تحديد ما إذا كان النقر على واجهة العرض (الصورة المصغرة)
-    const placeholder = e.target.closest('.video-placeholder');
-    
-if (placeholder) {
-    // 1. أوقف أي فيديو آخر قيد التشغيل
-    stopCurrentVideo(); 
-
-    // 2. أوقف فقط التمرير التلقائي، واحتفظ بالتحكم اليدوي
-    if (videoSwiper && videoSwiper.autoplay.running) {
-        videoSwiper.autoplay.stop();
-    }
-
-    const videoItem = placeholder.closest('.video-item');
-    const videoId = videoItem.dataset.videoId;
-    const embedContainer = videoItem.querySelector('.video-embed-container');
-
-    // 3. شغّل الفيديو الجديد
-    const iframeHTML = `
-        <iframe 
-            width="100%" 
-            height="100%" 
-            src="https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&showinfo=0" 
-            frameborder="0" 
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-            allowfullscreen 
-            title="${videoItem.querySelector('img').alt}"
-        ></iframe>
-    `;
-    embedContainer.innerHTML = iframeHTML;
-    embedContainer.style.display = 'block';
-    placeholder.style.display = 'none';
-}
-});
-        
-        // --- منطق التحكم في التشغيل التلقائي للفيديوهات ---
-        let userStoppedAutoplay = false;
-
-        // 🟢 الدالة المساعدة: لإيقاف تشغيل أي فيديو حالي واستعادة الصورة المصغرة
-function stopCurrentVideo() {
-    document.querySelectorAll('.video-embed-container').forEach(embed => {
-        // نتحقق مما إذا كان المشغل iframe ظاهراً
-        if (embed.style.display !== 'none') {
-            const videoItem = embed.closest('.video-item');
-            const placeholder = videoItem.querySelector('.video-placeholder');
-            
-            // 1. إفراغ مشغل الفيديو لإيقاف التشغيل الفوري
-            embed.innerHTML = '';
-            embed.style.display = 'none';
-            
-            // 2. إظهار الصورة المصغرة مرة أخرى
-            placeholder.style.display = 'block';
-        }
-    });
-}
-
-    // 1. إيقاف التمرير عند النقر على أي شريحة فيديو (محاكاة لتشغيل الفيديو)
-// نستخدم Event Delegation ليعمل مع الشرائح المحملة ديناميكياً
-document.querySelector('.myVideoSwiper').addEventListener('click', (e) => {
-    // نتحقق مما إذا كان النقر على رابط داخل شريحة
-    if (e.target.closest('.swiper-slide a')) {
-        // نوقف الـ swiper الخاص بالفيديوهات فقط
-        if (videoSwiper.autoplay.running) {
-            videoSwiper.autoplay.stop();
-            userStoppedAutoplay = true;
-        }
-    }
-});
-
-        // 2. إيقاف التمرير التلقائي عند بدء المستخدم التفاعل يدوياً (باللمس)
-        videoSwiper.on('touchStart', () => {
-            if (videoSwiper.autoplay.running) {
-                videoSwiper.autoplay.stop();
-                userStoppedAutoplay = true;
-            }
-        });
-        
-        // 3. استئناف التمرير التلقائي بعد انتهاء التمرير اليدوي أو انتهاء الفيديو (باستخدام توقيت)
-        videoSwiper.on('touchEnd', () => {
-            if (userStoppedAutoplay) {
-                // 1 ثانية انتظار قبل الاستئناف لانتهاء التفاعل
-                setTimeout(() => {
-                    if (!videoSwiper.autoplay.running) {
-                        videoSwiper.autoplay.start();
-                        userStoppedAutoplay = false;
-                    }
-                }, 1000); 
-            }
-        });
-        // --- نهاية منطق التحكم في التشغيل التلقائي ---
-
-
-        // 🟢 الكود الجديد: إعادة تمكين المُنزلق عند لمس المستخدم أو النقر
-document.querySelector('.myVideoSwiper').addEventListener('mousedown', attemptEnableSwiper);
-document.querySelector('.myVideoSwiper').addEventListener('touchstart', attemptEnableSwiper);
-
-function attemptEnableSwiper() {
-    // 1. التحقق من أن المُنزلق مُعطّل حالياً
-    if (videoSwiper && videoSwiper.disabled) {
-        
-        // 2. إعادة تفعيل المُنزلق للسماح بالتمرير اليدوي
-        videoSwiper.enable();
-        
-        // 3. استئناف التشغيل التلقائي (في حال كان متوقفاً)
-        if (!videoSwiper.autoplay.running) {
-             videoSwiper.autoplay.start();
-        }
-    }
-}
-
-        // 🟢 الكود الجديد: إيقاف الفيديو واستئناف التمرير عند تغيير الشريحة يدوياً
-videoSwiper.on('slideChange', () => {
-    // 1. إيقاف أي فيديو قيد التشغيل في الشريحة السابقة
-    stopCurrentVideo(); 
-    
-    // 2. استئناف التمرير: تفعيل المُنزلق أولاً ثم بدء التشغيل التلقائي
-    if (videoSwiper && videoSwiper.disabled) {
-        videoSwiper.enable(); // ⬅️ إعادة التفعيل هنا
-        videoSwiper.autoplay.start(); 
-    }
-});
 
         /* ===== Explore (mobile) ===== */
         const exploreBtn = document.getElementById('exploreBtn');
@@ -1862,6 +1859,7 @@ videoSwiper.on('slideChange', () => {
 </body>
 
 </html>
+
 
 
 
