@@ -1133,8 +1133,18 @@
         </div>
       
       <!-- 🔵 أسهم التنقل اليدوي في شريط الفيديوهات -->
-    <div id="videoNavLeft" class="video-nav-btn left-btn">‹</div>
-    <div id="videoNavRight" class="video-nav-btn right-btn">›</div>
+    <!-- 🌟 أسهم التنقل اليدوي بتصميم SVG Minimal -->
+<div id="videoNavLeft" class="video-nav-btn left-btn" aria-label="Previous">
+  <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="15 18 9 12 15 6"></polyline>
+  </svg>
+</div>
+
+<div id="videoNavRight" class="video-nav-btn right-btn" aria-label="Next">
+  <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="9 6 15 12 9 18"></polyline>
+  </svg>
+</div>
         
     </div>
 </section>
@@ -2037,6 +2047,7 @@ function handleVideoStopUI() {
 </body>
 
 </html>
+
 
 
 
