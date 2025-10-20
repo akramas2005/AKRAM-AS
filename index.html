@@ -231,11 +231,37 @@
         /* !important لضمان تجاوز الأنماط الافتراضية لـ Swiper */
     }
 
-    /* 3. تعديل حجم الحاوية لمنع الفيديوهات من أن تكون عالية جداً */
+  .swiper-slide .video-item {
+    display: flex; /* لترتيب الصورة والعنوان عمودياً */
+    flex-direction: column;
+    /* إزالة تحديد الارتفاع القسري (مثل height: 100%) إن وجد */
+    /* يجب أن يسمح الارتفاع الآن للعناصر بالظهور خارجه */
+}
+
+/* 🟢 ضبط ارتفاع الصورة المصغرة */
+.video-placeholder {
+    width: 100%;
+    /* تحديد ارتفاع مرن أو ثابت للصورة المصغرة فقط */
+    height: 180px; /* مثال لارتفاع معقول */
+    flex-shrink: 0; /* لمنعها من الانكماش */
+    position: relative;
+    border-radius: 10px; /* إعادة تعيين الزوايا المشطوفة */
+    overflow: hidden;
+}
+
+/* 🟢 التنسيق الخاص بالكمبيوتر (في @media (min-width: 768px)) */
+@media (min-width: 768px) {
+    /* ... (تعديلات الكمبيوتر القديمة) ... */
+    
+    /* 🌟 تعديل ارتفاع الحاوية الكلي للكمبيوتر */
     .video-item {
-        /* تحديد ارتفاع أقصى لحاوية الفيديو لجعلها أقصر */
-        max-height: 250px; 
+        max-height: none !important; /* إلغاء الـ max-height القديم */
     }
+    
+    .video-placeholder {
+        height: 150px; /* ارتفاع أقل للصور المصغرة في الكمبيوتر */
+    }
+}
     
     /* 4. تعديل حجم الخطوط والأيقونات لتبدو متناسبة مع شاشة أكبر (اختياري) */
     .carousel-title {
@@ -1293,11 +1319,19 @@ async function fetchAndPopulateVideos() {
                             onerror="this.onerror=null; this.src='https://img.youtube.com/vi/${video.id}/hqdefault.jpg';"
                         >
                         
-                        <div class="title-overlay" style="position:absolute; bottom:0; left:0; width:100%; padding:10px; box-sizing:border-box; background:linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%);">
-                            <p style="font-size: 14px; font-weight: 600; color: white; margin: 0; text-align: right; max-height: 3.6em; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">
-                                ${video.title}
-                            </p>
-                        </div>
+                        <div class="video-info-footer" style="display: flex; align-items: flex-start; padding: 8px 0; margin-top: 5px;">
+    
+    <img 
+        src="https://via.placeholder.com/40/007bff/ffffff?text=AS" 
+        alt="Channel Icon"
+        class="channel-icon"
+        style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex-shrink: 0; margin-left: 10px;"
+    >
+
+    <p class="video-title-new" style="font-size: 14px; font-weight: 600; color: #111; margin: 0; text-align: right; max-height: 3.6em; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; padding-right: 10px;">
+        ${video.title}
+    </p>
+</div>
 
                         <div class="play-icon" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:rgba(0,0,0,0.6); border-radius:50%; padding:10px; transition:opacity 0.2s;">
                             <svg width="48" height="48" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
@@ -1846,6 +1880,7 @@ videoSwiper.on('slideChange', () => {
 </body>
 
 </html>
+
 
 
 
