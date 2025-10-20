@@ -401,6 +401,41 @@
   border: none;
   display: block;
 }
+  .video-nav-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  background: rgba(0, 0, 0, 0.4);
+  color: white;
+  font-size: 30px;
+  width: 40px;
+  height: 40px;
+  line-height: 36px;
+  text-align: center;
+  border-radius: 50%;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.3s, background 0.3s;
+  user-select: none;
+}
+
+.video-nav-btn:hover {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.video-nav-btn.left-btn {
+  left: 8px;
+}
+
+.video-nav-btn.right-btn {
+  right: 8px;
+}
+
+/* عند تفعيلها */
+.video-nav-btn.visible {
+  opacity: 1;
+}
 
   /*
     * New Styles for Swiper (unchanged)
@@ -1043,6 +1078,10 @@
             <div class="swiper-button-next video-next-btn"></div>
             <div class="swiper-button-prev video-prev-btn"></div>
         </div>
+      
+      <!-- 🔵 أسهم التنقل اليدوي في شريط الفيديوهات -->
+    <div id="videoNavLeft" class="video-nav-btn left-btn">‹</div>
+    <div id="videoNavRight" class="video-nav-btn right-btn">›</div>
         
     </div>
 </section>
@@ -1255,6 +1294,8 @@
             }
         });
 
+        
+
         // -----------------------------
 // Smart autoplay / video control
 // ضع هذا مباشرة بعد تعريف videoSwiper
@@ -1309,13 +1350,17 @@ document.querySelector('.myVideoSwiper').addEventListener('click', (e) => {
     ></iframe>
   `;
 
-  if (embedContainer) {
-    embedContainer.innerHTML = iframeHTML;
-    embedContainer.style.display = 'block';
-  }
+ if (embedContainer) {
+  embedContainer.innerHTML = iframeHTML;
+  embedContainer.style.display = 'block';
+}
 
-  // إخفاء الصورة المصغّرة
-  placeholder.style.display = 'none';
+// إخفاء الصورة المصغّرة
+placeholder.style.display = 'none';
+
+// 🔵 أظهر الأسهم عند تشغيل الفيديو
+handleVideoPlayUI(); 
+
 
   // بعد ثانية، نعيد تفعيل النقر على الفيديو
   setTimeout(() => {
@@ -1329,7 +1374,7 @@ document.querySelector('.myVideoSwiper').addEventListener('click', (e) => {
 
 // دالة لإيقاف أي فيديو يعمل حالياً وإرجاع الحالة إلى الصورة المصغرة
 function stopCurrentVideo() {
-  // قُم بإيقاف أي iframe موجود في جميع الشرايح
+  // قُم بإيقاف أي iframe موجود في جميع الشرائح
   document.querySelectorAll('.video-embed-container').forEach(embed => {
     if (embed && embed.style.display !== 'none') {
       const videoItem = embed.closest('.video-item');
@@ -1340,6 +1385,9 @@ function stopCurrentVideo() {
     }
   });
   currentPlayingVideoItem = null;
+
+  // 🔵 أخفِ الأسهم بعد إيقاف الفيديو
+  handleVideoStopUI();
 }
 
 // --------- التعامل مع التمرير اليدوي/اللمس ---------
@@ -1528,6 +1576,25 @@ async function fetchAndPopulateVideos() {
 // استدعاء الدالة لبدء العملية
 fetchAndPopulateVideos();
 // 🔴 نهاية الكود الجديد
+
+        // 🔵 وظائف التحكم في إظهار/إخفاء الأسهم اليدوية
+function handleVideoPlayUI() {
+  const leftBtn = document.getElementById('videoNavLeft');
+  const rightBtn = document.getElementById('videoNavRight');
+  if (leftBtn && rightBtn) {
+    leftBtn.style.display = 'flex';
+    rightBtn.style.display = 'flex';
+  }
+}
+
+function handleVideoStopUI() {
+  const leftBtn = document.getElementById('videoNavLeft');
+  const rightBtn = document.getElementById('videoNavRight');
+  if (leftBtn && rightBtn) {
+    leftBtn.style.display = 'none';
+    rightBtn.style.display = 'none';
+  }
+}
 
         /* ===== Explore (mobile) ===== */
         const exploreBtn = document.getElementById('exploreBtn');
@@ -1885,6 +1952,7 @@ fetchAndPopulateVideos();
 </body>
 
 </html>
+
 
 
 
