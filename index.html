@@ -1255,6 +1255,17 @@
             }
         });
 
+        let autoplayTimer = null;
+        videoSwiper.on('slideChange', () => {
+    stopCurrentVideo();
+    if (autoplayTimer) clearTimeout(autoplayTimer);
+    autoplayTimer = setTimeout(() => {
+        if (!videoSwiper.autoplay.running) {
+            videoSwiper.autoplay.start();
+        }
+    }, 5000);
+});
+
         // 🟢 الكود الجديد لجلب البيانات من خادم Render وملء شريط الفيديوهات
 const BACKEND_URL = "https://backend-as-space-1.onrender.com"; // ⬅️ رابط الخادم الذي تم نشره بنجاح
 const API_ENDPOINT = "/api/fetch-videos";
@@ -1377,39 +1388,35 @@ document.querySelector('.myVideoSwiper').addEventListener('click', (e) => {
     // 1. تحديد ما إذا كان النقر على واجهة العرض (الصورة المصغرة)
     const placeholder = e.target.closest('.video-placeholder');
     
- if (placeholder) {
-    // 1. إيقاف أي فيديو آخر قيد التشغيل أولاً
+if (placeholder) {
+    // 1. أوقف أي فيديو آخر قيد التشغيل
     stopCurrentVideo(); 
-    
-    // 2. 🌟 الجزء الحاسم: إيقاف التمرير التلقائي الآن
-    if (videoSwiper) {
-        // نوقف التشغيل التلقائي بشكل قاطع
-       videoSwiper.disable();
+
+    // 2. أوقف فقط التمرير التلقائي، واحتفظ بالتحكم اليدوي
+    if (videoSwiper && videoSwiper.autoplay.running) {
+        videoSwiper.autoplay.stop();
     }
 
-        const videoItem = placeholder.closest('.video-item');
-        const videoId = videoItem.dataset.videoId;
-        
-        const embedContainer = videoItem.querySelector('.video-embed-container');
+    const videoItem = placeholder.closest('.video-item');
+    const videoId = videoItem.dataset.videoId;
+    const embedContainer = videoItem.querySelector('.video-embed-container');
 
-        // 2. إنشاء كود iframe لمشغل YouTube
-        const iframeHTML = `
-            <iframe 
-                width="100%" 
-                height="100%" 
-                src="https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&showinfo=0" 
-                frameborder="0" 
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                allowfullscreen 
-                title="${videoItem.querySelector('img').alt}"
-            ></iframe>
-        `;
-        
-        // 3. عرض المشغل وإخفاء الواجهة
-        embedContainer.innerHTML = iframeHTML;
-        embedContainer.style.display = 'block';
-        placeholder.style.display = 'none';
-    }
+    // 3. شغّل الفيديو الجديد
+    const iframeHTML = `
+        <iframe 
+            width="100%" 
+            height="100%" 
+            src="https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&showinfo=0" 
+            frameborder="0" 
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+            allowfullscreen 
+            title="${videoItem.querySelector('img').alt}"
+        ></iframe>
+    `;
+    embedContainer.innerHTML = iframeHTML;
+    embedContainer.style.display = 'block';
+    placeholder.style.display = 'none';
+}
 });
         
         // --- منطق التحكم في التشغيل التلقائي للفيديوهات ---
@@ -1467,6 +1474,9 @@ document.querySelector('.myVideoSwiper').addEventListener('click', (e) => {
             }
         });
         // --- نهاية منطق التحكم في التشغيل التلقائي ---
+
+        let autoplayTimer = null;
+
 
         // 🟢 الكود الجديد: إعادة تمكين المُنزلق عند لمس المستخدم أو النقر
 document.querySelector('.myVideoSwiper').addEventListener('mousedown', attemptEnableSwiper);
@@ -1854,6 +1864,7 @@ videoSwiper.on('slideChange', () => {
 </body>
 
 </html>
+
 
 
 
