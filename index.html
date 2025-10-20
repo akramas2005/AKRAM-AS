@@ -1331,9 +1331,41 @@
                     pagination: false,
                 }
             }
-        });
+        }); 
 
-        
+        // 🔵 ربط الأسهم اليدوية بالتحكم في Swiper
+const leftArrow = document.getElementById('videoNavLeft');
+const rightArrow = document.getElementById('videoNavRight');
+
+if (leftArrow && rightArrow) {
+  leftArrow.addEventListener('click', () => {
+    if (videoSwiper) {
+      videoSwiper.slidePrev(); // تمرير إلى اليسار
+      stopCurrentVideo();
+      restartAutoplayAfterDelay();
+    }
+  });
+
+  rightArrow.addEventListener('click', () => {
+    if (videoSwiper) {
+      videoSwiper.slideNext(); // تمرير إلى اليمين
+      stopCurrentVideo();
+      restartAutoplayAfterDelay();
+    }
+  });
+}
+
+// 🟢 دالة مساعدة لاستئناف التمرير التلقائي بعد 3 ثواني
+function restartAutoplayAfterDelay() {
+  if (typeof autoplayResumeTimer !== 'undefined' && autoplayResumeTimer) {
+    clearTimeout(autoplayResumeTimer);
+  }
+  autoplayResumeTimer = setTimeout(() => {
+    if (videoSwiper && videoSwiper.autoplay && !videoSwiper.autoplay.running) {
+      videoSwiper.autoplay.start();
+    }
+  }, 3000);
+}        
 
         // -----------------------------
 // Smart autoplay / video control
@@ -1991,6 +2023,7 @@ function handleVideoStopUI() {
 </body>
 
 </html>
+
 
 
 
