@@ -1467,10 +1467,21 @@ async function fetchAndPopulateVideos() {
             }
             
             // تحديث Swiper ليقرأ الشرائح الجديدة (نستخدم المتغير videoSwiper)
-            if (videoSwiper) {
-                videoSwiper.update();
-                videoSwiper.slideTo(0, 0); 
+           if (videoSwiper) {
+    videoSwiper.update();
+    videoSwiper.slideTo(0, 0);
+
+    // 🟢 تأخير بسيط لتأكيد تحميل الشرائح ثم بدء autoplay مباشرة
+    setTimeout(() => {
+        try {
+            if (videoSwiper && videoSwiper.autoplay && !videoSwiper.autoplay.running) {
+                videoSwiper.autoplay.start();
             }
+        } catch (err) {
+            console.warn("Autoplay init error:", err);
+        }
+    }, 800); // 0.8 ثانية كافية بعد التحديث
+}
 
         } else {
             // 🟢 في حالة عدم وجود فيديوهات
@@ -1859,6 +1870,7 @@ fetchAndPopulateVideos();
 </body>
 
 </html>
+
 
 
 
