@@ -1016,6 +1016,218 @@
   transform: translateY(-50%) scale(1.05);
   background: rgba(255, 255, 255, 0.28);
 }
+
+  /* Progressive Blur Card Section */
+.card-showcase-section {
+  max-width: 900px;
+  margin: 60px auto;
+  padding: 0 16px;
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.8s ease, transform 0.8s ease;
+}
+
+.card-showcase-section.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.card-showcase-title {
+  text-align: center;
+  font-size: 28px;
+  color: #0b2633;
+  margin-bottom: 30px;
+  font-weight: 800;
+}
+
+.card-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.blur-card {
+  width: 320px;
+  height: 520px;
+  border-radius: 20px;
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 18px 40px rgba(0,0,0,0.3);
+}
+
+.blur-card-image {
+  position: absolute;
+  inset: 0;
+  background: url('https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800&h=1200&fit=crop') center/cover no-repeat;
+}
+
+.blur-card-blurred {
+  position: absolute;
+  inset: 0;
+  background: url('https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800&h=1200&fit=crop') center/cover no-repeat;
+  filter: blur(20px) saturate(1.3);
+  -webkit-filter: blur(20px) saturate(1.3);
+  mask-image: linear-gradient(
+    to top,
+    rgba(0,0,0,1) 0%,
+    rgba(0,0,0,0.98) 8%,
+    rgba(0,0,0,0.95) 12%,
+    rgba(0,0,0,0.9) 18%,
+    rgba(0,0,0,0.82) 24%,
+    rgba(0,0,0,0.72) 30%,
+    rgba(0,0,0,0.6) 36%,
+    rgba(0,0,0,0.48) 42%,
+    rgba(0,0,0,0.35) 48%,
+    rgba(0,0,0,0.24) 54%,
+    rgba(0,0,0,0.15) 60%,
+    rgba(0,0,0,0.08) 68%,
+    rgba(0,0,0,0.03) 76%,
+    rgba(0,0,0,0) 85%
+  );
+  -webkit-mask-image: linear-gradient(
+    to top,
+    rgba(0,0,0,1) 0%,
+    rgba(0,0,0,0.98) 8%,
+    rgba(0,0,0,0.95) 12%,
+    rgba(0,0,0,0.9) 18%,
+    rgba(0,0,0,0.82) 24%,
+    rgba(0,0,0,0.72) 30%,
+    rgba(0,0,0,0.6) 36%,
+    rgba(0,0,0,0.48) 42%,
+    rgba(0,0,0,0.35) 48%,
+    rgba(0,0,0,0.24) 54%,
+    rgba(0,0,0,0.15) 60%,
+    rgba(0,0,0,0.08) 68%,
+    rgba(0,0,0,0.03) 76%,
+    rgba(0,0,0,0) 85%
+  );
+}
+
+.blur-card-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 220px;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(
+    to top,
+    rgba(0,0,0,0.5) 0%,
+    rgba(0,0,0,0.35) 20%,
+    rgba(0,0,0,0.2) 40%,
+    rgba(0,0,0,0.1) 60%,
+    transparent 80%
+  );
+}
+
+.blur-card-content {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding: 24px 20px;
+  color: white;
+}
+
+.blur-card-meta {
+  max-width: 65%;
+  position: relative;
+  z-index: 3;
+}
+
+.blur-card-meta h3 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.5);
+  letter-spacing: -0.3px;
+}
+
+.blur-card-meta p {
+  margin: 10px 0 0;
+  font-size: 13.5px;
+  opacity: 0.95;
+  line-height: 1.5;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+
+.blur-card-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  font-weight: 700;
+  border: none;
+  border-radius: 50px;
+  padding: 14px 26px;
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: 
+    0 8px 24px rgba(102, 126, 234, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  min-width: 110px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.blur-card-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  transition: left 0.5s ease;
+}
+
+.blur-card-btn:hover::before {
+  left: 100%;
+}
+
+.blur-card-btn:hover {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 
+    0 12px 32px rgba(102, 126, 234, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.blur-card-btn:active {
+  transform: translateY(-1px) scale(0.98);
+  box-shadow: 
+    0 6px 16px rgba(102, 126, 234, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+@media (max-width: 768px) {
+  .card-showcase-section {
+    margin: 40px auto;
+  }
+  
+  .blur-card {
+    width: 280px;
+    height: 480px;
+  }
+  
+  .blur-card-meta h3 {
+    font-size: 17px;
+  }
+  
+  .blur-card-meta p {
+    font-size: 12.5px;
+  }
+}
 /* --- END SUPPORT MODAL STYLES --- */
 </style>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
@@ -1176,6 +1388,25 @@
         
     </div>
 </section>
+
+  <!-- Progressive Blur Card Showcase -->
+<section class="card-showcase-section" id="cardShowcase">
+  <h2 class="card-showcase-title">Featured Experience</h2>
+  <div class="card-container">
+    <div class="blur-card">
+      <div class="blur-card-image"></div>
+      <div class="blur-card-blurred"></div>
+      <div class="blur-card-overlay"></div>
+      <div class="blur-card-content">
+        <div class="blur-card-meta">
+          <h3>AI Study Partner</h3>
+          <p>Learn smarter, not harder. Let AI guide you through understanding and solving problems.</p>
+        </div>
+        <button class="blur-card-btn">TRY NOW</button>
+      </div>
+    </div>
+  </div>
+</section>
   <div class="support-buttons">
     <button id="contactBtn">Contact Us</button>
     <button id="getSupportBtn">Get Support</button>
@@ -1332,6 +1563,24 @@
                 }
             }
         }); 
+
+        // Intersection Observer للبطاقة
+const cardShowcase = document.getElementById('cardShowcase');
+if (cardShowcase) {
+  const cardObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+        cardObserver.unobserve(entry.target);
+      }
+    });
+  }, {
+    threshold: 0.2,
+    rootMargin: '0px 0px -50px 0px'
+  });
+  
+  cardObserver.observe(cardShowcase);
+}
 
         // 🔵 ربط الأسهم اليدوية بالتحكم في Swiper
 const leftArrow = document.getElementById('videoNavLeft');
@@ -2023,6 +2272,7 @@ function handleVideoStopUI() {
 </body>
 
 </html>
+
 
 
 
