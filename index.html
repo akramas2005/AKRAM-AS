@@ -2499,8 +2499,11 @@ function changeLanguage(lang) {
     hideMenu();
   }
   
+  // ✅ تطبيق اللغة على الموقع
+  applyLanguage(lang);
+  
   // إظهار تأكيد
-alert(`Language changed to ${getLanguageName(lang)}`);
+  alert(`Language changed to ${getLanguageName(lang)}`);
 }
 
 function getLanguageName(code) {
@@ -2518,6 +2521,101 @@ function getLanguageName(code) {
   };
   return languages[code] || code;
 }
+    function applyLanguage(lang) {
+  // تغيير النصوص حسب اللغة
+  const translations = {
+    'en': {
+      'home': 'Home',
+      'sections': 'Sections', 
+      'account': 'My Account',
+      'searchPlaceholder': 'Search tools, prompts...',
+      'explore': 'Explore',
+      'section': 'Section',
+      'tryNow': 'TRY NOW',
+      'contactUs': 'Contact Us',
+      'getSupport': 'Get Support'
+    },
+    'ar': {
+      'home': 'الرئيسية',
+      'sections': 'الأقسام',
+      'account': 'حسابي',
+      'searchPlaceholder': 'ابحث في الأدوات...',
+      'explore': 'استكشف',
+      'section': 'قسم',
+      'tryNow': 'جرب الآن',
+      'contactUs': 'اتصل بنا',
+      'getSupport': 'الدعم'
+    },
+    'fr': {
+      'home': 'Accueil',
+      'sections': 'Sections',
+      'account': 'Mon Compte',
+      'searchPlaceholder': 'Rechercher outils...',
+      'explore': 'Explorer',
+      'section': 'Section',
+      'tryNow': 'ESSAYER',
+      'contactUs': 'Nous Contacter',
+      'getSupport': 'Support'
+    }
+  };
+  
+  const texts = translations[lang] || translations['en'];
+  
+  // تطبيق التغييرات على النصوص
+  if (texts.home) {
+    document.querySelectorAll('.nav-links a[href="#hero"]').forEach(el => {
+      el.textContent = texts.home;
+    });
+  }
+  
+  if (texts.sections) {
+    document.querySelectorAll('.nav-links a').forEach((el, index) => {
+      if (index === 1) el.textContent = texts.sections;
+    });
+  }
+  
+  if (texts.account) {
+    document.querySelectorAll('.nav-links a').forEach((el, index) => {
+      if (index === 2) el.textContent = texts.account;
+    });
+  }
+  
+  if (texts.explore) {
+    const exploreBtn = document.getElementById('exploreBtn');
+    if (exploreBtn) exploreBtn.innerHTML = `${texts.explore} ▾`;
+  }
+  
+  if (texts.section) {
+    const sectionBtn = document.getElementById('sectionBtn');
+    if (sectionBtn) sectionBtn.innerHTML = `${texts.section} ▾`;
+  }
+  
+  if (texts.tryNow) {
+    document.querySelectorAll('.blur-card-btn').forEach(btn => {
+      btn.textContent = texts.tryNow;
+    });
+  }
+  
+  if (texts.contactUs) {
+    const contactBtn = document.getElementById('contactBtn');
+    if (contactBtn) contactBtn.textContent = texts.contactUs;
+  }
+  
+  if (texts.getSupport) {
+    const supportBtn = document.getElementById('getSupportBtn');
+    if (supportBtn) supportBtn.textContent = texts.getSupport;
+  }
+  
+  // تحديث placeholders
+  const searchInputs = document.querySelectorAll('input[type="search"]');
+  searchInputs.forEach(input => {
+    if (texts.searchPlaceholder) {
+      input.placeholder = texts.searchPlaceholder;
+    }
+  });
+  
+  console.log(`Language applied: ${lang}`);
+}
 
 // إغلاق القوائم عند النقر خارجها
 document.addEventListener('click', (e) => {
@@ -2529,6 +2627,18 @@ document.addEventListener('click', (e) => {
       item.classList.remove('active');
     });
   }
+});
+    // تطبيق اللغة المحفوظة عند تحميل الصفحة
+document.addEventListener('DOMContentLoaded', function() {
+  const savedLang = localStorage.getItem('preferred-language') || 'en';
+  applyLanguage(savedLang);
+  
+  // تعيين الخيار النشط في القائمة
+  document.querySelectorAll('.lang-option').forEach(option => {
+    if (option.onclick && option.onclick.toString().includes(`'${savedLang}'`)) {
+      option.classList.add('active');
+    }
+  });
 });
   </script>
 
@@ -2582,6 +2692,7 @@ document.addEventListener('click', (e) => {
 </body>
 
 </html>
+
 
 
 
