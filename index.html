@@ -2393,90 +2393,7 @@ function handleVideoStopUI() {
         function openContactModal() {
           if (!contactModalBackdrop) return;
           contactModalBackdrop.classList.add('visible');
-        }
-         // ========================
-    // LANGUAGE MENU FUNCTIONS
-    // ========================
-    
-    function toggleLanguageSubmenu(event) {
-      event.preventDefault();
-      event.stopPropagation();
-      
-      const menuItem = event.target.closest('.has-submenu');
-      const submenu = menuItem.nextElementSibling;
-      const isShowing = submenu.classList.contains('show');
-      
-      // إغلاق جميع القوائم المفتوحة
-      document.querySelectorAll('.language-submenu.show').forEach(menu => {
-        menu.classList.remove('show');
-      });
-      document.querySelectorAll('.has-submenu.active').forEach(item => {
-        item.classList.remove('active');
-      });
-      
-      // فتح/إغلاق القائمة الحالية
-      if (!isShowing) {
-        submenu.classList.add('show');
-        menuItem.classList.add('active');
-      }
-    }
-
-    function changeLanguage(lang) {
-      console.log("Changing language to:", lang);
-      
-      // تحديث الخيار النشط
-      document.querySelectorAll('.lang-option.active').forEach(option => {
-        option.classList.remove('active');
-      });
-      event.target.closest('.lang-option').classList.add('active');
-      
-      // حفظ اللغة المفضلة
-      localStorage.setItem('preferred-language', lang);
-      
-      // إغلاق القائمة
-      document.querySelectorAll('.language-submenu.show').forEach(menu => {
-        menu.classList.remove('show');
-      });
-      document.querySelectorAll('.has-submenu.active').forEach(item => {
-        item.classList.remove('active');
-      });
-      
-      // إغلاق القائمة الجانبية
-      if (typeof hideMenu === 'function') {
-        hideMenu();
-      }
-      
-      // إظهار تأكيد
-      showToast(`Language changed to ${getLanguageName(lang)}`);
-    }
-
-    function getLanguageName(code) {
-      const languages = {
-        'en': 'English',
-        'ar': 'Arabic', 
-        'fr': 'French',
-        'es': 'Spanish',
-        'de': 'German',
-        'zh': 'Chinese',
-        'ja': 'Japanese',
-        'ru': 'Russian',
-        'pt': 'Portuguese',
-        'hi': 'Hindi'
-      };
-      return languages[code] || code;
-    }
-
-    // إغلاق القوائم عند النقر خارجها
-    document.addEventListener('click', (e) => {
-      if (!e.target.closest('.language-submenu') && !e.target.closest('.has-submenu')) {
-        document.querySelectorAll('.language-submenu.show').forEach(menu => {
-          menu.classList.remove('show');
-        });
-        document.querySelectorAll('.has-submenu.active').forEach(item => {
-          item.classList.remove('active');
-        });
-      }
-    });
+  }
 
         function closeContactModal() {
           if (!contactModalBackdrop) return;
@@ -2530,6 +2447,89 @@ function handleVideoStopUI() {
         // --- END CONTACT MODAL JAVASCRIPT ---
       });
     })();
+    // ========================
+// LANGUAGE MENU FUNCTIONS - ⬅️ أضف هنا بعد })();
+// ========================
+
+function toggleLanguageSubmenu(event) {
+  event.preventDefault();
+  event.stopPropagation();
+  
+  const menuItem = event.target.closest('.has-submenu');
+  const submenu = menuItem.nextElementSibling;
+  const isShowing = submenu.classList.contains('show');
+  
+  // إغلاق جميع القوائم المفتوحة
+  document.querySelectorAll('.language-submenu.show').forEach(menu => {
+    menu.classList.remove('show');
+  });
+  document.querySelectorAll('.has-submenu.active').forEach(item => {
+    item.classList.remove('active');
+  });
+  
+  // فتح/إغلاق القائمة الحالية
+  if (!isShowing) {
+    submenu.classList.add('show');
+    menuItem.classList.add('active');
+  }
+}
+
+function changeLanguage(lang) {
+  console.log("Changing language to:", lang);
+  
+  // تحديث الخيار النشط
+  document.querySelectorAll('.lang-option.active').forEach(option => {
+    option.classList.remove('active');
+  });
+  event.target.closest('.lang-option').classList.add('active');
+  
+  // حفظ اللغة المفضلة
+  localStorage.setItem('preferred-language', lang);
+  
+  // إغلاق القائمة
+  document.querySelectorAll('.language-submenu.show').forEach(menu => {
+    menu.classList.remove('show');
+  });
+  document.querySelectorAll('.has-submenu.active').forEach(item => {
+    item.classList.remove('active');
+  });
+  
+  // إغلاق القائمة الجانبية
+  if (typeof hideMenu === 'function') {
+    hideMenu();
+  }
+  
+  // إظهار تأكيد
+  showToast(`Language changed to ${getLanguageName(lang)}`);
+}
+
+function getLanguageName(code) {
+  const languages = {
+    'en': 'English',
+    'ar': 'Arabic', 
+    'fr': 'French',
+    'es': 'Spanish',
+    'de': 'German',
+    'zh': 'Chinese',
+    'ja': 'Japanese',
+    'ru': 'Russian',
+    'pt': 'Portuguese',
+    'hi': 'Hindi'
+  };
+  return languages[code] || code;
+}
+
+// إغلاق القوائم عند النقر خارجها
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.language-submenu') && !e.target.closest('.has-submenu')) {
+    document.querySelectorAll('.language-submenu.show').forEach(menu => {
+      menu.classList.remove('show');
+    });
+    document.querySelectorAll('.has-submenu.active').forEach(item => {
+      item.classList.remove('active');
+    });
+  }
+});
   </script>
 
   <div class="modal-backdrop" id="supportModalBackdrop">
@@ -2582,6 +2582,7 @@ function handleVideoStopUI() {
 </body>
 
 </html>
+
 
 
 
