@@ -345,6 +345,15 @@
       text-align: center;
     }
   }
+  /* تحسين التمرير السلس */
+html {
+  scroll-behavior: smooth;
+}
+
+/* تأكيد أن الصفحة تبدأ من الأعلى */
+body {
+  scroll-padding-top: 0;
+}
 
   /* Animations for fade-in from left and right */
   @keyframes fadeInLeft {
@@ -1300,14 +1309,14 @@
       <input type="search" placeholder="Search..." aria-label="Search">
     </div>
     <div class="nav-links">
-      <a href="#">Home</a>
-      <a href="#">Sections</a>
-      <a href="#">My Account</a>
-    </div>
+  <a href="#hero" onclick="handleHomeClick()">Home</a>
+  <a href="#">Sections</a>
+  <a href="#">My Account</a>
+</div>
   </div>
 
   <nav id="sideMenu" class="side-menu" aria-hidden="true">
-    <a href="#" onclick="menuNavClick(event, 'home')">Home</a>
+    <a href="#hero" onclick="menuNavClick(event, 'home')">Home</a>
     <a href="#" onclick="menuNavClick(event, 'allsections')">All Section</a>
     <a href="#" onclick="menuNavClick(event, 'image')">Image Generation</a>
     <a href="#" onclick="menuNavClick(event, 'account')">My account</a>
@@ -1316,7 +1325,7 @@
     <a href="#" onclick="menuNavClick(event, 'support')">Support and Contact</a>
   </nav>
 
-  <div class="hero">
+  <div class="hero" id="hero">
     <div id="mobileHeroSearch" class="mobile-hero-search" aria-hidden="false">
       <input type="search" placeholder="Search tools, prompts…" aria-label="Mobile search" />
       <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -1472,6 +1481,43 @@
           // ignore measurement errors
         }
       }
+
+      // أضف قبل window.addEventListener('DOMContentLoaded'
+
+// دالة للعودة إلى الصفحة الرئيسية
+function scrollToTop() {
+  window.scrollTo({
+    top: 0,
+    behavior: 'smooth'
+  });
+}
+
+// دالة للتعامل مع زر Home
+function handleHomeClick() {
+  // إذا كنا بالفعل في الأعلى، نحدث الصفحة
+  if (window.scrollY === 0) {
+    location.reload();
+  } else {
+    // إذا كنا في أسفل الصفحة، نرجع للأعلى
+    scrollToTop();
+  }
+  
+  // إغلاق القائمة الجانبية إذا كانت مفتوحة
+  hideMenu();
+}
+
+// تحديث دالة menuNavClick
+window.menuNavClick = function(ev, target) {
+  ev.preventDefault();
+  hideMenu();
+  
+  if (target === 'home') {
+    handleHomeClick();
+  } else {
+    console.log("navigate to:", target);
+    // هنا يمكنك إضافة التنقل لأقسام أخرى لاحقاً
+  }
+}
 
       window.addEventListener('DOMContentLoaded', () => {
         const title = document.getElementById('mainTitle');
@@ -2249,3 +2295,4 @@ function handleVideoStopUI() {
 </body>
 
 </html>
+
