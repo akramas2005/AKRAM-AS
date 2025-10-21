@@ -1174,12 +1174,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  white-space: nowrap; /* هذه مهمة لمنع ضغط النص */
 }
 
 .blur-card-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
-}  
+}
+
+/* وسائط الاستعلام للهاتف - يجب أن تكون منظمة بشكل صحيح */
+@media (max-width: 420px) {
   .blur-card {
     width: 280px;
     height: 480px;
@@ -1192,16 +1196,13 @@
   .blur-card-meta p {
     font-size: 12.5px;
   }
-}
-  @media(max-width:420px){
-  :root{--card-width:280px;--card-height:480px;}
-  .meta h3{font-size:17px;}
-  .meta p{font-size:12.5px;}
-  .try-btn{
+  
+  .blur-card-btn {
     padding: 8px 14px;
     font-size: 12px;
-    min-width: 70px;
+    min-width: 75px; /* زيادة قليلة للعرض */
     height: 36px;
+    border-radius: 12px; /* تأكيد الحواف الدائرية */
   }
 }
 /* --- END SUPPORT MODAL STYLES --- */
@@ -2248,6 +2249,7 @@ function handleVideoStopUI() {
 </body>
 
 </html>
+
 
 
 
