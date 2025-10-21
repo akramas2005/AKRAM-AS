@@ -1372,6 +1372,47 @@ body {
     transform: translateY(0);
   }
 }
+
+  /* أضف هذا في نهاية الـ <style> */
+.language-toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%) translateY(100px);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 16px;
+  padding: 12px 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  z-index: 10000;
+  opacity: 0;
+  transition: all 0.4s cubic-bezier(0.2, 0.9, 0.25, 1);
+  min-width: 200px;
+  max-width: 90%;
+}
+
+.language-toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.toast-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-weight: 600;
+  color: #0b2633;
+}
+
+.toast-icon {
+  font-size: 18px;
+}
+
+.toast-message {
+  font-size: 14px;
+  flex: 1;
+}
 /* --- END SUPPORT MODAL STYLES --- */
 </style>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
@@ -2502,8 +2543,8 @@ function changeLanguage(lang) {
   // ✅ تطبيق اللغة على الموقع
   applyLanguage(lang);
   
-  // إظهار تأكيد
-  alert(`Language changed to ${getLanguageName(lang)}`);
+  // 🎯 إظهار Toast جميل بدلاً من Alert
+  showLanguageToast(`Language changed to ${getLanguageName(lang)}`);
 }
 
 function getLanguageName(code) {
@@ -2521,6 +2562,40 @@ function getLanguageName(code) {
   };
   return languages[code] || code;
 }
+
+    // ========================
+// BEAUTIFUL TOAST NOTIFICATION
+// ========================
+
+function showLanguageToast(message) {
+  // إنشاء عنصر الـ Toast
+  const toast = document.createElement('div');
+  toast.className = 'language-toast';
+  toast.innerHTML = `
+    <div class="toast-content">
+      <span class="toast-icon">🌐</span>
+      <span class="toast-message">${message}</span>
+    </div>
+  `;
+  
+  // إضافة الـ Toast للصفحة
+  document.body.appendChild(toast);
+  
+  // إظهار الـ Toast ب animation
+  setTimeout(() => {
+    toast.classList.add('show');
+  }, 100);
+  
+  // إخفاء الـ Toast بعد 3 ثواني
+  setTimeout(() => {
+    toast.classList.remove('show');
+    setTimeout(() => {
+      if (toast.parentNode) {
+        toast.parentNode.removeChild(toast);
+      }
+    }, 300);
+  }, 3000);
+}
     function applyLanguage(lang) {
   // تغيير النصوص حسب اللغة
   const translations = {
@@ -2533,7 +2608,12 @@ function getLanguageName(code) {
       'section': 'Section',
       'tryNow': 'TRY NOW',
       'contactUs': 'Contact Us',
-      'getSupport': 'Get Support'
+      'getSupport': 'Get Support',
+      'language': 'Language',
+      'allSections': 'All Sections',
+      'imageGeneration': 'Image Generation',
+      'settings': 'Settings',
+      'supportContact': 'Support and Contact'
     },
     'ar': {
       'home': 'الرئيسية',
@@ -2544,7 +2624,12 @@ function getLanguageName(code) {
       'section': 'قسم',
       'tryNow': 'جرب الآن',
       'contactUs': 'اتصل بنا',
-      'getSupport': 'الدعم'
+      'getSupport': 'الدعم',
+      'language': 'اللغة',
+      'allSections': 'كل الأقسام',
+      'imageGeneration': 'إنشاء الصور',
+      'settings': 'الإعدادات',
+      'supportContact': 'الدعم والاتصال'
     },
     'fr': {
       'home': 'Accueil',
@@ -2555,7 +2640,124 @@ function getLanguageName(code) {
       'section': 'Section',
       'tryNow': 'ESSAYER',
       'contactUs': 'Nous Contacter',
-      'getSupport': 'Support'
+      'getSupport': 'Support',
+      'language': 'Langue',
+      'allSections': 'Toutes les sections',
+      'imageGeneration': 'Génération d\'images',
+      'settings': 'Paramètres',
+      'supportContact': 'Support et Contact'
+    },
+    'es': {
+      'home': 'Inicio',
+      'sections': 'Secciones',
+      'account': 'Mi Cuenta',
+      'searchPlaceholder': 'Buscar herramientas...',
+      'explore': 'Explorar',
+      'section': 'Sección',
+      'tryNow': 'PROBAR',
+      'contactUs': 'Contáctanos',
+      'getSupport': 'Soporte',
+      'language': 'Idioma',
+      'allSections': 'Todas las secciones',
+      'imageGeneration': 'Generación de imágenes',
+      'settings': 'Configuración',
+      'supportContact': 'Soporte y Contacto'
+    },
+    'de': {
+      'home': 'Startseite',
+      'sections': 'Bereiche',
+      'account': 'Mein Konto',
+      'searchPlaceholder': 'Tools suchen...',
+      'explore': 'Entdecken',
+      'section': 'Bereich',
+      'tryNow': 'AUSPROBIEREN',
+      'contactUs': 'Kontakt',
+      'getSupport': 'Support',
+      'language': 'Sprache',
+      'allSections': 'Alle Bereiche',
+      'imageGeneration': 'Bilderstellung',
+      'settings': 'Einstellungen',
+      'supportContact': 'Support und Kontakt'
+    },
+    'zh': {
+      'home': '首页',
+      'sections': '部分',
+      'account': '我的账户',
+      'searchPlaceholder': '搜索工具...',
+      'explore': '探索',
+      'section': '部分',
+      'tryNow': '立即尝试',
+      'contactUs': '联系我们',
+      'getSupport': '获取支持',
+      'language': '语言',
+      'allSections': '所有部分',
+      'imageGeneration': '图像生成',
+      'settings': '设置',
+      'supportContact': '支持与联系'
+    },
+    'ja': {
+      'home': 'ホーム',
+      'sections': 'セクション',
+      'account': 'マイアカウント',
+      'searchPlaceholder': 'ツールを検索...',
+      'explore': '探検',
+      'section': 'セクション',
+      'tryNow': '今すぐ試す',
+      'contactUs': 'お問い合わせ',
+      'getSupport': 'サポート',
+      'language': '言語',
+      'allSections': 'すべてのセクション',
+      'imageGeneration': '画像生成',
+      'settings': '設定',
+      'supportContact': 'サポートと連絡'
+    },
+    'ru': {
+      'home': 'Главная',
+      'sections': 'Разделы',
+      'account': 'Мой аккаунт',
+      'searchPlaceholder': 'Поиск инструментов...',
+      'explore': 'Исследовать',
+      'section': 'Раздел',
+      'tryNow': 'ПОПРОБОВАТЬ',
+      'contactUs': 'Связаться с нами',
+      'getSupport': 'Поддержка',
+      'language': 'Язык',
+      'allSections': 'Все разделы',
+      'imageGeneration': 'Генерация изображений',
+      'settings': 'Настройки',
+      'supportContact': 'Поддержка и контакт'
+    },
+    'pt': {
+      'home': 'Início',
+      'sections': 'Seções',
+      'account': 'Minha Conta',
+      'searchPlaceholder': 'Pesquisar ferramentas...',
+      'explore': 'Explorar',
+      'section': 'Seção',
+      'tryNow': 'EXPERIMENTAR',
+      'contactUs': 'Contate-nos',
+      'getSupport': 'Suporte',
+      'language': 'Idioma',
+      'allSections': 'Todas as seções',
+      'imageGeneration': 'Geração de imagens',
+      'settings': 'Configurações',
+      'supportContact': 'Suporte e Contato'
+    },
+    'hi': {
+      'home': 'होम',
+      'sections': 'सेक्शन',
+      'account': 'मेरा अकाउंट',
+      'searchPlaceholder': 'टूल्स खोजें...',
+      'explore': 'एक्सप्लोर',
+      'section': 'सेक्शन',
+      'tryNow': 'आज़माएं',
+      'contactUs': 'संपर्क करें',
+      'getSupport': 'सहायता',
+      'language': 'भाषा',
+      'allSections': 'सभी सेक्शन',
+      'imageGeneration': 'इमेज जनरेशन',
+      'settings': 'सेटिंग्स',
+      'supportContact': 'सहायता और संपर्क'
     }
   };
   
@@ -2692,6 +2894,7 @@ document.addEventListener('DOMContentLoaded', function() {
 </body>
 
 </html>
+
 
 
 
