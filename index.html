@@ -1400,18 +1400,14 @@ body {
 .toast-content {
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: center; /* توسيط النص */
   font-weight: 600;
   color: #0b2633;
 }
 
-.toast-icon {
-  font-size: 18px;
-}
-
 .toast-message {
   font-size: 14px;
-  flex: 1;
+  text-align: center;
 }
 /* --- END SUPPORT MODAL STYLES --- */
 </style>
@@ -2573,7 +2569,6 @@ function showLanguageToast(message) {
   toast.className = 'language-toast';
   toast.innerHTML = `
     <div class="toast-content">
-      <span class="toast-icon">🌐</span>
       <span class="toast-message">${message}</span>
     </div>
   `;
@@ -2894,6 +2889,7 @@ document.addEventListener('DOMContentLoaded', function() {
 </body>
 
 </html>
+
 
 
 
