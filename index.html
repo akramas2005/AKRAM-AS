@@ -2042,31 +2042,107 @@ function restartAutoplayAfterDelay() {
 // متغيرات حالة
 let currentPlayingVideoItem = null; // العنصر الذي يحتوي الفيديو المشغل حاليًا
 let autoplayResumeTimer = null;     // مؤقت لإعادة تشغيل الـ autoplay
-let userInitiatedInteraction = false; // true إذا بدأ المستخدم تفاعل يدوي (touch/mouse)
+let userInitiatedInteraction = false; // لتتبع ما إذا بدأ المستخدم التفاعل يدويًا
 
-// force start autoplay on load (helps when autoplay not starting automatically)
+// إجبار تشغيل autoplay عند تحميل الصفحة (للحالات التي لا تبدأ تلقائيًا)
 try { 
   if (videoSwiper && videoSwiper.autoplay && !videoSwiper.autoplay.running) {
     videoSwiper.autoplay.start();
   }
-} catch(e) { console.warn("Could not start videoSwiper autoplay on init:", e); }
+} catch(e) {
+  console.warn("⚠️ Could not start videoSwiper autoplay on init:", e);
+}
 
-// استخدام Delegation لأن الشرائح تُحمّل ديناميكياً
+/* -------------------------------------------------------------
+   🟦 Action Box (المستطيل الأبيض أسفل الفيديو المشغّل)
+------------------------------------------------------------- */
+const actionBox = document.getElementById('videoActionBox');
+const actionTextEl = document.getElementById('actionText');
+
+const actionPhrases = [
+  "Analyzing...",
+  "Explain this video",
+  "Summarize the key points",
+  "Generate practice problems",
+  "Extract keywords",
+  "Suggest further reading"
+];
+
+let actionRotateTimer = null;
+let actionRotateIndex = 0;
+
+// إظهار الصندوق تحت الفيديو المشغل
+function showActionBoxForSlide(slideEl) {
+  if (!slideEl || !actionBox) return;
+
+  const rect = slideEl.getBoundingClientRect();
+  const topY = rect.bottom + 10 + window.scrollY;
+  const leftX = rect.left + rect.width * 0.25 + window.scrollX;
+
+  actionBox.style.left = `${leftX}px`;
+  actionBox.style.top = `${topY}px`;
+
+  startActionRotate();
+  actionBox.classList.add('show');
+}
+
+// إخفاء الصندوق
+function hideActionBox() {
+  if (!actionBox) return;
+  actionBox.classList.remove('show');
+  stopActionRotate();
+}
+
+// تدوير النصوص تلقائيًا كل 5 ثواني
+function startActionRotate() {
+  if (!actionTextEl) return;
+  stopActionRotate();
+  actionRotateIndex = 0;
+  actionTextEl.textContent = actionPhrases[actionRotateIndex];
+
+  actionRotateTimer = setInterval(() => {
+    actionRotateIndex = (actionRotateIndex + 1) % actionPhrases.length;
+    actionTextEl.style.opacity = '0';
+    setTimeout(() => {
+      actionTextEl.textContent = actionPhrases[actionRotateIndex];
+      actionTextEl.style.opacity = '1';
+    }, 180);
+  }, 5000);
+}
+
+function stopActionRotate() {
+  if (actionRotateTimer) {
+    clearInterval(actionRotateTimer);
+    actionRotateTimer = null;
+  }
+}
+
+/* -------------------------------------------------------------
+   🧩 التشغيل الذكي للفيديوهات داخل الـ Swiper
+------------------------------------------------------------- */
+
 document.querySelector('.myVideoSwiper').addEventListener('click', (e) => {
   const placeholder = e.target.closest('.video-placeholder');
   if (!placeholder) return;
 
-  // إذا تم النقر على أي عنصر تشغيل:
+  // 1️⃣ إيقاف أي فيديو كان يعمل
   stopCurrentVideo();
 
+  // 2️⃣ نوقف التمرير التلقائي مؤقتًا
   if (videoSwiper && videoSwiper.autoplay && videoSwiper.autoplay.running) {
     videoSwiper.autoplay.stop();
   }
 
-  if (autoplayResumeTimer) { clearTimeout(autoplayResumeTimer); autoplayResumeTimer = null; }
+  // 3️⃣ نلغي مؤقت إعادة التشغيل إن وُجد
+  if (autoplayResumeTimer) {
+    clearTimeout(autoplayResumeTimer);
+    autoplayResumeTimer = null;
+  }
 
+  // 4️⃣ نحدد العنصر والـ iframe
   const videoItem = placeholder.closest('.video-item');
   if (!videoItem) return;
+
   const videoId = videoItem.dataset.videoId;
   const embedContainer = videoItem.querySelector('.video-embed-container');
 
@@ -2088,18 +2164,57 @@ document.querySelector('.myVideoSwiper').addEventListener('click', (e) => {
     embedContainer.style.display = 'block';
   }
 
+  // 5️⃣ إخفاء الصورة المصغّرة
   placeholder.style.display = 'none';
+
+  // 6️⃣ إظهار الأسهم عند التشغيل
   handleVideoPlayUI();
 
+  // 7️⃣ تفعيل النقر على الفيديو بعد ثانية
   setTimeout(() => {
     const iframe = embedContainer.querySelector('iframe');
     if (iframe) iframe.style.pointerEvents = 'auto';
   }, 1000);
 
-  // ✅ هنا بالضبط نضيف سطورنا الصحيحة
-  currentPlayingVideoItem = videoItem;     // استخدم videoItem وليس this
-  showActionBoxForSlide(videoItem);        // مرّر العنصر الصحيح
+  // 8️⃣ تحديد العنصر الحالي وإظهار الصندوق
+  currentPlayingVideoItem = videoItem;
+  showActionBoxForSlide(videoItem);
 });
+
+/* -------------------------------------------------------------
+   🟢 إعادة تشغيل التمرير التلقائي بعد 3 ثوانٍ من توقف التفاعل
+------------------------------------------------------------- */
+function restartAutoplayAfterDelay() {
+  if (typeof autoplayResumeTimer !== 'undefined' && autoplayResumeTimer) {
+    clearTimeout(autoplayResumeTimer);
+  }
+  autoplayResumeTimer = setTimeout(() => {
+    if (videoSwiper && videoSwiper.autoplay && !videoSwiper.autoplay.running) {
+      videoSwiper.autoplay.start();
+    }
+  }, 3000);
+}
+
+/* -------------------------------------------------------------
+   🟥 تأكد من أن stopCurrentVideo() تستدعي إخفاء الصندوق أيضًا
+------------------------------------------------------------- */
+function stopCurrentVideo() {
+  document.querySelectorAll('.video-embed-container').forEach(embed => {
+    if (embed && embed.style.display !== 'none') {
+      const videoItem = embed.closest('.video-item');
+      const placeholder = videoItem ? videoItem.querySelector('.video-placeholder') : null;
+      embed.innerHTML = '';
+      embed.style.display = 'none';
+      if (placeholder) placeholder.style.display = 'block';
+    }
+  });
+
+  currentPlayingVideoItem = null;
+  handleVideoStopUI();
+
+  // ✅ إخفاء الصندوق عند التوقف
+  hideActionBox();
+}
 
 
 // دالة لإيقاف أي فيديو يعمل حالياً وإرجاع الحالة إلى الصورة المصغرة
@@ -3035,6 +3150,7 @@ document.addEventListener('DOMContentLoaded', function() {
 </body>
 
 </html>
+
 
 
 
