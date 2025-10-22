@@ -1408,72 +1408,6 @@ body {
   font-size: 14px;
   text-align: center;
 }
-
-  /* ---------- Video Action Box (appearing under active video) ---------- */
-.video-action-box {
-  position: absolute;
-  width: 320px;               /* تعديل ممكن */
-  max-width: 40vw;
-  height: 64px;
-  left: 0;                    /* سنحدد الموضع ديناميكيا بالـ JS */
-  top: 0;
-  transform: translate(-50%, 12px); /* افتراضي: سنضعه تحت الشريحة */
-  background: rgba(255,255,255,0.95);
-  color: #0b1220;
-  border-radius: 14px;
-  box-shadow: 0 10px 30px rgba(8,20,40,0.12), 0 2px 10px rgba(0,140,255,0.06) inset;
-  display: flex;
-  align-items: center;
-  padding: 10px 16px;
-  gap: 12px;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 280ms ease, transform 280ms cubic-bezier(.2,.9,.2,1);
-  z-index: 60; /* أعلى من الفيديو وداخل حاوية الشريط */
-  will-change: opacity, transform;
-}
-
-/* الظل الرفيع الشعاعي للشعور بالاحتراف */
-.video-action-box::before{
-  content:"";
-  position:absolute;
-  inset:auto 0  -10px 0;
-  height:18px;
-  filter: blur(18px);
-  background: linear-gradient(90deg, rgba(0,170,255,0.10), rgba(0,170,255,0.02));
-  border-radius: 14px;
-  z-index: -1;
-}
-
-/* المحتوى الداخلي */
-.video-action-box .action-inner{
-  display:flex;
-  align-items:center;
-  gap:12px;
-  width:100%;
-}
-
-.action-text{
-  font-weight:700;
-  font-size:15px;
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
-  direction:ltr;
-}
-
-/* حالة الظهور */
-.video-action-box.show {
-  opacity: 1;
-  transform: translate(-50%, 6px); /* يرتفع قليلا عند الظهور */
-  pointer-events: auto; /* لو أردت تفاعل لاحقاً */
-}
-
-/* responsive */
-@media (max-width:720px){
-  .video-action-box{ width: 260px; height:56px; font-size:14px; }
-}
-  
 /* --- END SUPPORT MODAL STYLES --- */
 </style>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
@@ -1663,12 +1597,6 @@ body {
         <div class="swiper myVideoSwiper" style="display: none;">
             <div class="swiper-wrapper">
                 </div>
-          <!-- داخل .video-swiper-container، بعد div.swiper.myVideoSwiper -->
-<div class="video-action-box" id="videoActionBox" aria-hidden="true">
-  <div class="action-inner">
-    <div class="action-text" id="actionText">Analyzing...</div>
-  </div>
-</div>
             
             <div class="swiper-pagination video-pagination"></div>
             <div class="swiper-button-next video-next-btn"></div>
@@ -1936,92 +1864,6 @@ if (leftArrow && rightArrow) {
   });
 }
 
-        /* ====== Action box logic (show under active playing slide) ====== */
-const actionBox = document.getElementById('videoActionBox');
-const actionTextEl = document.getElementById('actionText');
-
-const actionPhrases = [
-  "Analyzing...",
-  "Explain this video",
-  "Summarize the key points",
-  "Generate practice problems",
-  "Extract keywords",
-  "Suggest further reading"
-];
-
-let actionRotateTimer = null;
-let actionRotateIndex = 0;
-
-// show action box under a DOM slide element (slideEl = .video-item or .swiper-slide)
-function showActionBoxForSlide(slideEl) {
-  if (!slideEl || !actionBox) return;
-  // Position: compute bounding rect of slide inside viewport then place box slightly under left side
-  const rect = slideEl.getBoundingClientRect();
-  const containerRect = document.querySelector('.video-swiper-container')?.getBoundingClientRect();
-
-  // compute center X we want (left side of slide + 22% for left placement), adjust so stays in viewport
-  const desiredX = rect.left + Math.max(16, rect.width * 0.18);
-  const viewportX = Math.min(window.innerWidth - 20, Math.max(20 + (actionBox.offsetWidth/2), desiredX + actionBox.offsetWidth/2));
-
-  // top: place just below slide bottom
-  const topY = rect.bottom + 10 + window.scrollY;
-
-  // set style (we use translate(-50%) so left is center of box)
-  actionBox.style.left = (desiredX + actionBox.offsetWidth/2) + 'px';
-  actionBox.style.top = (topY) + 'px';
-
-  // ensure text rotation starts
-  startActionRotate();
-
-  // fade in
-  requestAnimationFrame(() => {
-    actionBox.classList.add('show');
-  });
-}
-
-// hide box and stop rotating
-function hideActionBox() {
-  if (!actionBox) return;
-  actionBox.classList.remove('show');
-  stopActionRotate();
-}
-
-// rotate the action text every 5 seconds
-function startActionRotate() {
-  if (!actionTextEl) return;
-  stopActionRotate();
-  actionRotateIndex = 0;
-  actionTextEl.textContent = actionPhrases[actionRotateIndex];
-  actionRotateTimer = setInterval(() => {
-    actionRotateIndex = (actionRotateIndex + 1) % actionPhrases.length;
-    // small fade transition for text
-    actionTextEl.style.opacity = '0';
-    setTimeout(() => {
-      actionTextEl.textContent = actionPhrases[actionRotateIndex];
-      actionTextEl.style.opacity = '1';
-    }, 180);
-  }, 5000);
-}
-
-function stopActionRotate() {
-  if (actionRotateTimer) { clearInterval(actionRotateTimer); actionRotateTimer = null; }
-}
-
-/* ====== Integrate with your existing play/stop logic ======
-   * Call showActionBoxForSlide(videoItemElement) when you create & show iframe.
-   * Call hideActionBox() inside stopCurrentVideo().
-   * Also hide on slideChange if no video.
-*/
-
-// Example: modify your click handler where you play iframe
-// after embedContainer.innerHTML = iframeHTML; embedContainer.style.display='block'; placeholder.style.display='none';
-/* add: */
-currentPlayingVideoItem = videoItem; // ensure your existing code sets this
-showActionBoxForSlide(videoItem);
-
-/* And inside stopCurrentVideo() make sure to call: */
-hideActionBox();
-
 // 🟢 دالة مساعدة لاستئناف التمرير التلقائي بعد 3 ثواني
 function restartAutoplayAfterDelay() {
   if (typeof autoplayResumeTimer !== 'undefined' && autoplayResumeTimer) {
@@ -2042,110 +1884,39 @@ function restartAutoplayAfterDelay() {
 // متغيرات حالة
 let currentPlayingVideoItem = null; // العنصر الذي يحتوي الفيديو المشغل حاليًا
 let autoplayResumeTimer = null;     // مؤقت لإعادة تشغيل الـ autoplay
-let userInitiatedInteraction = false; // لتتبع ما إذا بدأ المستخدم التفاعل يدويًا
+let userInitiatedInteraction = false; // true إذا بدأ المستخدم تفاعل يدوي (touch/mouse)
 
-// إجبار تشغيل autoplay عند تحميل الصفحة (للحالات التي لا تبدأ تلقائيًا)
+// force start autoplay on load (helps when autoplay not starting automatically)
 try { 
   if (videoSwiper && videoSwiper.autoplay && !videoSwiper.autoplay.running) {
     videoSwiper.autoplay.start();
   }
-} catch(e) {
-  console.warn("⚠️ Could not start videoSwiper autoplay on init:", e);
-}
+} catch(e) { console.warn("Could not start videoSwiper autoplay on init:", e); }
 
-/* -------------------------------------------------------------
-   🟦 Action Box (المستطيل الأبيض أسفل الفيديو المشغّل)
-------------------------------------------------------------- */
-const actionBox = document.getElementById('videoActionBox');
-const actionTextEl = document.getElementById('actionText');
-
-const actionPhrases = [
-  "Analyzing...",
-  "Explain this video",
-  "Summarize the key points",
-  "Generate practice problems",
-  "Extract keywords",
-  "Suggest further reading"
-];
-
-let actionRotateTimer = null;
-let actionRotateIndex = 0;
-
-// إظهار الصندوق تحت الفيديو المشغل
-function showActionBoxForSlide(slideEl) {
-  if (!slideEl || !actionBox) return;
-
-  const rect = slideEl.getBoundingClientRect();
-  const topY = rect.bottom + 10 + window.scrollY;
-  const leftX = rect.left + rect.width * 0.25 + window.scrollX;
-
-  actionBox.style.left = `${leftX}px`;
-  actionBox.style.top = `${topY}px`;
-
-  startActionRotate();
-  actionBox.classList.add('show');
-}
-
-// إخفاء الصندوق
-function hideActionBox() {
-  if (!actionBox) return;
-  actionBox.classList.remove('show');
-  stopActionRotate();
-}
-
-// تدوير النصوص تلقائيًا كل 5 ثواني
-function startActionRotate() {
-  if (!actionTextEl) return;
-  stopActionRotate();
-  actionRotateIndex = 0;
-  actionTextEl.textContent = actionPhrases[actionRotateIndex];
-
-  actionRotateTimer = setInterval(() => {
-    actionRotateIndex = (actionRotateIndex + 1) % actionPhrases.length;
-    actionTextEl.style.opacity = '0';
-    setTimeout(() => {
-      actionTextEl.textContent = actionPhrases[actionRotateIndex];
-      actionTextEl.style.opacity = '1';
-    }, 180);
-  }, 5000);
-}
-
-function stopActionRotate() {
-  if (actionRotateTimer) {
-    clearInterval(actionRotateTimer);
-    actionRotateTimer = null;
-  }
-}
-
-/* -------------------------------------------------------------
-   🧩 التشغيل الذكي للفيديوهات داخل الـ Swiper
-------------------------------------------------------------- */
-
+// استخدام Delegation لأن الشرائح تُحمّل ديناميكياً
 document.querySelector('.myVideoSwiper').addEventListener('click', (e) => {
   const placeholder = e.target.closest('.video-placeholder');
   if (!placeholder) return;
 
-  // 1️⃣ إيقاف أي فيديو كان يعمل
+  // إذا تم النقر على أي عنصر تشغيل:
+  // 1) إيقاف أي فيديو كان يعمل
   stopCurrentVideo();
 
-  // 2️⃣ نوقف التمرير التلقائي مؤقتًا
+  // 2) نوقف التمرير التلقائي فقط (لا نعطل التمرير اليدوي)
   if (videoSwiper && videoSwiper.autoplay && videoSwiper.autoplay.running) {
     videoSwiper.autoplay.stop();
   }
 
-  // 3️⃣ نلغي مؤقت إعادة التشغيل إن وُجد
-  if (autoplayResumeTimer) {
-    clearTimeout(autoplayResumeTimer);
-    autoplayResumeTimer = null;
-  }
+  // 3) نلغي أي مؤقت لإعادة التشغيل سابق
+  if (autoplayResumeTimer) { clearTimeout(autoplayResumeTimer); autoplayResumeTimer = null; }
 
-  // 4️⃣ نحدد العنصر والـ iframe
+  // 4) شغل الفيديو المطلوب داخل الشريحة
   const videoItem = placeholder.closest('.video-item');
   if (!videoItem) return;
-
   const videoId = videoItem.dataset.videoId;
   const embedContainer = videoItem.querySelector('.video-embed-container');
 
+  // إنشاء iframe مع pointer-events:none للسماح بالتمرير فوق الفيديو
   const iframeHTML = `
     <iframe
       width="100%"
@@ -2159,63 +1930,27 @@ document.querySelector('.myVideoSwiper').addEventListener('click', (e) => {
     ></iframe>
   `;
 
-  if (embedContainer) {
-    embedContainer.innerHTML = iframeHTML;
-    embedContainer.style.display = 'block';
-  }
+ if (embedContainer) {
+  embedContainer.innerHTML = iframeHTML;
+  embedContainer.style.display = 'block';
+}
 
-  // 5️⃣ إخفاء الصورة المصغّرة
-  placeholder.style.display = 'none';
+// إخفاء الصورة المصغّرة
+placeholder.style.display = 'none';
 
-  // 6️⃣ إظهار الأسهم عند التشغيل
-  handleVideoPlayUI();
+// 🔵 أظهر الأسهم عند تشغيل الفيديو
+handleVideoPlayUI(); 
 
-  // 7️⃣ تفعيل النقر على الفيديو بعد ثانية
+
+  // بعد ثانية، نعيد تفعيل النقر على الفيديو
   setTimeout(() => {
     const iframe = embedContainer.querySelector('iframe');
     if (iframe) iframe.style.pointerEvents = 'auto';
   }, 1000);
 
-  // 8️⃣ تحديد العنصر الحالي وإظهار الصندوق
+  // تعيين العنصر المشغّل حالياً
   currentPlayingVideoItem = videoItem;
-  showActionBoxForSlide(videoItem);
 });
-
-/* -------------------------------------------------------------
-   🟢 إعادة تشغيل التمرير التلقائي بعد 3 ثوانٍ من توقف التفاعل
-------------------------------------------------------------- */
-function restartAutoplayAfterDelay() {
-  if (typeof autoplayResumeTimer !== 'undefined' && autoplayResumeTimer) {
-    clearTimeout(autoplayResumeTimer);
-  }
-  autoplayResumeTimer = setTimeout(() => {
-    if (videoSwiper && videoSwiper.autoplay && !videoSwiper.autoplay.running) {
-      videoSwiper.autoplay.start();
-    }
-  }, 3000);
-}
-
-/* -------------------------------------------------------------
-   🟥 تأكد من أن stopCurrentVideo() تستدعي إخفاء الصندوق أيضًا
-------------------------------------------------------------- */
-function stopCurrentVideo() {
-  document.querySelectorAll('.video-embed-container').forEach(embed => {
-    if (embed && embed.style.display !== 'none') {
-      const videoItem = embed.closest('.video-item');
-      const placeholder = videoItem ? videoItem.querySelector('.video-placeholder') : null;
-      embed.innerHTML = '';
-      embed.style.display = 'none';
-      if (placeholder) placeholder.style.display = 'block';
-    }
-  });
-
-  currentPlayingVideoItem = null;
-  handleVideoStopUI();
-
-  // ✅ إخفاء الصندوق عند التوقف
-  hideActionBox();
-}
-
 
 // دالة لإيقاف أي فيديو يعمل حالياً وإرجاع الحالة إلى الصورة المصغرة
 function stopCurrentVideo() {
@@ -3150,19 +2885,6 @@ document.addEventListener('DOMContentLoaded', function() {
 </body>
 
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
