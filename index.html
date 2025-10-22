@@ -1408,6 +1408,66 @@ body {
   font-size: 14px;
   text-align: center;
 }
+
+  /* 🔵 الإطار المتوهّج للفيديو المركزي */
+.video-glow-frame {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 320px;
+  height: 190px;
+  transform: translate(-50%, -50%);
+  border: 3px solid rgba(0, 174, 255, 0.9);
+  border-radius: 20px;
+  box-shadow:
+    0 0 20px rgba(0, 174, 255, 0.4),
+    inset 0 0 20px rgba(0, 174, 255, 0.3);
+  animation: glowPulse 2.8s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* 🌀 حركة التوهج */
+@keyframes glowPulse {
+  0%, 100% {
+    box-shadow:
+      0 0 20px rgba(0, 174, 255, 0.4),
+      inset 0 0 20px rgba(0, 174, 255, 0.3);
+  }
+  50% {
+    box-shadow:
+      0 0 35px rgba(0, 210, 255, 0.7),
+      inset 0 0 30px rgba(0, 210, 255, 0.4);
+  }
+}
+
+/* 🟢 الفقاعة السفلية “Analyzing” */
+.analyzing-bubble {
+  position: absolute;
+  bottom: -36px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, #00b4ff, #007bff);
+  color: white;
+  font-weight: 600;
+  padding: 6px 18px;
+  border-radius: 20px 20px 50% 50%;
+  font-size: 13px;
+  box-shadow: 0 4px 18px rgba(0, 174, 255, 0.4);
+  animation: bubbleGlow 2.2s ease-in-out infinite;
+}
+
+/* ✨ حركة الفقاعة */
+@keyframes bubbleGlow {
+  0%, 100% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  50% {
+    opacity: 0.85;
+    transform: translateX(-50%) translateY(-2px);
+  }
+}
 /* --- END SUPPORT MODAL STYLES --- */
 </style>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
@@ -1597,6 +1657,11 @@ body {
         <div class="swiper myVideoSwiper" style="display: none;">
             <div class="swiper-wrapper">
                 </div>
+          <!-- 🔵 الإطار المتوهّج حول الفيديو في المنتصف -->
+<div class="video-glow-frame">
+  <div class="analyzing-bubble">Analyzing...</div>
+</div>
+
             
             <div class="swiper-pagination video-pagination"></div>
             <div class="swiper-button-next video-next-btn"></div>
@@ -2885,6 +2950,7 @@ document.addEventListener('DOMContentLoaded', function() {
 </body>
 
 </html>
+
 
 
 
