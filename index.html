@@ -1409,65 +1409,71 @@ body {
   text-align: center;
 }
 
-  /* 🔵 الإطار المتوهّج للفيديو المركزي */
-.video-glow-frame {
+  /* ---------- Video Action Box (appearing under active video) ---------- */
+.video-action-box {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 320px;
-  height: 190px;
-  transform: translate(-50%, -50%);
-  border: 3px solid rgba(0, 174, 255, 0.9);
-  border-radius: 20px;
-  box-shadow:
-    0 0 20px rgba(0, 174, 255, 0.4),
-    inset 0 0 20px rgba(0, 174, 255, 0.3);
-  animation: glowPulse 2.8s ease-in-out infinite;
+  width: 320px;               /* تعديل ممكن */
+  max-width: 40vw;
+  height: 64px;
+  left: 0;                    /* سنحدد الموضع ديناميكيا بالـ JS */
+  top: 0;
+  transform: translate(-50%, 12px); /* افتراضي: سنضعه تحت الشريحة */
+  background: rgba(255,255,255,0.95);
+  color: #0b1220;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(8,20,40,0.12), 0 2px 10px rgba(0,140,255,0.06) inset;
+  display: flex;
+  align-items: center;
+  padding: 10px 16px;
+  gap: 12px;
+  opacity: 0;
   pointer-events: none;
-  z-index: 10;
+  transition: opacity 280ms ease, transform 280ms cubic-bezier(.2,.9,.2,1);
+  z-index: 60; /* أعلى من الفيديو وداخل حاوية الشريط */
+  will-change: opacity, transform;
 }
 
-/* 🌀 حركة التوهج */
-@keyframes glowPulse {
-  0%, 100% {
-    box-shadow:
-      0 0 20px rgba(0, 174, 255, 0.4),
-      inset 0 0 20px rgba(0, 174, 255, 0.3);
-  }
-  50% {
-    box-shadow:
-      0 0 35px rgba(0, 210, 255, 0.7),
-      inset 0 0 30px rgba(0, 210, 255, 0.4);
-  }
+/* الظل الرفيع الشعاعي للشعور بالاحتراف */
+.video-action-box::before{
+  content:"";
+  position:absolute;
+  inset:auto 0  -10px 0;
+  height:18px;
+  filter: blur(18px);
+  background: linear-gradient(90deg, rgba(0,170,255,0.10), rgba(0,170,255,0.02));
+  border-radius: 14px;
+  z-index: -1;
 }
 
-/* 🟢 الفقاعة السفلية “Analyzing” */
-.analyzing-bubble {
-  position: absolute;
-  bottom: -36px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: linear-gradient(135deg, #00b4ff, #007bff);
-  color: white;
-  font-weight: 600;
-  padding: 6px 18px;
-  border-radius: 20px 20px 50% 50%;
-  font-size: 13px;
-  box-shadow: 0 4px 18px rgba(0, 174, 255, 0.4);
-  animation: bubbleGlow 2.2s ease-in-out infinite;
+/* المحتوى الداخلي */
+.video-action-box .action-inner{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  width:100%;
 }
 
-/* ✨ حركة الفقاعة */
-@keyframes bubbleGlow {
-  0%, 100% {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-  }
-  50% {
-    opacity: 0.85;
-    transform: translateX(-50%) translateY(-2px);
-  }
+.action-text{
+  font-weight:700;
+  font-size:15px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  direction:ltr;
 }
+
+/* حالة الظهور */
+.video-action-box.show {
+  opacity: 1;
+  transform: translate(-50%, 6px); /* يرتفع قليلا عند الظهور */
+  pointer-events: auto; /* لو أردت تفاعل لاحقاً */
+}
+
+/* responsive */
+@media (max-width:720px){
+  .video-action-box{ width: 260px; height:56px; font-size:14px; }
+}
+  
 /* --- END SUPPORT MODAL STYLES --- */
 </style>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
@@ -1657,11 +1663,12 @@ body {
         <div class="swiper myVideoSwiper" style="display: none;">
             <div class="swiper-wrapper">
                 </div>
-          <!-- 🔵 الإطار المتوهّج حول الفيديو في المنتصف -->
-<div class="video-glow-frame">
-  <div class="analyzing-bubble">Analyzing...</div>
+          <!-- داخل .video-swiper-container، بعد div.swiper.myVideoSwiper -->
+<div class="video-action-box" id="videoActionBox" aria-hidden="true">
+  <div class="action-inner">
+    <div class="action-text" id="actionText">Analyzing...</div>
+  </div>
 </div>
-
             
             <div class="swiper-pagination video-pagination"></div>
             <div class="swiper-button-next video-next-btn"></div>
@@ -1929,6 +1936,92 @@ if (leftArrow && rightArrow) {
   });
 }
 
+        /* ====== Action box logic (show under active playing slide) ====== */
+const actionBox = document.getElementById('videoActionBox');
+const actionTextEl = document.getElementById('actionText');
+
+const actionPhrases = [
+  "Analyzing...",
+  "Explain this video",
+  "Summarize the key points",
+  "Generate practice problems",
+  "Extract keywords",
+  "Suggest further reading"
+];
+
+let actionRotateTimer = null;
+let actionRotateIndex = 0;
+
+// show action box under a DOM slide element (slideEl = .video-item or .swiper-slide)
+function showActionBoxForSlide(slideEl) {
+  if (!slideEl || !actionBox) return;
+  // Position: compute bounding rect of slide inside viewport then place box slightly under left side
+  const rect = slideEl.getBoundingClientRect();
+  const containerRect = document.querySelector('.video-swiper-container')?.getBoundingClientRect();
+
+  // compute center X we want (left side of slide + 22% for left placement), adjust so stays in viewport
+  const desiredX = rect.left + Math.max(16, rect.width * 0.18);
+  const viewportX = Math.min(window.innerWidth - 20, Math.max(20 + (actionBox.offsetWidth/2), desiredX + actionBox.offsetWidth/2));
+
+  // top: place just below slide bottom
+  const topY = rect.bottom + 10 + window.scrollY;
+
+  // set style (we use translate(-50%) so left is center of box)
+  actionBox.style.left = (desiredX + actionBox.offsetWidth/2) + 'px';
+  actionBox.style.top = (topY) + 'px';
+
+  // ensure text rotation starts
+  startActionRotate();
+
+  // fade in
+  requestAnimationFrame(() => {
+    actionBox.classList.add('show');
+  });
+}
+
+// hide box and stop rotating
+function hideActionBox() {
+  if (!actionBox) return;
+  actionBox.classList.remove('show');
+  stopActionRotate();
+}
+
+// rotate the action text every 5 seconds
+function startActionRotate() {
+  if (!actionTextEl) return;
+  stopActionRotate();
+  actionRotateIndex = 0;
+  actionTextEl.textContent = actionPhrases[actionRotateIndex];
+  actionRotateTimer = setInterval(() => {
+    actionRotateIndex = (actionRotateIndex + 1) % actionPhrases.length;
+    // small fade transition for text
+    actionTextEl.style.opacity = '0';
+    setTimeout(() => {
+      actionTextEl.textContent = actionPhrases[actionRotateIndex];
+      actionTextEl.style.opacity = '1';
+    }, 180);
+  }, 5000);
+}
+
+function stopActionRotate() {
+  if (actionRotateTimer) { clearInterval(actionRotateTimer); actionRotateTimer = null; }
+}
+
+/* ====== Integrate with your existing play/stop logic ======
+   * Call showActionBoxForSlide(videoItemElement) when you create & show iframe.
+   * Call hideActionBox() inside stopCurrentVideo().
+   * Also hide on slideChange if no video.
+*/
+
+// Example: modify your click handler where you play iframe
+// after embedContainer.innerHTML = iframeHTML; embedContainer.style.display='block'; placeholder.style.display='none';
+/* add: */
+currentPlayingVideoItem = videoItem; // ensure your existing code sets this
+showActionBoxForSlide(videoItem);
+
+/* And inside stopCurrentVideo() make sure to call: */
+hideActionBox();
+
 // 🟢 دالة مساعدة لاستئناف التمرير التلقائي بعد 3 ثواني
 function restartAutoplayAfterDelay() {
   if (typeof autoplayResumeTimer !== 'undefined' && autoplayResumeTimer) {
@@ -2012,6 +2105,9 @@ handleVideoPlayUI();
     const iframe = embedContainer.querySelector('iframe');
     if (iframe) iframe.style.pointerEvents = 'auto';
   }, 1000);
+
+// ✅ إظهار صندوق الأكشن تحت الفيديو المشغّل
+showActionBoxForSlide(videoItem);
 
   // تعيين العنصر المشغّل حالياً
   currentPlayingVideoItem = videoItem;
@@ -2950,6 +3046,7 @@ document.addEventListener('DOMContentLoaded', function() {
 </body>
 
 </html>
+
 
 
 
