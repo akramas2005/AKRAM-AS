@@ -1243,7 +1243,7 @@ body {
   /* القائمة الفرعية للغات */
 .language-submenu {
   display: none;
-  max-height: 220px; /* ارتفاع يظهر 3 لغات ونصف */
+  max-height: 220px;
   overflow-y: auto;
   background: rgba(255, 255, 255, 0.98);
   backdrop-filter: blur(30px);
@@ -1279,7 +1279,6 @@ body {
   background: rgba(0, 120, 255, 0.5);
 }
 
-/* خيارات اللغة */
 .lang-option {
   padding: 14px 20px;
   cursor: pointer;
@@ -1314,6 +1313,7 @@ body {
   font-size: 18px;
   width: 24px;
   text-align: center;
+  flex-shrink: 0; /* ⬅️ مهم: منع انكماش العلم */
 }
 
 .lang-name {
@@ -1327,9 +1327,9 @@ body {
   color: #0078ff;
   font-weight: bold;
   transition: opacity 0.2s ease;
+  flex-shrink: 0; /* ⬅️ مهم: منع انكماش ✓ */
 }
 
-/* تأثير الضبابية */
 .scroll-fade {
   position: sticky;
   bottom: 0;
@@ -1344,7 +1344,6 @@ body {
   border-radius: 0 0 12px 12px;
 }
 
-/* سهم القائمة الفرعية */
 .has-submenu {
   display: flex;
   justify-content: space-between;
@@ -1361,7 +1360,6 @@ body {
   transform: rotate(180deg);
 }
 
-/* أنيميشن */
 @keyframes submenuSlide {
   from {
     opacity: 0;
@@ -1373,6 +1371,52 @@ body {
   }
 }
 
+/* تحسينات الهواتف */
+@media (max-width: 768px) {
+  .language-submenu {
+    max-height: 200px;
+    margin: -6px 0 6px 0;
+  }
+  
+  .lang-option {
+    padding: 12px 16px;
+    gap: 12px;
+  }
+  
+  .flag {
+    font-size: 16px;
+    width: 22px;
+  }
+  
+  .lang-name {
+    font-size: 14px;
+  }
+  
+  .checkmark {
+    font-size: 14px;
+  }
+}
+
+/* تحسينات الشاشات الصغيرة جداً */
+@media (max-width: 480px) {
+  .language-submenu {
+    max-height: 180px;
+  }
+  
+  .lang-option {
+    padding: 10px 14px;
+    gap: 10px;
+  }
+  
+  .flag {
+    font-size: 15px;
+    width: 20px;
+  }
+  
+  .lang-name {
+    font-size: 13px;
+  }
+}
   /* أضف هذا في نهاية الـ <style> */
 .language-toast {
   position: fixed;
@@ -2889,6 +2933,7 @@ document.addEventListener('DOMContentLoaded', function() {
 </body>
 
 </html>
+
 
 
 
