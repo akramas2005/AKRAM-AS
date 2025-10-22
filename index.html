@@ -2057,24 +2057,19 @@ document.querySelector('.myVideoSwiper').addEventListener('click', (e) => {
   if (!placeholder) return;
 
   // إذا تم النقر على أي عنصر تشغيل:
-  // 1) إيقاف أي فيديو كان يعمل
   stopCurrentVideo();
 
-  // 2) نوقف التمرير التلقائي فقط (لا نعطل التمرير اليدوي)
   if (videoSwiper && videoSwiper.autoplay && videoSwiper.autoplay.running) {
     videoSwiper.autoplay.stop();
   }
 
-  // 3) نلغي أي مؤقت لإعادة التشغيل سابق
   if (autoplayResumeTimer) { clearTimeout(autoplayResumeTimer); autoplayResumeTimer = null; }
 
-  // 4) شغل الفيديو المطلوب داخل الشريحة
   const videoItem = placeholder.closest('.video-item');
   if (!videoItem) return;
   const videoId = videoItem.dataset.videoId;
   const embedContainer = videoItem.querySelector('.video-embed-container');
 
-  // إنشاء iframe مع pointer-events:none للسماح بالتمرير فوق الفيديو
   const iframeHTML = `
     <iframe
       width="100%"
@@ -2088,30 +2083,24 @@ document.querySelector('.myVideoSwiper').addEventListener('click', (e) => {
     ></iframe>
   `;
 
- if (embedContainer) {
-  embedContainer.innerHTML = iframeHTML;
-  embedContainer.style.display = 'block';
-}
+  if (embedContainer) {
+    embedContainer.innerHTML = iframeHTML;
+    embedContainer.style.display = 'block';
+  }
 
-// إخفاء الصورة المصغّرة
-placeholder.style.display = 'none';
+  placeholder.style.display = 'none';
+  handleVideoPlayUI();
 
-// 🔵 أظهر الأسهم عند تشغيل الفيديو
-handleVideoPlayUI(); 
-
-
-  // بعد ثانية، نعيد تفعيل النقر على الفيديو
   setTimeout(() => {
     const iframe = embedContainer.querySelector('iframe');
     if (iframe) iframe.style.pointerEvents = 'auto';
   }, 1000);
 
-// ✅ إظهار صندوق الأكشن تحت الفيديو المشغّل
-showActionBoxForSlide(videoItem);
-
-  // تعيين العنصر المشغّل حالياً
-  currentPlayingVideoItem = videoItem;
+  // ✅ هنا بالضبط نضيف سطورنا الصحيحة
+  currentPlayingVideoItem = videoItem;     // استخدم videoItem وليس this
+  showActionBoxForSlide(videoItem);        // مرّر العنصر الصحيح
 });
+
 
 // دالة لإيقاف أي فيديو يعمل حالياً وإرجاع الحالة إلى الصورة المصغرة
 function stopCurrentVideo() {
@@ -3046,6 +3035,7 @@ document.addEventListener('DOMContentLoaded', function() {
 </body>
 
 </html>
+
 
 
 
