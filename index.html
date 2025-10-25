@@ -1559,6 +1559,32 @@ body {
   font-size: 14px;
   text-align: center;
 }
+  /* =========================
+   Hide/Show Search Bars Based on Screen Size
+   ========================= */
+@media (min-width: 769px) {
+  /* إخفاء شريط البحث الموبايل في الـ PC */
+  .mobile-hero-search {
+    display: none !important;
+  }
+  
+  /* إظهار شريط البحث العادي في الـ PC */
+  .search-bar {
+    display: block !important;
+  }
+}
+
+@media (max-width: 768px) {
+  /* إخفاء شريط البحث العادي في الموبايل */
+  .search-bar {
+    display: none !important;
+  }
+  
+  /* إظهار شريط البحث الموبايل في الموبايل */
+  .mobile-hero-search {
+    display: block !important;
+  }
+}
 /* --- END SUPPORT MODAL STYLES --- */
 </style>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
@@ -3084,6 +3110,7 @@ document.addEventListener('DOMContentLoaded', function() {
 </body>
 
 </html>
+
 
 
 
